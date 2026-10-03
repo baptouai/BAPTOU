@@ -40,6 +40,9 @@ export type Application = {
   matchScore?: number; // 0-100
   location?: string;
   searchId?: string; // the search that found it
+  dismissReason?: string; // why the user turned it down; future searches learn from it
+  fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
+  fitVerdictReason?: string;
   research?: string; // company/university research summary
   approachNote?: string; // why the letter takes this angle
   letter: string; // current editable motivation letter
@@ -98,4 +101,16 @@ export type Search = {
   totalFound?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+};
+
+export type FitVerdict = "good_fit" | "uncertain" | "poor_fit";
+
+// users/{uid}/applications/{appId}/chat/{messageId}, written by the askAboutOffer function.
+export type ChatMessage = {
+  role: "user" | "baptou";
+  text: string;
+  verdict?: FitVerdict;
+  verdictReason?: string;
+  followUpQuestions?: string[];
+  createdAt: Timestamp;
 };

@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
+  addDoc, collection, deleteField, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { statusLabel } from "@/components/ApplicationList";
+import { DismissForm } from "@/components/DismissForm";
+import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import type { Application, LetterVersion } from "@/lib/types";
 
 const AUTOSAVE_MS = 800;
@@ -135,9 +137,31 @@ export default function ApplicationPage() {
             <h1 className="text-2xl font-semibold">{app.title}</h1>
             <p className="text-muted">{app.organization}{app.country ? ` · ${app.country}` : ""}</p>
           </div>
-          <span className="rounded-full border border-border px-3 py-1 text-sm">{statusLabel[app.status]}</span>
+          <div className="flex gap-2">
+            {app.fitVerdict && (
+              <span className={`rounded-full px-3 py-1 text-sm font-medium ${verdictLabel[app.fitVerdict].className}`}>
+                {verdictLabel[app.fitVerdict].text}
+              </span>
+            )}
+            <span className="rounded-full border border-border px-3 py-1 text-sm">{statusLabel[app.status]}</span>
+          </div>
         </div>
       </div>
+
+      {app.status === "dismissed" && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-5 text-sm">
+          <p>
+            <span className="font-medium">You dismissed this offer.</span>{" "}
+            <span className="text-muted">{app.dismissReason}</span>
+          </p>
+          <button
+            onClick={() => setStatus("suggested", { dismissReason: deleteField() as never })}
+            className="rounded-lg border border-border px-3 py-1.5"
+          >
+            Restore
+          </button>
+        </section>
+      )}
 
       {(app.matchReason || app.research || app.approachNote) && (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5 text-sm">
@@ -146,6 +170,8 @@ export default function ApplicationPage() {
           {app.approachNote && <Info title="Approach taken in the letter" text={app.approachNote} />}
         </section>
       )}
+
+      <FitCheck applicationId={id} />
 
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between">
@@ -267,10 +293,8 @@ export default function ApplicationPage() {
               Mark as applied
             </button>
           )}
-          {app.status === "suggested" && (
-            <button onClick={() => setStatus("dismissed")} className="rounded-lg px-4 py-2 text-muted">
-              Not interested
-            </button>
+          {(app.status === "suggested" || app.status === "editing") && (
+            <DismissForm onDismiss={(reason) => setStatus("dismissed", { dismissReason: reason })} />
           )}
         </div>
       </section>

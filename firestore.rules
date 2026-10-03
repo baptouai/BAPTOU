@@ -27,6 +27,11 @@ service cloud.firestore {
         match /letterVersions/{versionId} {
           allow read, create: if isOwner(uid);
         }
+
+        // "Is this for me?" conversation, written by the askAboutOffer function only.
+        match /chat/{messageId} {
+          allow read: if isOwner(uid);
+        }
       }
     }
 

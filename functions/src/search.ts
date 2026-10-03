@@ -79,9 +79,14 @@ async function runSearch(uid: string, searchId: string) {
       .where("type", "==", "internship")
       .orderBy("updatedAt", "desc")
       .limit(200)
-      .select("applyUrl")
+      .select("applyUrl", "status", "title", "organization", "dismissReason")
       .get();
     const seen = existing.docs.map((d) => d.get("applyUrl")).filter(Boolean);
+    // Offers the student turned down, with their reasons, so BAPTOU stops suggesting similar ones.
+    const dismissed = existing.docs
+      .filter((d) => d.get("status") === "dismissed" && d.get("dismissReason"))
+      .slice(0, 20)
+      .map((d) => `- ${d.get("title")} at ${d.get("organization")}: ${d.get("dismissReason")}`);
     const maxPerRun = Math.min(Math.max(search.maxPerRun || 5, 1), 10);
 
     const result = await runAgent({
@@ -104,7 +109,7 @@ Search criteria:
 - Languages: ${search.languages || "any"}
 - Notes from the student: ${search.notes || "none"}
 
-Find up to ${maxPerRun} new internship offers.
+${dismissed.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new internship offers.
 Already suggested (skip these): ${seen.length ? seen.join("\n") : "none"}`,
         },
       ],

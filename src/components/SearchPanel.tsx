@@ -24,6 +24,7 @@ export function SearchPanel() {
   const { user } = useAuth();
   const [searches, setSearches] = useState<(Search & { id: string })[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -60,7 +61,12 @@ export function SearchPanel() {
         {visible.length === 0 && !showForm && (
           <li className="text-sm text-muted">No search yet. Create one to start receiving internship suggestions.</li>
         )}
-        {visible.map((s) => (
+        {visible.map((s) =>
+          editingId === s.id ? (
+            <li key={s.id}>
+              <SearchForm existing={s} onDone={() => setEditingId(null)} />
+            </li>
+          ) : (
           <li key={s.id} className="rounded-lg border border-border p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -100,31 +106,42 @@ export function SearchPanel() {
                   Resume
                 </button>
               )}
+              <button onClick={() => setEditingId(s.id)} className="rounded-lg border border-border px-3 py-1.5">
+                Edit
+              </button>
               <button onClick={() => setStatus(s.id, "stopped")} className="rounded-lg px-3 py-1.5 text-red-600">
                 Stop
               </button>
             </div>
           </li>
-        ))}
+          ),
+        )}
       </ul>
     </section>
   );
 }
 
-function SearchForm({ onDone }: { onDone: () => void }) {
+const toDateInput = (t: Timestamp | null | undefined) => {
+  if (!t) return "";
+  const d = t.toDate();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Creates a new search, or edits `existing`. Changes apply from the next run. */
+function SearchForm({ existing, onDone }: { existing?: Search & { id: string }; onDone: () => void }) {
   const { user } = useAuth();
   const [form, setForm] = useState({
-    name: "",
-    roles: "",
-    locations: "",
-    workMode: "any" as Search["workMode"],
-    duration: "",
-    startDate: "",
-    industries: "",
-    languages: "",
-    notes: "",
-    maxPerRun: 5,
-    endsOn: "", // empty = until stopped
+    name: existing?.name ?? "",
+    roles: existing?.roles ?? "",
+    locations: existing?.locations ?? "",
+    workMode: existing?.workMode ?? ("any" as Search["workMode"]),
+    duration: existing?.duration ?? "",
+    startDate: existing?.startDate ?? "",
+    industries: existing?.industries ?? "",
+    languages: existing?.languages ?? "",
+    notes: existing?.notes ?? "",
+    maxPerRun: existing?.maxPerRun ?? 5,
+    endsOn: toDateInput(existing?.endsAt), // empty = until stopped
   });
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -135,11 +152,28 @@ function SearchForm({ onDone }: { onDone: () => void }) {
     if (!user) return;
     setBusy(true);
     const { endsOn, ...fields } = form;
+    const endsAt = endsOn ? Timestamp.fromDate(new Date(`${endsOn}T23:59:59`)) : null;
+
+    if (existing) {
+      // Moving the end date into the future revives a search that had ended on its own.
+      const revive = existing.status === "ended" && (!endsAt || endsAt.toMillis() > Date.now());
+      await updateDoc(doc(db, "users", user.uid, "searches", existing.id), {
+        ...fields,
+        name: fields.name || fields.roles,
+        endsAt,
+        ...(revive ? { status: "active" } : {}),
+        updatedAt: serverTimestamp(),
+      });
+      setBusy(false);
+      onDone();
+      return;
+    }
+
     const ref = await addDoc(collection(db, "users", user.uid, "searches"), {
       ...fields,
       name: fields.name || fields.roles,
       status: "active",
-      endsAt: endsOn ? Timestamp.fromDate(new Date(`${endsOn}T23:59:59`)) : null,
+      endsAt,
       runState: "idle",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -200,7 +234,7 @@ function SearchForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="flex gap-2 sm:col-span-2">
         <button disabled={busy} className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50">
-          {busy ? "Starting…" : "Start searching"}
+          {existing ? (busy ? "Saving…" : "Save changes") : busy ? "Starting…" : "Start searching"}
         </button>
         <button type="button" onClick={onDone} className="rounded-lg px-4 py-2 text-muted">
           Cancel
