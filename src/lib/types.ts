@@ -43,6 +43,7 @@ export type Application = {
   dismissReason?: string; // why the user turned it down; future searches learn from it
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
   fitVerdictReason?: string;
+  applicationForm?: ApplicationForm; // the real form's layout, prepared by prepareApplication
   research?: string; // company/university research summary
   approachNote?: string; // why the letter takes this angle
   letter: string; // current editable motivation letter
@@ -113,4 +114,31 @@ export type ChatMessage = {
   verdictReason?: string;
   followUpQuestions?: string[];
   createdAt: Timestamp;
+};
+
+// Mirrors FormSchema in functions/src/form.ts.
+export type FormEntry = {
+  title: string; organization: string; location: string; startDate: string; endDate: string; description: string;
+};
+
+export type FormField = {
+  label: string;
+  kind: "file" | "short_text" | "long_text" | "choice" | "yes_no" | "entries" | "checkbox";
+  required: boolean;
+  charLimit: number; // 0 = no limit
+  options: string[];
+  value: string;
+  suggestedDocument: DocumentKind | "none";
+  entries: FormEntry[];
+  needsUser: boolean;
+  note: string;
+};
+
+export type ApplicationForm = {
+  platform: string;
+  formUrl: string;
+  seenOnForm: boolean;
+  notes: string;
+  sections: { title: string; fields: FormField[] }[];
+  preparedAt?: Timestamp;
 };

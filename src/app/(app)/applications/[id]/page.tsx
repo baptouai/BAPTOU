@@ -10,6 +10,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { statusLabel } from "@/components/ApplicationList";
+import { ApplicationFormView } from "@/components/ApplicationFormView";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import type { Application, LetterVersion } from "@/lib/types";
@@ -173,6 +174,14 @@ export default function ApplicationPage() {
 
       <FitCheck applicationId={id} />
 
+      <ApplicationFormView
+        applicationId={id}
+        form={app.applicationForm}
+        letter={letter}
+        title={`${app.title} - ${app.organization}`}
+        onChange={(applicationForm) => scheduleSave({ applicationForm })}
+      />
+
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Motivation letter</h2>
@@ -262,12 +271,14 @@ export default function ApplicationPage() {
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="font-medium">Application pack</h2>
-        <p className="mt-1 text-sm text-muted">
-          Everything the application form will likely ask for, ready to copy.
-        </p>
-        <ul className="mt-3 grid gap-3">
-          {(app.packFields ?? []).map((f) => (
+        {!app.applicationForm && !!app.packFields?.length && (
+          <>
+            <h2 className="font-medium">Quick answers</h2>
+            <p className="mt-1 text-sm text-muted">Prepare the application above to get them in the form&apos;s exact format.</p>
+          </>
+        )}
+        <ul className="mt-3 grid gap-3 empty:hidden">
+          {(app.applicationForm ? [] : app.packFields ?? []).map((f) => (
             <li key={f.label} className="rounded-lg border border-border p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium">{f.label}</p>
@@ -285,7 +296,7 @@ export default function ApplicationPage() {
               rel="noopener noreferrer"
               className="rounded-lg bg-accent px-4 py-2 font-medium text-white"
             >
-              Open application page ↗
+              Open posting ↗
             </a>
           )}
           {app.status !== "applied" && (
