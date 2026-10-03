@@ -10,7 +10,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { statusLabel } from "@/components/ApplicationList";
-import { ApplicationFormView } from "@/components/ApplicationFormView";
+import { ApplicationFormView, coverLetterField } from "@/components/ApplicationFormView";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import type { Application, LetterVersion } from "@/lib/types";
@@ -47,8 +47,14 @@ export default function ApplicationPage() {
       setApp(data);
       if (!loaded.current) {
         loaded.current = true;
-        setLetter(data.letter);
         setEmail(data.emailDraft);
+        // Forms prepared before the letter was unified kept their cover letter inside the form only.
+        const fromForm = !data.letter ? coverLetterField(data.applicationForm)?.value : undefined;
+        setLetter(data.letter || fromForm || "");
+        if (fromForm) updateDoc(snap.ref, { letter: fromForm, updatedAt: serverTimestamp() });
+      } else if (data.letter) {
+        // BAPTOU filled an empty letter (e.g. while preparing the form): show it unless the user is typing.
+        setLetter((current) => (current || pending.current?.letter !== undefined ? current : data.letter));
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,17 +181,7 @@ export default function ApplicationPage() {
         onChange={(applicationForm) => scheduleSave({ applicationForm })}
       />
 
-      {(app.matchReason || app.research || app.approachNote) && (
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5 text-sm">
-          {app.matchReason && <Info title="Why BAPTOU suggests it" text={app.matchReason} />}
-          {app.research && <Info title="Research" text={app.research} />}
-          {app.approachNote && <Info title="Approach taken in the letter" text={app.approachNote} />}
-        </section>
-      )}
-
-      <FitCheck applicationId={id} />
-
-      <section className="rounded-xl border border-border bg-card p-5">
+      <section id="letter" className="scroll-mt-4 rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Motivation letter</h2>
           <span className="text-xs text-muted">
@@ -272,6 +268,16 @@ export default function ApplicationPage() {
           </>
         )}
       </section>
+
+      {(app.matchReason || app.research || app.approachNote) && (
+        <section className="grid gap-3 rounded-xl border border-border bg-card p-5 text-sm">
+          {app.matchReason && <Info title="Why BAPTOU suggests it" text={app.matchReason} />}
+          {app.research && <Info title="Research" text={app.research} />}
+          {app.approachNote && <Info title="Approach taken in the letter" text={app.approachNote} />}
+        </section>
+      )}
+
+      <FitCheck applicationId={id} />
 
       <section className="rounded-xl border border-border bg-card p-5">
         {!app.applicationForm && !!app.packFields?.length && (

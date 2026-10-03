@@ -12,6 +12,17 @@ const prepareApplication = httpsCallable<{ applicationId: string }, ApplicationF
   timeout: 540_000,
 });
 
+const COVER_LETTER_LABEL = /cover(ing)? letter|motivation letter|lettre de motivation|anschreiben|carta de presentaci/i;
+
+/** The form field asking for the cover/motivation letter, if any. Older forms lack the flag, so the label is checked too. */
+export function coverLetterField(form: ApplicationForm | undefined): FormField | undefined {
+  const fields = form?.sections.flatMap((s) => s.fields) ?? [];
+  return (
+    fields.find((f) => f.isCoverLetter) ??
+    fields.find((f) => f.isCoverLetter === undefined && (f.kind === "long_text" || f.kind === "file") && COVER_LETTER_LABEL.test(f.label))
+  );
+}
+
 /**
  * The application laid out like the organization's real form, every field prepared and editable.
  * Edits are passed to `onChange`, which autosaves them.
@@ -89,6 +100,7 @@ export function ApplicationFormView({
   }
 
   const fields = local?.sections.flatMap((s) => s.fields) ?? [];
+  const coverField = coverLetterField(local);
   const todo = fields.filter((f) => f.needsUser && !f.value).length;
 
   return (
@@ -138,6 +150,7 @@ export function ApplicationFormView({
                     <li key={fi}>
                       <FieldView
                         field={field}
+                        isCoverLetter={field === coverField}
                         docs={docs}
                         letter={letter}
                         title={title}
@@ -234,9 +247,10 @@ function ChecklistColumn({
 }
 
 function FieldView({
-  field, docs, letter, title, onChange,
+  field, isCoverLetter, docs, letter, title, onChange,
 }: {
   field: FormField;
+  isCoverLetter: boolean;
   docs: (UploadedDocument & { id: string })[];
   letter: string;
   title: string;
@@ -254,6 +268,39 @@ function FieldView({
     </div>
   );
   const note = field.note && <p className="mt-1 text-xs text-muted">{field.note}</p>;
+
+  // The letter is edited in one place only: the Motivation letter section below.
+  if (isCoverLetter) {
+    return (
+      <div>
+        {header}
+        <div className="mt-2 rounded-lg border border-border bg-background p-3 text-sm">
+          {letter ? (
+            <p className="line-clamp-4 whitespace-pre-wrap text-muted">{letter}</p>
+          ) : (
+            <p className="text-muted">No letter yet. Write it in the Motivation letter section below.</p>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <a href="#letter" className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
+            Edit the letter ↓
+          </a>
+          {letter && field.kind === "file" && (
+            <button onClick={() => printLetter(letter, title)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
+              Save as PDF to attach
+            </button>
+          )}
+          {letter && field.kind !== "file" && <CopyButton text={letter} />}
+        </div>
+        {field.charLimit > 0 && letter && (
+          <p className={`mt-1 text-xs ${letter.length > field.charLimit ? "text-red-600" : "text-muted"}`}>
+            {letter.length} / {field.charLimit} characters
+          </p>
+        )}
+        {note}
+      </div>
+    );
+  }
 
   if (field.kind === "file") {
     const matches = docs.filter((d) => d.kind === field.suggestedDocument);

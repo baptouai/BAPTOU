@@ -25,6 +25,9 @@ const Field = z.object({
     .describe("For file fields: which of the student's documents to attach"),
   entries: z.array(Entry).describe("For 'entries' fields (experience, education lists), otherwise empty"),
   needsUser: z.boolean().describe("True for facts BAPTOU cannot know: phone, address, work permit, salary, consents"),
+  isCoverLetter: z
+    .boolean()
+    .describe("True only for the field asking for the cover/motivation letter itself (text box or file upload)"),
   note: z.string().describe("Short tip for the student about this field, or empty"),
 });
 
@@ -50,6 +53,7 @@ const SYSTEM = `You are BAPTOU. You prepare a student's application in the exact
    - "entries" fields (work experience, education): one entry per relevant item, descriptions ready to paste.
    - Free-text questions (message to the hiring team, why us, ...): tailored, specific answers within the character limit, consistent with the motivation letter if there is one.
    - File fields: say which document to attach.
+   - Cover/motivation letter (text box or file): set isCoverLetter and put the full letter text in value. Reuse the student's letter for this application if there is one, otherwise write it.
 4. Never invent facts. Anything only the student can answer (phone, address, work authorization, salary expectations, consents, diversity questions) gets needsUser = true and an empty value.
 When done, call submit_form exactly once.`;
 
@@ -107,9 +111,17 @@ export const prepareApplication = onCall(
 
     try {
       const form = await readForm(uid, app, profile);
+      // The letter lives in one place: the application's letter (editable, with version history).
+      // If the form needed one and none existed yet, BAPTOU's draft becomes that letter.
+      const coverLetter = form.sections.flatMap((s) => s.fields).find((f) => f.isCoverLetter && f.value)?.value;
+      const adoptLetter = !app.letter && coverLetter;
+      if (adoptLetter) {
+        await appRef.collection("letterVersions").add({ text: coverLetter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
+      }
       await appRef.update({
         applicationForm: { ...form, preparedAt: FieldValue.serverTimestamp() },
         applicationFormStatus: "ready",
+        ...(adoptLetter ? { letter: coverLetter } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       });
       return form;

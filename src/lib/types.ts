@@ -134,6 +134,7 @@ export type FormField = {
   entries: FormEntry[];
   needsUser: boolean;
   note: string;
+  isCoverLetter?: boolean; // missing on forms prepared before this flag existed
 };
 
 export type ApplicationForm = {
