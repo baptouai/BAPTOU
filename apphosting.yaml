@@ -6,14 +6,16 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: REPLACE_ME
+    value: AIzaSyAR12OliB4xA8YvFeF6lP0ppWXrSZ6J6gc
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: REPLACE_ME
+    value: baptou-5041c.firebaseapp.com
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: REPLACE_ME
+    value: baptou-5041c
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: REPLACE_ME
+    value: baptou-5041c.firebasestorage.app
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: REPLACE_ME
+    value: "421746504296"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: REPLACE_ME
+    value: 1:421746504296:web:8fa8aa3751e925aa82c1dd
+  - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
+    value: baptou

@@ -14,7 +14,8 @@ const firebaseConfig = {
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// BAPTOU uses a named Firestore database ("baptou"), not "(default)".
+export const db = getFirestore(app, process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID ?? "(default)");
 export const storage = getStorage(app);
 
 // Plain sign-in only. Gmail permissions are requested separately, server-side,

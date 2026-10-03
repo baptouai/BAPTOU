@@ -1,9 +1,11 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json",
-    "location": "eur3"
-  },
+  "firestore": [
+    {
+      "database": "baptou",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },
