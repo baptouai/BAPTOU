@@ -26,7 +26,7 @@ type Search = {
   runState?: "idle" | "queued" | "running" | "error";
 };
 
-const OffersSchema = z.object({
+export const OffersSchema = z.object({
   offers: z.array(
     z.object({
       title: z.string(),
@@ -38,7 +38,7 @@ const OffersSchema = z.object({
       startDate: z.string().describe("As stated in the posting, or empty"),
       duration: z.string().describe("As stated in the posting, or empty"),
       postingLanguage: z.string().describe("Language the posting is written in"),
-      matchScore: z.int().describe("0 to 100"),
+      matchScore: z.number().describe("0 to 100"),
       matchReason: z.string().describe("2-3 sentences: why this fits the student, citing their profile"),
       companyBrief: z.string().describe("3-5 short lines on the company: what it does, size, recent news, culture"),
     }),
@@ -127,7 +127,7 @@ Already suggested (skip these): ${seen.length ? seen.join("\n") : "none"}`,
           startDate: o.startDate,
           duration: o.duration,
           postingLanguage: o.postingLanguage,
-          matchScore: o.matchScore,
+          matchScore: Math.round(Math.min(Math.max(o.matchScore, 0), 100)),
           matchReason: o.matchReason,
           research: o.companyBrief,
           letter: "",

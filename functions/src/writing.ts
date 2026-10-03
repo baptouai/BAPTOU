@@ -11,7 +11,7 @@ const Input = z.object({
   instructions: z.string().max(2000).optional().default(""),
 });
 
-const LetterSchema = z.object({
+export const LetterSchema = z.object({
   research: z.string().describe("Updated brief on the organization: what it does, recent news, values, the team if known"),
   approachNote: z.string().describe("2-4 sentences for the student: the angle the letter takes and why"),
   letter: z.string().describe("The full motivation letter, ready to send, in plain text"),
@@ -20,7 +20,7 @@ const LetterSchema = z.object({
     .describe("Answers the application form is likely to ask for (why us, why this role, availability, ...), ready to copy"),
 });
 
-const EmailSchema = z.object({
+export const EmailSchema = z.object({
   to: z.string().describe("Recipient email address if publicly listed for this posting, otherwise empty"),
   subject: z.string(),
   body: z.string(),

@@ -10,10 +10,28 @@ export const webTools = (maxSearches: number): Anthropic.Beta.BetaToolUnion[] =>
   { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearches },
 ];
 
+// JSON Schema keywords strict tool use rejects. Zod adds some implicitly (z.int() emits min/max),
+// so they are stripped here; Zod still enforces them when the answer is parsed.
+const UNSUPPORTED = new Set(["$schema", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "pattern", "format"]);
+
+function stripUnsupported(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(stripUnsupported);
+  if (node && typeof node === "object") {
+    return Object.fromEntries(
+      Object.entries(node).filter(([k]) => !UNSUPPORTED.has(k)).map(([k, v]) => [k, k === "properties" ? mapValues(v) : stripUnsupported(v)]),
+    );
+  }
+  return node;
+}
+
+// Property names are user-defined, so only their schemas are cleaned, never the names themselves.
+const mapValues = (props: unknown) =>
+  Object.fromEntries(Object.entries(props as Record<string, unknown>).map(([k, v]) => [k, stripUnsupported(v)]));
+
 /** Builds a strict custom tool from a Zod schema; Claude calls it to hand back its final answer. */
 export function submitTool(name: string, description: string, schema: z.ZodType): Anthropic.Beta.BetaTool {
-  const { $schema: _ignored, ...input_schema } = z.toJSONSchema(schema) as Record<string, unknown>;
-  return { name, description, strict: true, input_schema: input_schema as Anthropic.Beta.BetaTool.InputSchema };
+  const input_schema = stripUnsupported(z.toJSONSchema(schema)) as Anthropic.Beta.BetaTool.InputSchema;
+  return { name, description, strict: true, input_schema };
 }
 
 /**
