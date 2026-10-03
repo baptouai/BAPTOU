@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import mammoth from "mammoth";
 import { z } from "zod";
-import { anthropicKey, bucket, claude, db, FALLBACK, MODEL, recordUsage, REGION } from "./shared.js";
+import { anthropicKey, assertBudget, bucket, claude, db, FALLBACK, MODELS, recordUsage, REGION } from "./shared.js";
 
 const MAX_DOCUMENTS = 15;
 
@@ -83,6 +83,7 @@ export const buildProfile = onCall(
       .limit(MAX_DOCUMENTS)
       .get();
     if (docsSnap.empty) throw new HttpsError("failed-precondition", "Upload at least one document first.");
+    await assertBudget(uid);
 
     const blocks = (await Promise.all(docsSnap.docs.map((d) => toContentBlock(d.data())))).filter(
       (b): b is Anthropic.Beta.BetaContentBlockParam => b !== null,
@@ -92,7 +93,7 @@ export const buildProfile = onCall(
     }
 
     const response = await claude().beta.messages.parse({
-      model: MODEL,
+      model: MODELS.profile,
       max_tokens: 16000,
       ...FALLBACK,
       output_config: { effort: "medium", format: betaZodOutputFormat(ProfileSchema) },
@@ -104,7 +105,7 @@ export const buildProfile = onCall(
         },
       ],
     });
-    await recordUsage(uid, response.usage);
+    await recordUsage(uid, MODELS.profile, response.usage);
 
     if (response.stop_reason === "refusal" || !response.parsed_output) {
       throw new HttpsError("internal", "BAPTOU couldn't build your profile from these documents. Try again.");

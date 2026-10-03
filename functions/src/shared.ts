@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
 initializeApp();
@@ -12,7 +13,29 @@ export const db = getFirestore("baptou");
 export const bucket = () => getStorage().bucket();
 
 export const REGION = "europe-west1";
-export const MODEL = "claude-opus-5";
+
+export type Model = "claude-opus-5" | "claude-sonnet-5" | "claude-haiku-4-5";
+
+// Which model each task uses. Writing quality matters most for letters; the rest is research and extraction.
+export const MODELS = {
+  profile: "claude-opus-5",
+  search: "claude-opus-5",
+  form: "claude-opus-5",
+  letter: "claude-opus-5",
+  email: "claude-opus-5",
+  ask: "claude-opus-5",
+} satisfies Record<string, Model>;
+
+// USD per million tokens (Claude API list prices). Cache writes cost 1.25x input, cache reads 0.1x.
+const PRICES: Record<Model, { input: number; output: number }> = {
+  "claude-opus-5": { input: 5, output: 25 },
+  "claude-sonnet-5": { input: 2, output: 10 },
+  "claude-haiku-4-5": { input: 1, output: 5 },
+};
+const WEB_SEARCH_USD = 0.01; // $10 per 1,000 searches
+
+// Default monthly Claude budget per user, in USD. Override per user with `monthlyLimitUsd` on private/{uid}.
+export const DEFAULT_MONTHLY_LIMIT_USD = 5;
 
 // Stored in Google Secret Manager: `npx firebase functions:secrets:set ANTHROPIC_API_KEY`
 export const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
@@ -27,17 +50,70 @@ export const FALLBACK: { betas: Anthropic.Beta.AnthropicBeta[]; fallbacks: "defa
   fallbacks: "default",
 };
 
-/** Tracks token usage per user in the server-only `private/{uid}` doc (for quotas and billing later). */
-export async function recordUsage(uid: string, usage: { input_tokens: number; output_tokens: number }) {
+type Usage = Pick<
+  Anthropic.Beta.BetaUsage,
+  "input_tokens" | "output_tokens" | "cache_creation_input_tokens" | "cache_read_input_tokens" | "server_tool_use"
+>;
+
+export function estimateCostUsd(model: Model, usage: Usage) {
+  const p = PRICES[model];
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const searches = usage.server_tool_use?.web_search_requests ?? 0;
+  return (
+    (usage.input_tokens * p.input + cacheWrite * p.input * 1.25 + cacheRead * p.input * 0.1 + usage.output_tokens * p.output) /
+      1_000_000 +
+    searches * WEB_SEARCH_USD
+  );
+}
+
+const month = () => new Date().toISOString().slice(0, 7); // "2026-10"
+
+/** Refuses the call when the user has used up this month's budget. Call before every Claude request. */
+export async function assertBudget(uid: string) {
+  const snap = await db.doc(`private/${uid}`).get();
+  const limit = (snap.get("monthlyLimitUsd") as number | undefined) ?? DEFAULT_MONTHLY_LIMIT_USD;
+  const spent = (snap.get(`spendUsd.${month()}`) as number | undefined) ?? 0;
+  if (spent >= limit) {
+    throw new HttpsError(
+      "resource-exhausted",
+      `You've reached this month's BAPTOU limit ($${limit}). It resets on the 1st of next month.`,
+    );
+  }
+}
+
+/**
+ * Records token usage and estimated cost per user and month. The details live in the server-only
+ * private/{uid} doc; a summary is mirrored on users/{uid} so the app can show it.
+ */
+export async function recordUsage(uid: string, model: Model, usage: Usage) {
+  const cost = estimateCostUsd(model, usage);
+  const m = month();
   await db.doc(`private/${uid}`).set(
     {
       usage: {
         inputTokens: FieldValue.increment(usage.input_tokens),
         outputTokens: FieldValue.increment(usage.output_tokens),
+        cacheWriteTokens: FieldValue.increment(usage.cache_creation_input_tokens ?? 0),
+        cacheReadTokens: FieldValue.increment(usage.cache_read_input_tokens ?? 0),
+        webSearches: FieldValue.increment(usage.server_tool_use?.web_search_requests ?? 0),
         calls: FieldValue.increment(1),
       },
+      spendUsd: { [m]: FieldValue.increment(cost) },
       lastCallAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
+  const priv = await db.doc(`private/${uid}`).get();
+  await db.doc(`users/${uid}`).set(
+    {
+      usageSummary: {
+        month: m,
+        spentUsd: priv.get(`spendUsd.${m}`) ?? cost,
+        limitUsd: priv.get("monthlyLimitUsd") ?? DEFAULT_MONTHLY_LIMIT_USD,
+      },
+    },
+    { merge: true },
+  );
+  return cost;
 }

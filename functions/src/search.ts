@@ -7,7 +7,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, REGION } from "./shared.js";
+import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 type Search = {
@@ -92,7 +92,8 @@ async function runSearch(uid: string, searchId: string) {
     const result = await runAgent({
       uid,
       system: SYSTEM,
-      maxSearches: 15,
+      model: MODELS.search,
+      web: { searches: 6, fetches: 4 },
       submit: { name: "submit_offers", description: "Return the internship offers found in this run.", schema: OffersSchema },
       prompt: [
         { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },

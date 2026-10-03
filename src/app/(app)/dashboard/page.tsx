@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { UsageMeter } from "@/components/UsageMeter";
 
 const steps = [
   { href: "/profile", title: "1. Add your documents", text: "CVs, transcripts, past motivation letters." },
@@ -22,6 +23,9 @@ export default function Dashboard() {
             <p className="mt-1 text-sm text-muted">{s.text}</p>
           </Link>
         ))}
+      </div>
+      <div className="mt-6">
+        <UsageMeter />
       </div>
     </div>
   );

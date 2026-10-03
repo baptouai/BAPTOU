@@ -175,7 +175,7 @@ export default function ApplicationPage() {
         form={app.applicationForm}
         status={app.applicationFormStatus}
         statusError={app.applicationFormError}
-        autoPrepare={app.status !== "dismissed" && !!app.applyUrl}
+        autoPrepare={false} // each preparation costs Claude credit, so it only runs on click
         letter={letter}
         title={`${app.title} - ${app.organization}`}
         onChange={(applicationForm) => scheduleSave({ applicationForm })}

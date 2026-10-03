@@ -4,7 +4,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { toContentBlock } from "./profile.js";
-import { anthropicKey, db, REGION } from "./shared.js";
+import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -76,7 +76,9 @@ export const draftLetter = onCall(
     const result = await runAgent({
       uid,
       system: WRITER_SYSTEM,
-      maxSearches: 6,
+      model: MODELS.letter,
+      web: { searches: 3, fetches: 2 },
+      effort: "high",
       submit: { name: "submit_letter", description: "Return the letter, research and application answers.", schema: LetterSchema },
       prompt: [
         ...pastLetters,
@@ -123,7 +125,8 @@ export const draftEmail = onCall(
     const result = await runAgent({
       uid,
       system: WRITER_SYSTEM,
-      maxSearches: 3,
+      model: MODELS.email,
+      web: { searches: 1, fetches: 1 },
       effort: "medium",
       submit: { name: "submit_email", description: "Return the email draft.", schema: EmailSchema },
       prompt: [

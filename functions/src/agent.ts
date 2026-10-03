@@ -1,13 +1,19 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { claude, db, FALLBACK, MODEL, recordUsage } from "./shared.js";
+import { assertBudget, claude, db, FALLBACK, type Model, recordUsage } from "./shared.js";
 
-const MAX_CONTINUATIONS = 6;
+const MAX_CONTINUATIONS = 4;
+// Hard ceiling per task run: past it, BAPTOU is told to answer with what it already has.
+const MAX_RUN_USD = 0.75;
+// Web pages are cut to this size. Whole career sites can be 50k+ tokens and were the main cost.
+const MAX_PAGE_TOKENS = 6000;
 
-export const webTools = (maxSearches: number): Anthropic.Beta.BetaToolUnion[] => [
-  { type: "web_search_20260209", name: "web_search", max_uses: maxSearches },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearches },
+export type WebBudget = { searches: number; fetches: number };
+
+export const webTools = ({ searches, fetches }: WebBudget): Anthropic.Beta.BetaToolUnion[] => [
+  { type: "web_search_20260209", name: "web_search", max_uses: searches },
+  { type: "web_fetch_20260209", name: "web_fetch", max_uses: fetches, max_content_tokens: MAX_PAGE_TOKENS },
 ];
 
 // JSON Schema keywords strict tool use rejects. Zod adds some implicitly (z.int() emits min/max),
@@ -43,26 +49,32 @@ export async function runAgent<T>(opts: {
   system: string;
   prompt: Anthropic.Beta.BetaContentBlockParam[];
   submit: { name: string; description: string; schema: z.ZodType<T> };
-  maxSearches: number;
+  model: Model;
+  web: WebBudget;
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
-  const tools = [...webTools(opts.maxSearches), submitTool(opts.submit.name, opts.submit.description, opts.submit.schema)];
+  await assertBudget(opts.uid);
+  const tools = [...webTools(opts.web), submitTool(opts.submit.name, opts.submit.description, opts.submit.schema)];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: opts.prompt }];
   let nudged = false;
+  let runCost = 0;
 
   for (let i = 0; i < MAX_CONTINUATIONS; i++) {
     const response = await claude()
       .beta.messages.stream({
-        model: MODEL,
+        model: opts.model,
         max_tokens: 32000,
         ...FALLBACK,
-        output_config: { effort: opts.effort ?? "high" },
-        system: opts.system,
+        output_config: { effort: opts.effort ?? "medium" },
+        // Caching: the system prompt is a fixed breakpoint, and the top-level field caches the growing
+        // tail, so pages Claude re-reads during the search loop are billed at 10% instead of in full.
+        cache_control: { type: "ephemeral" },
+        system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
         tools,
         messages,
       })
       .finalMessage();
-    await recordUsage(opts.uid, response.usage);
+    runCost += await recordUsage(opts.uid, opts.model, response.usage);
 
     if (response.stop_reason === "refusal") {
       throw new HttpsError("internal", "BAPTOU couldn't complete this request.");
@@ -78,7 +90,7 @@ export async function runAgent<T>(opts: {
     }
 
     messages.push({ role: "assistant", content: response.content });
-    if (response.stop_reason === "pause_turn") continue;
+    if (response.stop_reason === "pause_turn" && runCost < MAX_RUN_USD) continue;
     if (nudged) break;
     nudged = true;
     messages.push({ role: "user", content: `Now call ${opts.submit.name} with your final answer.` });

@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, REGION } from "./shared.js";
+import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 const Entry = z.object({
   title: z.string().describe("Job title, or degree"),
@@ -65,7 +65,8 @@ async function readForm(uid: string, app: FirebaseFirestore.DocumentData, profil
   return runAgent({
     uid,
     system: SYSTEM,
-    maxSearches: 8,
+    model: MODELS.form,
+    web: { searches: 2, fetches: 4 },
     submit: { name: "submit_form", description: "Return the application form with prepared answers.", schema: FormSchema },
     prompt: [
       { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },
@@ -97,17 +98,22 @@ export const prepareApplication = onCall(
     if (!app) throw new HttpsError("not-found", "Application not found.");
     if (!app.applyUrl) throw new HttpsError("failed-precondition", "This offer has no link to an application page.");
 
-    // Skip if a run is already in progress (e.g. the offer is open in two tabs). A run that died
-    // without reporting back (timeout) is considered stale after 10 minutes.
-    const startedAt = app.applicationFormStartedAt?.toMillis?.() ?? 0;
-    if (app.applicationFormStatus === "preparing" && Date.now() - startedAt < 10 * 60_000) return null;
-
     const profile = await loadProfile(uid);
-    await appRef.update({
-      applicationFormStatus: "preparing",
-      applicationFormStartedAt: FieldValue.serverTimestamp(),
-      applicationFormError: FieldValue.delete(),
+
+    // Claim the run atomically so two clicks (or two tabs) never pay for two runs. A run that died
+    // without reporting back (timeout) is considered stale after 10 minutes.
+    const claimed = await db.runTransaction(async (tx) => {
+      const current = (await tx.get(appRef)).data();
+      const startedAt = current?.applicationFormStartedAt?.toMillis?.() ?? 0;
+      if (current?.applicationFormStatus === "preparing" && Date.now() - startedAt < 10 * 60_000) return false;
+      tx.update(appRef, {
+        applicationFormStatus: "preparing",
+        applicationFormStartedAt: FieldValue.serverTimestamp(),
+        applicationFormError: FieldValue.delete(),
+      });
+      return true;
     });
+    if (!claimed) return null;
 
     try {
       const form = await readForm(uid, app, profile);
