@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { assertBudget, claude, db, FALLBACK, type Model, recordUsage } from "./shared.js";
+import { assertBudget, claude, db, fallbackFor, type Model, recordUsage } from "./shared.js";
 
 const MAX_CONTINUATIONS = 4;
 // Hard ceiling per task run: past it, BAPTOU is told to answer with what it already has.
@@ -64,7 +64,7 @@ export async function runAgent<T>(opts: {
       .beta.messages.stream({
         model: opts.model,
         max_tokens: 32000,
-        ...FALLBACK,
+        ...fallbackFor(opts.model),
         output_config: { effort: opts.effort ?? "medium" },
         // Caching: the system prompt is a fixed breakpoint, and the top-level field caches the growing
         // tail, so pages Claude re-reads during the search loop are billed at 10% instead of in full.

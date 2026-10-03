@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import mammoth from "mammoth";
 import { z } from "zod";
-import { anthropicKey, assertBudget, bucket, claude, db, FALLBACK, MODELS, recordUsage, REGION } from "./shared.js";
+import { anthropicKey, assertBudget, bucket, claude, db, fallbackFor, MODELS, recordUsage, REGION } from "./shared.js";
 
 const MAX_DOCUMENTS = 15;
 
@@ -95,7 +95,7 @@ export const buildProfile = onCall(
     const response = await claude().beta.messages.parse({
       model: MODELS.profile,
       max_tokens: 16000,
-      ...FALLBACK,
+      ...fallbackFor(MODELS.profile),
       output_config: { effort: "medium", format: betaZodOutputFormat(ProfileSchema) },
       system: SYSTEM,
       messages: [

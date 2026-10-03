@@ -17,13 +17,15 @@ export const REGION = "europe-west1";
 export type Model = "claude-opus-5" | "claude-sonnet-5" | "claude-haiku-4-5";
 
 // Which model each task uses. Writing quality matters most for letters; the rest is research and extraction.
+// Chosen to give the best quality within a $10/month budget: the daily search (~30 runs/month) is the
+// largest recurring cost, so research tasks use Sonnet 5 and Opus 5 is kept for the letter and profile.
 export const MODELS = {
   profile: "claude-opus-5",
-  search: "claude-opus-5",
-  form: "claude-opus-5",
+  search: "claude-sonnet-5",
+  form: "claude-sonnet-5",
   letter: "claude-opus-5",
-  email: "claude-opus-5",
-  ask: "claude-opus-5",
+  email: "claude-sonnet-5",
+  ask: "claude-sonnet-5",
 } satisfies Record<string, Model>;
 
 // USD per million tokens (Claude API list prices). Cache writes cost 1.25x input, cache reads 0.1x.
@@ -44,11 +46,10 @@ export function claude() {
   return new Anthropic({ apiKey: anthropicKey.value() });
 }
 
-// Server-side refusal fallback: if the main model declines, the API re-runs on a fallback model.
-export const FALLBACK: { betas: Anthropic.Beta.AnthropicBeta[]; fallbacks: "default" } = {
-  betas: ["server-side-fallback-2026-07-01"],
-  fallbacks: "default",
-};
+// Server-side refusal fallback for Opus 5: if it declines, the API re-runs on a fallback model.
+// Not sent for other models.
+export const fallbackFor = (model: Model): { betas?: Anthropic.Beta.AnthropicBeta[]; fallbacks?: "default" } =>
+  model === "claude-opus-5" ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {};
 
 type Usage = Pick<
   Anthropic.Beta.BetaUsage,
