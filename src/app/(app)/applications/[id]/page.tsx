@@ -4,14 +4,21 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
+  addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { statusLabel } from "@/components/ApplicationList";
 import type { Application, LetterVersion } from "@/lib/types";
 
 const AUTOSAVE_MS = 800;
+
+type AiInput = { applicationId: string; instructions: string };
+const draftLetter = httpsCallable<AiInput, { letter: string }>(functions, "draftLetter", { timeout: 540_000 });
+const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>>(functions, "draftEmail", {
+  timeout: 300_000,
+});
 
 export default function ApplicationPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,18 +29,24 @@ export default function ApplicationPage() {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [versions, setVersions] = useState<(LetterVersion & { id: string })[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<Partial<Application> | null>(null);
+  const loaded = useRef(false);
 
   const appRef = user ? doc(db, "users", user.uid, "applications", id) : null;
 
-  // Load once; after that the local editor state is the source of truth while editing.
+  // Live updates for BAPTOU's fields; the editors are filled once, then the local state is the
+  // source of truth while the user types (and after BAPTOU rewrites, from the call's result).
   useEffect(() => {
     if (!appRef) return;
-    getDoc(appRef).then((snap) => {
+    return onSnapshot(appRef, (snap) => {
       const data = snap.data() as Application | undefined;
       if (!data) return;
       setApp(data);
-      setLetter(data.letter);
-      setEmail(data.emailDraft);
+      if (!loaded.current) {
+        loaded.current = true;
+        setLetter(data.letter);
+        setEmail(data.emailDraft);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, id]);
@@ -50,17 +63,36 @@ export default function ApplicationPage() {
   function scheduleSave(patch: Partial<Application>) {
     if (!appRef) return;
     setSaveState("unsaved");
+    pending.current = { ...pending.current, ...patch };
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      setSaveState("saving");
-      await updateDoc(appRef, {
-        ...patch,
-        status: app?.status === "suggested" ? "editing" : app?.status,
-        updatedAt: serverTimestamp(),
-      });
-      setApp((a) => (a && a.status === "suggested" ? { ...a, status: "editing" } : a));
-      setSaveState("saved");
-    }, AUTOSAVE_MS);
+    timer.current = setTimeout(flushSave, AUTOSAVE_MS);
+  }
+
+  async function flushSave() {
+    if (!appRef || !pending.current) return;
+    if (timer.current) clearTimeout(timer.current);
+    const patch = pending.current;
+    pending.current = null;
+    setSaveState("saving");
+    await updateDoc(appRef, {
+      ...patch,
+      status: app?.status === "suggested" ? "editing" : app?.status,
+      updatedAt: serverTimestamp(),
+    });
+    setSaveState("saved");
+  }
+
+  // Saves the user's latest edits first, so BAPTOU rewrites what is actually on screen.
+  async function writeLetter(instructions: string) {
+    await flushSave();
+    const { data } = await draftLetter({ applicationId: id, instructions });
+    setLetter(data.letter);
+  }
+
+  async function writeEmail(instructions: string) {
+    await flushSave();
+    const { data } = await draftEmail({ applicationId: id, instructions });
+    setEmail(data);
   }
 
   async function saveVersion() {
@@ -122,6 +154,12 @@ export default function ApplicationPage() {
             {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes"}
           </span>
         </div>
+        <AiBar
+          action={letter ? "Rewrite with BAPTOU" : "Write my letter"}
+          placeholder={letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize"}
+          busyLabel="BAPTOU is researching and writing… (1–3 min)"
+          onRun={writeLetter}
+        />
         <textarea
           value={letter}
           onChange={(e) => {
@@ -155,10 +193,17 @@ export default function ApplicationPage() {
         )}
       </section>
 
-      {email && (
-        <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="font-medium">Email draft</h2>
-          <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="font-medium">Email draft</h2>
+        <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
+        <AiBar
+          action={email ? "Rewrite email" : "Draft an email"}
+          placeholder={email ? "e.g. Warmer tone, in French" : "Optional: who it's for, what to say"}
+          busyLabel="BAPTOU is writing the email…"
+          onRun={writeEmail}
+        />
+        {email && (
+          <>
           <div className="mt-3 grid gap-2">
             <input
               value={email.to}
@@ -186,8 +231,9 @@ export default function ApplicationPage() {
           >
             {app.emailSentAt ? "Sent" : app.status === "approved" ? "Approved" : "Approve & send"}
           </button>
-        </section>
-      )}
+          </>
+        )}
+      </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="font-medium">Application pack</h2>
@@ -229,6 +275,44 @@ export default function ApplicationPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function AiBar({
+  action, placeholder, busyLabel, onRun,
+}: { action: string; placeholder: string; busyLabel: string; onRun: (instructions: string) => Promise<void> }) {
+  const [instructions, setInstructions] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onRun(instructions);
+      setInstructions("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={run} className="mt-3 flex flex-col gap-2 sm:flex-row">
+      <input
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+        placeholder={placeholder}
+        disabled={busy}
+        className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+      />
+      <button disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        {busy ? busyLabel : action}
+      </button>
+      {error && <p className="text-sm text-red-600 sm:basis-full">{error}</p>}
+    </form>
   );
 }
 

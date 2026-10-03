@@ -37,6 +37,9 @@ export type Application = {
   applyUrl?: string;
   deadline?: Timestamp;
   matchReason?: string; // why BAPTOU suggests it
+  matchScore?: number; // 0-100
+  location?: string;
+  searchId?: string; // the search that found it
   research?: string; // company/university research summary
   approachNote?: string; // why the letter takes this angle
   letter: string; // current editable motivation letter
@@ -70,4 +73,29 @@ export type Profile = {
   gaps: string[];
   writingStyle: string;
   suggestedTargets: { internshipRoles: string[]; mastersFields: string[] };
+};
+
+// users/{uid}/searches/{searchId}. Created by the user; the daily job only runs "active" ones.
+export type SearchStatus = "active" | "paused" | "stopped" | "ended";
+
+export type Search = {
+  name: string;
+  roles: string;
+  locations: string;
+  workMode: "any" | "onsite" | "hybrid" | "remote";
+  duration: string;
+  startDate: string;
+  industries: string;
+  languages: string;
+  notes: string;
+  maxPerRun: number;
+  status: SearchStatus;
+  endsAt: Timestamp | null; // null = until the user stops it
+  runState?: "idle" | "queued" | "running" | "error";
+  lastRunAt?: Timestamp;
+  lastRunSummary?: string;
+  lastError?: string;
+  totalFound?: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };

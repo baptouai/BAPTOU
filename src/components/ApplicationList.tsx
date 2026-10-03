@@ -55,9 +55,14 @@ export function ApplicationList({ type, empty }: { type: ApplicationType; empty:
                   {a.deadline ? ` · deadline ${a.deadline.toDate().toLocaleDateString()}` : ""}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs">
-                {statusLabel[a.status]}
-              </span>
+              <div className="flex shrink-0 gap-1.5">
+                {a.matchScore != null && (
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                    {a.matchScore}% match
+                  </span>
+                )}
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs">{statusLabel[a.status]}</span>
+              </div>
             </div>
             {a.matchReason && <p className="mt-2 line-clamp-2 text-sm text-muted">{a.matchReason}</p>}
           </Link>

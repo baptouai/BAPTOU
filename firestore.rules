@@ -12,6 +12,11 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // Internship searches: BAPTOU only searches while one is "active".
+      match /searches/{searchId} {
+        allow read, write: if isOwner(uid);
+      }
+
       match /applications/{appId} {
         allow read, delete: if isOwner(uid);
         // Only the server may record that an email was actually sent.
