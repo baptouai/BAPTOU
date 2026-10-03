@@ -8,6 +8,7 @@ import { deleteObject, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { DocumentKind, UploadedDocument } from "@/lib/types";
+import { ProfileSummary } from "@/components/ProfileSummary";
 
 const kinds: { value: DocumentKind; label: string }[] = [
   { value: "cv", label: "CV" },
@@ -108,6 +109,8 @@ export default function ProfilePage() {
           </li>
         ))}
       </ul>
+
+      <ProfileSummary hasDocuments={docs.length > 0} />
     </div>
   );
 }

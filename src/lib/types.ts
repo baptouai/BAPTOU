@@ -53,3 +53,21 @@ export type LetterVersion = {
   author: "baptou" | "user";
   createdAt: Timestamp;
 };
+
+// Written by the `buildProfile` Cloud Function (see functions/src/profile.ts for the schema).
+export type Profile = {
+  fullName: string;
+  headline: string;
+  education: {
+    degree: string; field: string; institution: string; country: string;
+    startYear: string; endYear: string; grade: string; highlights: string[];
+  }[];
+  experience: { role: string; organization: string; country: string; period: string; achievements: string[] }[];
+  skills: string[];
+  languages: { language: string; level: string }[];
+  interests: string[];
+  strengths: string[];
+  gaps: string[];
+  writingStyle: string;
+  suggestedTargets: { internshipRoles: string[]; mastersFields: string[] };
+};
