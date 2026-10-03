@@ -1,0 +1,19 @@
+# Firebase App Hosting config (deploys the Next.js app from GitHub).
+runConfig:
+  region: europe-west1
+  minInstances: 0
+  maxInstances: 2
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: REPLACE_ME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: REPLACE_ME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: REPLACE_ME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: REPLACE_ME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: REPLACE_ME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: REPLACE_ME

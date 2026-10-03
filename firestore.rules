@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /documents/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /applications/{appId} {
+        allow read, delete: if isOwner(uid);
+        // Only the server may record that an email was actually sent.
+        allow create: if isOwner(uid) && !('emailSentAt' in request.resource.data);
+        allow update: if isOwner(uid)
+          && request.resource.data.get('emailSentAt', null) == resource.data.get('emailSentAt', null);
+
+        match /letterVersions/{versionId} {
+          allow read, create: if isOwner(uid);
+        }
+      }
+    }
+
+    // Server-only: Gmail tokens, usage counters, subscription status.
+    match /private/{uid} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "firebase-tools": "^15.32.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
