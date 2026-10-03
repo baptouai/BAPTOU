@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref } from "firebase/storage";
@@ -8,7 +8,7 @@ import { db, functions, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
 
-const prepareApplication = httpsCallable<{ applicationId: string }, ApplicationForm>(functions, "prepareApplication", {
+const prepareApplication = httpsCallable<{ applicationId: string }, ApplicationForm | null>(functions, "prepareApplication", {
   timeout: 540_000,
 });
 
@@ -17,10 +17,13 @@ const prepareApplication = httpsCallable<{ applicationId: string }, ApplicationF
  * Edits are passed to `onChange`, which autosaves them.
  */
 export function ApplicationFormView({
-  applicationId, form, letter, title, onChange,
+  applicationId, form, status, statusError, autoPrepare, letter, title, onChange,
 }: {
   applicationId: string;
   form: ApplicationForm | undefined;
+  status: "preparing" | "ready" | "error" | undefined;
+  statusError: string | undefined;
+  autoPrepare: boolean; // prepare on first open, without waiting for a click
   letter: string;
   title: string;
   onChange: (form: ApplicationForm) => void;
@@ -51,13 +54,27 @@ export function ApplicationFormView({
     setError(null);
     try {
       const { data } = await prepareApplication({ applicationId });
-      setLocal(data);
+      if (data) setLocal(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
   }
+
+  // First time an offer is opened, prepare its form straight away. The server records the run's
+  // status, so reloading or reopening the offer shows progress instead of starting again.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoPrepare || form || status || autoStarted.current) return;
+    autoStarted.current = true;
+    prepareApplication({ applicationId }).catch((e) =>
+      setError(e instanceof Error ? e.message : "Something went wrong"),
+    );
+  }, [autoPrepare, form, status, applicationId]);
+
+  const preparing = busy || status === "preparing";
+  const shownError = error ?? (status === "error" ? statusError : undefined);
 
   function updateField(si: number, fi: number, patch: Partial<FormField>) {
     if (!local) return;
@@ -71,7 +88,8 @@ export function ApplicationFormView({
     onChange(next);
   }
 
-  const todo = local?.sections.flatMap((s) => s.fields).filter((f) => f.needsUser && !f.value).length ?? 0;
+  const fields = local?.sections.flatMap((s) => s.fields) ?? [];
+  const todo = fields.filter((f) => f.needsUser && !f.value).length;
 
   return (
     <section className="rounded-xl border border-border bg-card p-5">
@@ -86,20 +104,26 @@ export function ApplicationFormView({
         </div>
         <button
           onClick={prepare}
-          disabled={busy}
+          disabled={preparing}
           className={local ? "rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50" : "rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"}
         >
-          {busy ? "Reading the form… (1–3 min)" : local ? "Prepare again" : "Prepare this application"}
+          {preparing ? "Reading the form… (1–3 min)" : local ? "Prepare again" : "Prepare this application"}
         </button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {shownError && <p className="mt-2 text-sm text-red-600">{shownError}</p>}
+      {preparing && !local && (
+        <p className="mt-4 animate-pulse rounded-lg bg-accent/10 p-3 text-sm">
+          BAPTOU is opening the application page and reading the form. You can keep reading the offer meanwhile.
+        </p>
+      )}
 
       {local && (
         <>
           {local.notes && <p className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">{local.notes}</p>}
+          <Checklist fields={fields} docs={docs} letter={letter} />
           {todo > 0 && (
             <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
-              {todo} field{todo > 1 ? "s" : ""} only you can answer — marked “Your answer”.
+              {todo} field{todo > 1 ? "s" : ""} only you can answer — marked “Your answer” below.
             </p>
           )}
 
@@ -137,6 +161,75 @@ export function ApplicationFormView({
         </>
       )}
     </section>
+  );
+}
+
+const docLabel: Record<string, string> = {
+  cv: "CV",
+  transcript: "Transcript / grades",
+  motivation_letter: "Motivation letter",
+  diploma: "Diploma",
+  other: "Other document",
+};
+
+/** "What you need": files to attach and information only the student can give, ticked when ready. */
+function Checklist({
+  fields, docs, letter,
+}: {
+  fields: FormField[];
+  docs: (UploadedDocument & { id: string })[];
+  letter: string;
+}) {
+  const files = fields
+    .filter((f) => f.kind === "file" && f.suggestedDocument !== "none")
+    .map((f) => {
+      const ready =
+        (f.suggestedDocument === "motivation_letter" && !!letter) || docs.some((d) => d.kind === f.suggestedDocument);
+      const hint = ready
+        ? docLabel[f.suggestedDocument]
+        : f.suggestedDocument === "motivation_letter"
+          ? "Write the letter below"
+          : `Upload your ${docLabel[f.suggestedDocument].toLowerCase()} on the Profile page`;
+      return { label: f.label, required: f.required, ready, hint };
+    });
+  const info = fields
+    .filter((f) => f.needsUser)
+    .map((f) => ({ label: f.label, required: f.required, ready: !!f.value, hint: f.value || "To fill in below" }));
+
+  if (!files.length && !info.length) return null;
+
+  return (
+    <div className="mt-4 grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
+      <ChecklistColumn title="Files to attach" items={files} empty="No files requested." />
+      <ChecklistColumn title="Information only you can give" items={info} empty="BAPTOU has prepared everything else." />
+    </div>
+  );
+}
+
+function ChecklistColumn({
+  title, items, empty,
+}: {
+  title: string;
+  items: { label: string; required: boolean; ready: boolean; hint: string }[];
+  empty: string;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-semibold">{title}</p>
+      {items.length === 0 && <p className="mt-1 text-sm text-muted">{empty}</p>}
+      <ul className="mt-2 grid gap-1.5 text-sm">
+        {items.map((it, i) => (
+          <li key={i} className="flex gap-2">
+            <span className={it.ready ? "text-green-600" : "text-amber-600"}>{it.ready ? "✓" : "○"}</span>
+            <span className="min-w-0">
+              {it.label}
+              {it.required && <span className="text-red-600"> *</span>}
+              <span className="block truncate text-xs text-muted">{it.hint}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

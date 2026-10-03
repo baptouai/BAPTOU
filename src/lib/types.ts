@@ -44,6 +44,8 @@ export type Application = {
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
   fitVerdictReason?: string;
   applicationForm?: ApplicationForm; // the real form's layout, prepared by prepareApplication
+  applicationFormStatus?: "preparing" | "ready" | "error"; // set by prepareApplication
+  applicationFormError?: string;
   research?: string; // company/university research summary
   approachNote?: string; // why the letter takes this angle
   letter: string; // current editable motivation letter

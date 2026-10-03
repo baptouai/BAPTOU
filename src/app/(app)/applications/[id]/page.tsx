@@ -164,6 +164,17 @@ export default function ApplicationPage() {
         </section>
       )}
 
+      <ApplicationFormView
+        applicationId={id}
+        form={app.applicationForm}
+        status={app.applicationFormStatus}
+        statusError={app.applicationFormError}
+        autoPrepare={app.status !== "dismissed" && !!app.applyUrl}
+        letter={letter}
+        title={`${app.title} - ${app.organization}`}
+        onChange={(applicationForm) => scheduleSave({ applicationForm })}
+      />
+
       {(app.matchReason || app.research || app.approachNote) && (
         <section className="grid gap-3 rounded-xl border border-border bg-card p-5 text-sm">
           {app.matchReason && <Info title="Why BAPTOU suggests it" text={app.matchReason} />}
@@ -173,14 +184,6 @@ export default function ApplicationPage() {
       )}
 
       <FitCheck applicationId={id} />
-
-      <ApplicationFormView
-        applicationId={id}
-        form={app.applicationForm}
-        letter={letter}
-        title={`${app.title} - ${app.organization}`}
-        onChange={(applicationForm) => scheduleSave({ applicationForm })}
-      />
 
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between">
