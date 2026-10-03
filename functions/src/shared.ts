@@ -8,7 +8,8 @@ initializeApp();
 
 // BAPTOU uses the named Firestore database "baptou", not "(default)".
 export const db = getFirestore("baptou");
-export const bucket = getStorage().bucket();
+// Resolved lazily: the bucket name comes from FIREBASE_CONFIG, which is only set at runtime.
+export const bucket = () => getStorage().bucket();
 
 export const REGION = "europe-west1";
 export const MODEL = "claude-opus-5";

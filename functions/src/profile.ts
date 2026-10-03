@@ -54,7 +54,7 @@ Only state facts present in the documents. When documents disagree, prefer the m
 Keep the student's own wording for achievements where possible. Write the profile in English.`;
 
 async function toContentBlock(d: FirebaseFirestore.DocumentData): Promise<Anthropic.Beta.BetaContentBlockParam | null> {
-  const [buffer] = await bucket.file(d.storagePath).download();
+  const [buffer] = await bucket().file(d.storagePath).download();
   const title = `${d.kind}: ${d.fileName}`;
   if (d.contentType === "application/pdf") {
     return {
