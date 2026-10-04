@@ -105,7 +105,7 @@ export const buildProfile = onCall(
         },
       ],
     });
-    await recordUsage(uid, MODELS.profile, response.usage);
+    await recordUsage(uid, MODELS.profile, response.usage, "profile");
 
     if (response.stop_reason === "refusal" || !response.parsed_output) {
       throw new HttpsError("internal", "BAPTOU couldn't build your profile from these documents. Try again.");

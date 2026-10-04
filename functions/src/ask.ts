@@ -47,6 +47,7 @@ export const askAboutOffer = onCall(
       uid,
       system: SYSTEM,
       model: MODELS.ask,
+      task: "ask",
       web: { searches: 2, fetches: 2 },
       effort: "medium",
       submit: { name: "submit_answer", description: "Return the answer and fit verdict.", schema: AnswerSchema },

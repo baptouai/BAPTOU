@@ -17,6 +17,9 @@ export const REGION = "europe-west1";
 
 export type Model = "claude-opus-5" | "claude-sonnet-5" | "claude-haiku-4-5";
 
+// What a Claude call was for, so spending can be shown per task.
+export type Task = "search" | "letter" | "form" | "contacts" | "ask" | "email" | "profile";
+
 // Which model each task uses. Writing quality matters most for letters; the rest is research and extraction.
 // Chosen to give the best quality within a $10/month budget: the daily search (~30 runs/month) is the
 // largest recurring cost, so research tasks use Sonnet 5 and Opus 5 is kept for the letter and profile.
@@ -109,7 +112,7 @@ export async function assertBudget(uid: string) {
  * Records token usage and estimated cost per user and month. The details live in the server-only
  * private/{uid} doc; a summary is mirrored on users/{uid} so the app can show it.
  */
-export async function recordUsage(uid: string, model: Model, usage: Usage) {
+export async function recordUsage(uid: string, model: Model, usage: Usage, task: Task) {
   const cost = estimateCostUsd(model, usage);
   const m = month();
   await db.doc(`private/${uid}`).set(
@@ -123,6 +126,7 @@ export async function recordUsage(uid: string, model: Model, usage: Usage) {
         calls: FieldValue.increment(1),
       },
       spendUsd: { [m]: FieldValue.increment(cost) },
+      spendByTask: { [m]: { [task]: FieldValue.increment(cost) } },
       lastCallAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -133,6 +137,7 @@ export async function recordUsage(uid: string, model: Model, usage: Usage) {
       usageSummary: {
         month: m,
         spentUsd: priv.get(`spendUsd.${m}`) ?? cost,
+        byTask: priv.get(`spendByTask.${m}`) ?? {},
         limitUsd: (await limitFor(uid, priv)) ?? 0,
       },
     },

@@ -88,6 +88,7 @@ async function runSearch(uid: string, searchId: string) {
       uid,
       system: SYSTEM,
       model: MODELS.search,
+      task: "search",
       // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
       web: { searches: Math.min(8 + maxPerRun, 40), fetches: Math.min(3 + maxPerRun, 25) },
       maxRunUsd: 0.5 + 0.08 * maxPerRun,

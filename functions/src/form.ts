@@ -66,6 +66,7 @@ async function readForm(uid: string, app: FirebaseFirestore.DocumentData, profil
     uid,
     system: SYSTEM,
     model: MODELS.form,
+    task: "form",
     web: { searches: 2, fetches: 4 },
     submit: { name: "submit_form", description: "Return the application form with prepared answers.", schema: FormSchema },
     prompt: [

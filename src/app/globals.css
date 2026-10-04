@@ -7,6 +7,15 @@
   --card: #ffffff;
   --border: #e7e5e4;
   --accent: #4f46e5;
+  /* Usage breakdown: one fixed color per task (validated categorical palette, light surface). */
+  --task-search: #2a78d6;
+  --task-letter: #eb6834;
+  --task-form: #1baf7a;
+  --task-contacts: #eda100;
+  --task-ask: #e87ba4;
+  --task-email: #008300;
+  --task-profile: #4a3aa7;
+  --task-earlier: #a8a29e;
 }
 
 @theme inline {
@@ -28,6 +37,14 @@
     --card: #1c1917;
     --border: #292524;
     --accent: #818cf8;
+    --task-search: #3987e5;
+    --task-letter: #d95926;
+    --task-form: #199e70;
+    --task-contacts: #c98500;
+    --task-ask: #d55181;
+    --task-email: #008300;
+    --task-profile: #9085e9;
+    --task-earlier: #78716c;
   }
 }
 

@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { assertBudget, claude, db, fallbackFor, type Model, recordUsage } from "./shared.js";
+import { assertBudget, claude, db, fallbackFor, type Model, recordUsage, type Task } from "./shared.js";
 
 const MAX_CONTINUATIONS = 4;
 // Hard ceiling per task run: past it, BAPTOU is told to answer with what it already has.
@@ -58,6 +58,7 @@ export async function runAgent<T>(opts: {
   prompt: Anthropic.Beta.BetaContentBlockParam[];
   submit: { name: string; description: string; schema: z.ZodType<T> };
   model: Model;
+  task: Task; // for the per-task spending breakdown
   web: WebBudget | null;
   clientTools?: ClientTool[];
   maxToolCalls?: number; // ceiling on client tool calls, default 10
@@ -92,7 +93,7 @@ export async function runAgent<T>(opts: {
         messages,
       })
       .finalMessage();
-    runCost += await recordUsage(opts.uid, opts.model, response.usage);
+    runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
 
     if (response.stop_reason === "refusal") {
       throw new HttpsError("internal", "BAPTOU couldn't complete this request.");
