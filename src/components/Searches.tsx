@@ -108,14 +108,27 @@ const toDateInput = (t: Timestamp | null | undefined) => {
 };
 
 /** Creates a search (internship or master's programmes), or edits `existing`. Changes apply from the next run. */
+/**
+ * Default tab name when the user leaves it empty: the kind and start date ("Internship · November 2026"),
+ * numbered if that name is taken, so two tabs never read the same.
+ */
+export function defaultTabName(kind: SearchKind, startDate: string, taken: string[]) {
+  const base = `${kind === "masters" ? "Master's" : "Internship"}${startDate.trim() ? ` · ${startDate.trim()}` : ""}`;
+  const names = new Set(taken.map((n) => n.toLowerCase()));
+  if (!names.has(base.toLowerCase())) return base;
+  for (let i = 2; ; i++) if (!names.has(`${base} (${i})`.toLowerCase())) return `${base} (${i})`;
+}
+
 export function SearchForm({
   existing,
   onDone,
   onCreated,
+  takenNames = [],
 }: {
   existing?: SearchItem;
   onDone: () => void;
   onCreated?: (id: string) => void;
+  takenNames?: string[]; // other tabs' names, to keep default names unique
 }) {
   const { user } = useAuth();
   const [form, setForm] = useState({
@@ -144,7 +157,9 @@ export function SearchForm({
     setBusy(true);
     const { endsOn, ...fields } = form;
     const endsAt = endsOn ? Timestamp.fromDate(new Date(`${endsOn}T23:59:59`)) : null;
-    const name = fields.name.trim() || fields.roles;
+    const name =
+      fields.name.trim() ||
+      (existing ? existing.name : defaultTabName(fields.kind, fields.startDate, takenNames));
 
     if (existing) {
       // Moving the end date into the future revives a search that had ended on its own.
@@ -204,7 +219,7 @@ export function SearchForm({
         <input
           value={form.name}
           onChange={set("name")}
-          placeholder={masters ? "e.g. Masters 2027" : "e.g. November internship"}
+          placeholder={`Leave empty for “${defaultTabName(form.kind, form.startDate, takenNames)}”`}
           className={input}
         />
       </Field>

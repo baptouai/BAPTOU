@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ApplicationList, type ApplicationItem } from "@/components/ApplicationList";
@@ -26,6 +26,18 @@ function Applications() {
   const selected = useSearchParams().get("search");
   const [searches, setSearches] = useState<SearchItem[] | null>(null);
   const [apps, setApps] = useState<ApplicationItem[] | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+
+  // Double-click a tab to rename it; Enter or leaving the field saves, Esc cancels.
+  async function saveRename() {
+    if (!user || !renaming) return;
+    const name = renaming.name.trim();
+    const search = searches?.find((s) => s.id === renaming.id);
+    setRenaming(null);
+    if (name && search && name !== search.name) {
+      await updateDoc(doc(db, "users", user.uid, "searches", renaming.id), { name, updatedAt: serverTimestamp() });
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -62,19 +74,39 @@ function Applications() {
     <div>
       <h1 className="text-2xl font-semibold">Applications</h1>
       <p className="mt-1 text-muted">
-        One tab per search, so each one keeps its own suggestions. BAPTOU searches once a day while a search is active.
+        One tab per search, so each one keeps its own suggestions. Double-click a tab to rename it. BAPTOU searches once
+        a day while a search is active.
       </p>
 
       <div role="tablist" className="mt-5 flex gap-1 overflow-x-auto border-b border-border">
         {tabs.map((s) => {
           const toReview = offersOf(s.id).filter((a) => a.status === "suggested").length;
           const active = current?.id === s.id;
+          if (renaming?.id === s.id) {
+            return (
+              <input
+                key={s.id}
+                autoFocus
+                value={renaming.name}
+                onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
+                onBlur={saveRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveRename();
+                  if (e.key === "Escape") setRenaming(null);
+                }}
+                aria-label="Tab name"
+                className="-mb-px w-48 border-b-2 border-accent bg-transparent px-4 py-2.5 text-sm font-medium outline-none"
+              />
+            );
+          }
           return (
             <button
               key={s.id}
               role="tab"
               aria-selected={active}
               onClick={() => select(s.id)}
+              onDoubleClick={() => setRenaming({ id: s.id, name: s.name })}
+              title="Double-click to rename"
               className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm ${
                 active ? "border-accent font-medium text-accent" : "border-transparent text-muted hover:text-foreground"
               } ${s.status === "stopped" || s.status === "ended" ? "opacity-60" : ""}`}
@@ -123,6 +155,7 @@ function Applications() {
               </p>
             )}
             <SearchForm
+              takenNames={searches.map((x) => x.name)}
               onDone={() => {
                 if (tabs.length) router.replace("/applications");
               }}
