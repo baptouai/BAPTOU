@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -7,6 +6,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
+import { loadDismissed, offerKey, urlId } from "./offers.js";
 import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
@@ -49,16 +49,14 @@ export const OffersSchema = z.object({
 const SYSTEM = `You are BAPTOU's internship scout. You search the web for real, currently open internship postings that fit a student's profile and search criteria.
 
 Rules:
-- Only return postings you actually found and opened during this run. Never invent a posting, company or link.
+- Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link. Open a page when you need to check that a posting is still open.
 - Prefer the company's own careers page or the original job-board posting. The url must lead to that specific posting.
 - Skip postings that are closed, expired, or whose deadline has passed.
 - Respect the search criteria (roles, locations, work mode, duration, start date, languages). Mention any compromise in matchReason.
 - Quality over quantity: return fewer offers rather than weak matches. Rank by matchScore, highest first.
-- Skip any posting whose url is in the "already suggested" list.
+- Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
+- If you run out of searches, return the good offers you found so far rather than nothing.
 When you are done, call submit_offers exactly once.`;
-
-const urlId = (url: string) =>
-  createHash("sha1").update(url.trim().toLowerCase().replace(/[#?].*$/, "").replace(/\/$/, "")).digest("hex").slice(0, 20);
 
 function parseDate(s: string): Timestamp | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -77,16 +75,12 @@ async function runSearch(uid: string, searchId: string) {
     const existing = await db
       .collection(`users/${uid}/applications`)
       .where("type", "==", "internship")
-      .orderBy("updatedAt", "desc")
-      .limit(200)
-      .select("applyUrl", "status", "title", "organization", "dismissReason")
+      .select("applyUrl", "title", "organization")
       .get();
     const seen = existing.docs.map((d) => d.get("applyUrl")).filter(Boolean);
-    // Offers the student turned down, with their reasons, so BAPTOU stops suggesting similar ones.
-    const dismissed = existing.docs
-      .filter((d) => d.get("status") === "dismissed" && d.get("dismissReason"))
-      .slice(0, 20)
-      .map((d) => `- ${d.get("title")} at ${d.get("organization")}: ${d.get("dismissReason")}`);
+    const existingKeys = new Set(existing.docs.map((d) => offerKey(d.get("organization") ?? "", d.get("title") ?? "")));
+    // Turned-down offers are deleted but remembered: never suggested again, and their reasons guide the search.
+    const dismissed = await loadDismissed(uid);
     // No product limit on offers per run; 50 only guards against typos (e.g. 500) and oversized answers.
     const maxPerRun = Math.min(Math.max(Math.round(search.maxPerRun) || 5, 1), 50);
 
@@ -94,7 +88,8 @@ async function runSearch(uid: string, searchId: string) {
       uid,
       system: SYSTEM,
       model: MODELS.search,
-      web: { searches: 4 + Math.ceil(maxPerRun / 2), fetches: 2 + Math.ceil(maxPerRun / 2) },
+      // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
+      web: { searches: Math.min(8 + maxPerRun, 40), fetches: Math.min(3 + maxPerRun, 25) },
       maxRunUsd: 0.5 + 0.08 * maxPerRun,
       submit: { name: "submit_offers", description: "Return the internship offers found in this run.", schema: OffersSchema },
       prompt: [
@@ -112,20 +107,28 @@ Search criteria:
 - Languages: ${search.languages || "any"}
 - Notes from the student: ${search.notes || "none"}
 
-${dismissed.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new internship offers.
-Already suggested (skip these): ${seen.length ? seen.join("\n") : "none"}`,
+${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new internship offers.
+Already suggested (skip these): ${seen.length ? seen.slice(0, 150).join("\n") : "none"}
+Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slice(0, 150).join("\n") : "none"}`,
         },
       ],
     });
 
     let created = 0;
-    for (const o of result.offers.slice(0, maxPerRun)) {
-      const ref = db.doc(`users/${uid}/applications/${urlId(o.url)}`);
+    const batchAt = Timestamp.now(); // groups this run's offers into the "Latest batch" list
+    for (const o of result.offers) {
+      if (created >= maxPerRun) break;
+      const id = urlId(o.url);
+      const key = offerKey(o.organization, o.title);
+      // Hard guarantee, whatever the model returned: turned-down and already-listed offers never come back.
+      if (dismissed.urlIds.has(id) || dismissed.offerKeys.has(key) || existingKeys.has(key)) continue;
+      const ref = db.doc(`users/${uid}/applications/${id}`);
       try {
         await ref.create({
           type: "internship",
           status: "suggested",
           searchId,
+          batchAt,
           title: o.title,
           organization: o.organization,
           country: o.country,
@@ -144,6 +147,7 @@ Already suggested (skip these): ${seen.length ? seen.join("\n") : "none"}`,
           updatedAt: FieldValue.serverTimestamp(),
         });
         created++;
+        existingKeys.add(key);
       } catch {
         // Already exists: same posting suggested before.
       }
@@ -152,6 +156,7 @@ Already suggested (skip these): ${seen.length ? seen.join("\n") : "none"}`,
     await searchRef.update({
       runState: "idle",
       lastRunAt: FieldValue.serverTimestamp(),
+      lastBatchAt: batchAt,
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${result.summary}`,
       totalFound: FieldValue.increment(created),
     });

@@ -21,6 +21,11 @@ service cloud.firestore {
           && request.resource.data.get('sentAt', null) == resource.data.get('sentAt', null);
       }
 
+      // Offers the user turned down (the offer itself is deleted). Written by dismissOffer only.
+      match /dismissedOffers/{offerId} {
+        allow read: if isOwner(uid);
+      }
+
       // Internship searches: BAPTOU only searches while one is "active".
       match /searches/{searchId} {
         allow read, write: if isOwner(uid);

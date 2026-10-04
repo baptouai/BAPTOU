@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  addDoc, collection, deleteField, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
+  addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { statusLabel } from "@/components/ApplicationList";
+import { dismissOffer, statusLabel } from "@/components/ApplicationList";
 import { ApplicationFormView, coverLetterField } from "@/components/ApplicationFormView";
 import { ContactsPanel, sendApprovedEmail } from "@/components/Contacts";
 import { DismissForm } from "@/components/DismissForm";
@@ -26,6 +26,8 @@ const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>
 
 export default function ApplicationPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [missing, setMissing] = useState(false);
   const { user } = useAuth();
   const [app, setApp] = useState<Application | null>(null);
   const [letter, setLetter] = useState("");
@@ -46,6 +48,7 @@ export default function ApplicationPage() {
     if (!appRef) return;
     return onSnapshot(appRef, (snap) => {
       const data = snap.data() as Application | undefined;
+      setMissing(!data);
       if (!data) return;
       setApp(data);
       if (!loaded.current) {
@@ -121,6 +124,12 @@ export default function ApplicationPage() {
     scheduleSave({ letter: v.text });
   }
 
+  async function dismiss(reason: string) {
+    await flushSave();
+    await dismissOffer({ applicationId: id, reason });
+    router.push(app?.type === "masters" ? "/universities" : "/applications");
+  }
+
   async function setStatus(status: Application["status"], extra: Partial<Application> = {}) {
     if (!appRef) return;
     await updateDoc(appRef, { status, ...extra, updatedAt: serverTimestamp() });
@@ -145,6 +154,13 @@ export default function ApplicationPage() {
     }
   }
 
+  if (missing) {
+    return (
+      <p className="text-muted">
+        This offer was removed. <Link href="/applications" className="text-accent">Back to internships</Link>
+      </p>
+    );
+  }
   if (!app) return <p className="text-muted">Loading…</p>;
 
   return (
@@ -169,18 +185,13 @@ export default function ApplicationPage() {
         </div>
       </div>
 
-      {app.status === "dismissed" && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-5 text-sm">
-          <p>
-            <span className="font-medium">You dismissed this offer.</span>{" "}
-            <span className="text-muted">{app.dismissReason}</span>
-          </p>
-          <button
-            onClick={() => setStatus("suggested", { dismissReason: deleteField() as never })}
-            className="rounded-lg border border-border px-3 py-1.5"
-          >
-            Restore
+      {app.status === "suggested" && (
+        <section className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-5">
+          <p className="w-full text-sm text-muted">Is this offer for you?</p>
+          <button onClick={() => setStatus("interested")} className="rounded-lg bg-accent px-4 py-2 font-medium text-white">
+            I&apos;m interested
           </button>
+          <DismissForm onDismiss={dismiss} />
         </section>
       )}
 
@@ -330,9 +341,7 @@ export default function ApplicationPage() {
               Mark as applied
             </button>
           )}
-          {(app.status === "suggested" || app.status === "editing") && (
-            <DismissForm onDismiss={(reason) => setStatus("dismissed", { dismissReason: reason })} />
-          )}
+          {app.status !== "suggested" && app.status !== "applied" && !app.emailSentAt && <DismissForm onDismiss={dismiss} />}
         </div>
       </section>
     </div>

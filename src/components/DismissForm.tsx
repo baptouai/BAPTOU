@@ -17,6 +17,7 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -31,7 +32,7 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
 
   return (
     <div className="grid w-full gap-3 rounded-lg border border-border p-4">
-      <p className="text-sm font-medium">Why isn&apos;t it for you? BAPTOU will avoid similar offers.</p>
+      <p className="text-sm font-medium">Why isn&apos;t it for you? The offer will be deleted and never suggested again, and BAPTOU will avoid similar ones.</p>
       <div className="flex flex-wrap gap-2">
         {REASONS.map((r) => (
           <button
@@ -56,16 +57,24 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
           disabled={!reason || busy}
           onClick={async () => {
             setBusy(true);
-            await onDismiss(reason);
+            setError(null);
+            try {
+              await onDismiss(reason);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Something went wrong");
+            } finally {
+              setBusy(false);
+            }
           }}
           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          Dismiss this offer
+          {busy ? "Deleting…" : "Dismiss this offer"}
         </button>
         <button onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-sm text-muted">
           Cancel
         </button>
       </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
 }

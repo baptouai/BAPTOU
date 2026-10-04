@@ -22,6 +22,7 @@ export type ApplicationType = "internship" | "masters";
 
 export type ApplicationStatus =
   | "suggested" // created by BAPTOU, not reviewed yet
+  | "interested" // the user said they're interested
   | "editing" // user is working on it
   | "approved" // letter/email approved by the user
   | "applied"
@@ -40,6 +41,7 @@ export type Application = {
   matchScore?: number; // 0-100
   location?: string;
   searchId?: string; // the search that found it
+  batchAt?: Timestamp; // when the search run that found it happened
   dismissReason?: string; // why the user turned it down; future searches learn from it
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
   fitVerdictReason?: string;
