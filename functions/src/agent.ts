@@ -40,9 +40,17 @@ export function submitTool(name: string, description: string, schema: z.ZodType)
   return { name, description, strict: true, input_schema };
 }
 
+/** A tool BAPTOU runs itself (e.g. Gmail search); its result is sent back to Claude as text. */
+export type ClientTool = {
+  name: string;
+  description: string;
+  schema: z.ZodType;
+  run: (input: unknown) => Promise<string>;
+};
+
 /**
- * Runs Claude with web tools until it calls the `submit` tool, and returns that tool's validated input.
- * Server tools (web search/fetch) run on Anthropic's side; we only loop on pause_turn.
+ * Runs Claude until it calls the `submit` tool, and returns that tool's validated input.
+ * Web search/fetch run on Anthropic's side (we only continue on pause_turn); client tools run here.
  */
 export async function runAgent<T>(opts: {
   uid: string;
@@ -50,16 +58,25 @@ export async function runAgent<T>(opts: {
   prompt: Anthropic.Beta.BetaContentBlockParam[];
   submit: { name: string; description: string; schema: z.ZodType<T> };
   model: Model;
-  web: WebBudget;
+  web: WebBudget | null;
+  clientTools?: ClientTool[];
+  maxToolCalls?: number; // ceiling on client tool calls, default 10
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
   await assertBudget(opts.uid);
-  const tools = [...webTools(opts.web), submitTool(opts.submit.name, opts.submit.description, opts.submit.schema)];
+  const clientTools = opts.clientTools ?? [];
+  const tools = [
+    ...(opts.web ? webTools(opts.web) : []),
+    ...clientTools.map((t) => submitTool(t.name, t.description, t.schema)),
+    submitTool(opts.submit.name, opts.submit.description, opts.submit.schema),
+  ];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: opts.prompt }];
+  const maxToolCalls = opts.maxToolCalls ?? 10;
+  let toolCalls = 0;
   let nudged = false;
   let runCost = 0;
 
-  for (let i = 0; i < MAX_CONTINUATIONS; i++) {
+  for (let i = 0; i < MAX_CONTINUATIONS + maxToolCalls; i++) {
     const response = await claude()
       .beta.messages.stream({
         model: opts.model,
@@ -67,7 +84,7 @@ export async function runAgent<T>(opts: {
         ...fallbackFor(opts.model),
         output_config: { effort: opts.effort ?? "medium" },
         // Caching: the system prompt is a fixed breakpoint, and the top-level field caches the growing
-        // tail, so pages Claude re-reads during the search loop are billed at 10% instead of in full.
+        // tail, so content Claude re-reads during the loop is billed at 10% instead of in full.
         cache_control: { type: "ephemeral" },
         system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
         tools,
@@ -80,9 +97,8 @@ export async function runAgent<T>(opts: {
       throw new HttpsError("internal", "BAPTOU couldn't complete this request.");
     }
 
-    const call = response.content.find(
-      (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === opts.submit.name,
-    );
+    const uses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+    const call = uses.find((b) => b.name === opts.submit.name);
     if (call) {
       const parsed = opts.submit.schema.safeParse(call.input);
       if (parsed.success) return parsed.data;
@@ -90,7 +106,33 @@ export async function runAgent<T>(opts: {
     }
 
     messages.push({ role: "assistant", content: response.content });
-    if (response.stop_reason === "pause_turn" && runCost < MAX_RUN_USD) continue;
+    const overBudget = runCost >= MAX_RUN_USD || toolCalls >= maxToolCalls;
+
+    if (response.stop_reason === "tool_use" && uses.length) {
+      // All results go back in one user message, as the API expects.
+      const results: Anthropic.Beta.BetaToolResultBlockParam[] = await Promise.all(
+        uses.map(async (use) => {
+          const tool = clientTools.find((t) => t.name === use.name);
+          if (!tool) return { type: "tool_result" as const, tool_use_id: use.id, is_error: true, content: "Unknown tool." };
+          if (overBudget) {
+            return { type: "tool_result" as const, tool_use_id: use.id, is_error: true, content: `Limit reached. Call ${opts.submit.name} now with what you have.` };
+          }
+          toolCalls++;
+          const parsed = tool.schema.safeParse(use.input);
+          if (!parsed.success) return { type: "tool_result" as const, tool_use_id: use.id, is_error: true, content: "Invalid input." };
+          try {
+            return { type: "tool_result" as const, tool_use_id: use.id, content: await tool.run(parsed.data) };
+          } catch (e) {
+            return { type: "tool_result" as const, tool_use_id: use.id, is_error: true, content: e instanceof Error ? e.message : "Tool failed." };
+          }
+        }),
+      );
+      messages.push({ role: "user", content: results });
+      if (overBudget) nudged = true;
+      continue;
+    }
+
+    if (response.stop_reason === "pause_turn" && !overBudget) continue;
     if (nudged) break;
     nudged = true;
     messages.push({ role: "user", content: `Now call ${opts.submit.name} with your final answer.` });

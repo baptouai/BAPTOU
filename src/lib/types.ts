@@ -145,3 +145,33 @@ export type ApplicationForm = {
   sections: { title: string; fields: FormField[] }[];
   preparedAt?: Timestamp;
 };
+
+// users/{uid}.gmail, written by the Gmail OAuth callback (the token itself is server-only).
+export type GmailConnection = {
+  email?: string;
+  canRead?: boolean;
+  canSend?: boolean;
+  needsReconnect?: boolean;
+  connectedAt?: Timestamp;
+};
+
+// users/{uid}/contacts/{id}: people from the mailbox who could help, written by findContacts.
+export type Contact = {
+  name: string;
+  email: string;
+  organization: string;
+  role: string;
+  relationship: "recruiter" | "manager" | "colleague" | "professor" | "alumni" | "classmate" | "friend" | "other";
+  lastContactDate: string;
+  history: string;
+  whyContact: string;
+  threadId: string;
+  replyInThread: boolean;
+  draft: { to: string; subject: string; body: string };
+  draftEditedByUser?: boolean;
+  status: "suggested" | "sent" | "dismissed";
+  applicationIds?: string[];
+  sentAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};

@@ -11,6 +11,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { statusLabel } from "@/components/ApplicationList";
 import { ApplicationFormView, coverLetterField } from "@/components/ApplicationFormView";
+import { ContactsPanel, sendApprovedEmail } from "@/components/Contacts";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import type { Application, LetterVersion } from "@/lib/types";
@@ -34,6 +35,8 @@ export default function ApplicationPage() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Partial<Application> | null>(null);
   const loaded = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const appRef = user ? doc(db, "users", user.uid, "applications", id) : null;
 
@@ -124,11 +127,22 @@ export default function ApplicationPage() {
     setApp((a) => (a ? { ...a, status } : a));
   }
 
+  // Approval and sending are one click: the approved draft is saved, then the server sends exactly
+  // what is stored (not what the browser sends), from the user's Gmail.
   async function approveEmail() {
     if (!appRef || !email) return;
-    await saveVersion();
-    // The Cloud Function `sendApprovedEmail` (step 5) sends exactly this approved draft.
-    await setStatus("approved", { emailDraft: email, emailApprovedAt: serverTimestamp() as never });
+    if (!confirm(`Send this email to ${email.to || "(no recipient)"} from your Gmail now?`)) return;
+    setEmailError(null);
+    setSending(true);
+    try {
+      await flushSave();
+      await setStatus("approved", { emailDraft: email, emailApprovedAt: serverTimestamp() as never });
+      await sendApprovedEmail({ kind: "application", id });
+    } catch (e) {
+      setEmailError(e instanceof Error ? e.message : "Couldn't send the email");
+    } finally {
+      setSending(false);
+    }
   }
 
   if (!app) return <p className="text-muted">Loading…</p>;
@@ -260,11 +274,12 @@ export default function ApplicationPage() {
           </div>
           <button
             onClick={approveEmail}
-            disabled={app.status === "approved" || !!app.emailSentAt}
+            disabled={sending || !!app.emailSentAt}
             className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
           >
-            {app.emailSentAt ? "Sent" : app.status === "approved" ? "Approved" : "Approve & send"}
+            {app.emailSentAt ? "Sent" : sending ? "Sending…" : "Approve & send"}
           </button>
+          {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
           </>
         )}
       </section>
@@ -276,6 +291,8 @@ export default function ApplicationPage() {
           {app.approachNote && <Info title="Approach taken in the letter" text={app.approachNote} />}
         </section>
       )}
+
+      <ContactsPanel applicationId={id} organization={app.organization} />
 
       <FitCheck applicationId={id} />
 

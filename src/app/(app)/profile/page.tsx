@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp,
 } from "firebase/firestore";
@@ -9,6 +9,7 @@ import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { DocumentKind, UploadedDocument } from "@/lib/types";
 import { ProfileSummary } from "@/components/ProfileSummary";
+import { GmailConnect } from "@/components/GmailConnect";
 
 const kinds: { value: DocumentKind; label: string }[] = [
   { value: "cv", label: "CV" },
@@ -111,6 +112,11 @@ export default function ProfilePage() {
       </ul>
 
       <ProfileSummary hasDocuments={docs.length > 0} />
+
+      {/* useSearchParams (Gmail connection result) needs a Suspense boundary. */}
+      <Suspense>
+        <GmailConnect />
+      </Suspense>
     </div>
   );
 }

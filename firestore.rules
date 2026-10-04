@@ -12,6 +12,15 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // People from the mailbox to contact, with draft emails. Created by findContacts; the user can
+      // edit drafts or dismiss, but only the server records a send.
+      match /contacts/{contactId} {
+        allow read, delete: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && request.resource.data.status != 'sent'
+          && request.resource.data.get('sentAt', null) == resource.data.get('sentAt', null);
+      }
+
       // Internship searches: BAPTOU only searches while one is "active".
       match /searches/{searchId} {
         allow read, write: if isOwner(uid);

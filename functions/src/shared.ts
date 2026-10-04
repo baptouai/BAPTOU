@@ -26,6 +26,7 @@ export const MODELS = {
   letter: "claude-opus-5",
   email: "claude-sonnet-5",
   ask: "claude-sonnet-5",
+  contacts: "claude-sonnet-5",
 } satisfies Record<string, Model>;
 
 // USD per million tokens (Claude API list prices). Cache writes cost 1.25x input, cache reads 0.1x.
