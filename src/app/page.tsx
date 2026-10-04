@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
@@ -15,6 +16,7 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-md text-center">
+        <Image src="/logo.svg" alt="" width={72} height={72} className="mx-auto mb-6" priority />
         <h1 className="text-5xl font-bold tracking-tight">BAPTOU</h1>
         <p className="mt-4 text-lg text-muted">
           Your AI agent for internships and master&apos;s applications. It finds

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -30,7 +31,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
-          <Link href="/dashboard" className="font-bold tracking-tight">
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
+            <Image src="/logo.svg" alt="" width={24} height={24} />
             BAPTOU
           </Link>
           <nav className="flex flex-1 gap-4 overflow-x-auto text-sm">
