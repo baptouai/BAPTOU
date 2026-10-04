@@ -8,11 +8,19 @@ import { db, functions, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
 
-const prepareApplication = httpsCallable<{ applicationId: string }, ApplicationForm | null>(functions, "prepareApplication", {
+const prepareApplication = httpsCallable<{ applicationId: string; formText?: string }, ApplicationForm | null>(functions, "prepareApplication", {
   timeout: 540_000,
 });
 
 const COVER_LETTER_LABEL = /cover(ing)? letter|motivation letter|lettre de motivation|anschreiben|carta de presentaci/i;
+
+/** Whether the application asks for a motivation letter (as a text box or a file). */
+export function formAsksForLetter(form: ApplicationForm | undefined) {
+  return (
+    !!coverLetterField(form) ||
+    !!form?.sections.some((s) => s.fields.some((f) => f.kind === "file" && f.suggestedDocument === "motivation_letter"))
+  );
+}
 
 /** The form field asking for the cover/motivation letter, if any. Older forms lack the flag, so the label is checked too. */
 export function coverLetterField(form: ApplicationForm | undefined): FormField | undefined {
@@ -60,11 +68,11 @@ export function ApplicationFormView({
     );
   }, [user]);
 
-  async function prepare() {
+  async function prepare(formText?: string) {
     setBusy(true);
     setError(null);
     try {
-      const { data } = await prepareApplication({ applicationId });
+      const { data } = await prepareApplication({ applicationId, ...(formText ? { formText } : {}) });
       if (data) setLocal(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -110,16 +118,28 @@ export function ApplicationFormView({
           <h2 className="font-medium">Application form</h2>
           <p className="mt-1 text-sm text-muted">
             {local
-              ? `${local.platform} · ${local.seenOnForm ? "fields read from the real form" : "fields inferred from the posting — check them on the page"}`
+              ? `${local.platform} · ${
+                  local.source === "pasted"
+                    ? "fields from the form you pasted"
+                    : local.seenOnForm
+                      ? "fields read from the real form"
+                      : "estimated: BAPTOU couldn't see the real form"
+                }`
               : "BAPTOU opens the application page and prepares every field in the organization's format."}
           </p>
         </div>
         <button
-          onClick={prepare}
+          onClick={() => prepare()}
           disabled={preparing}
           className={local ? "rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50" : "rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"}
         >
-          {preparing ? "Reading the form… (1–3 min)" : local ? "Prepare again" : "Prepare this application"}
+          {preparing
+            ? "Reading the form… (1–3 min)"
+            : local
+              ? "Prepare again"
+              : status === "error"
+                ? "Try again"
+                : "Prepare this application"}
         </button>
       </div>
       {shownError && <p className="mt-2 text-sm text-red-600">{shownError}</p>}
@@ -128,10 +148,34 @@ export function ApplicationFormView({
           BAPTOU is opening the application page and reading the form. You can keep reading the offer meanwhile.
         </p>
       )}
+      {!local && !preparing && (
+        <PasteForm
+          collapsed
+          intro="Some careers sites only show the form after you sign in or confirm your email. If that's the case, sign in there, then paste the form here."
+          onSubmit={prepare}
+        />
+      )}
 
       {local && (
         <>
           {local.notes && <p className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">{local.notes}</p>}
+          {local.source !== "pasted" && (!local.seenOnForm || local.loginRequired) ? (
+            <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p className="font-medium text-amber-800 dark:text-amber-300">
+                {local.loginRequired
+                  ? "This careers site asks you to sign in or confirm your email before it shows the form."
+                  : "BAPTOU couldn't see the real form."}{" "}
+                The fields below are what this platform usually asks, not the exact form.
+              </p>
+              <PasteForm
+                intro="To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here."
+                formUrl={local.formUrl}
+                onSubmit={prepare}
+              />
+            </div>
+          ) : (
+            <PasteForm collapsed intro="The real form looks different? Paste it here and BAPTOU will follow it exactly." onSubmit={prepare} />
+          )}
           <Checklist fields={fields} docs={docs} letter={letter} />
           {todo > 0 && (
             <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
@@ -174,6 +218,73 @@ export function ApplicationFormView({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The student pastes the text of the real form (copied from the careers site after signing in), and
+ * BAPTOU lays out exactly that form. One AI call; no browsing needed.
+ */
+function PasteForm({
+  intro,
+  formUrl,
+  collapsed = false,
+  onSubmit,
+}: {
+  intro: string;
+  formUrl?: string;
+  collapsed?: boolean;
+  onSubmit: (formText: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(!collapsed);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-3 text-sm text-muted underline">
+        Paste the real application form
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 grid gap-2">
+      <p className="text-sm text-muted">
+        {intro}{" "}
+        {formUrl && (
+          <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-accent">
+            Open the form ↗
+          </a>
+        )}
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={5}
+        disabled={busy}
+        placeholder="Paste the whole form page here"
+        className="rounded-lg border border-border bg-background p-3 text-sm"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={async () => {
+            setBusy(true);
+            await onSubmit(text);
+            setBusy(false);
+            setText("");
+          }}
+          disabled={busy || text.trim().length < 40}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {busy ? "Reading your form… (about 1 min)" : "Use this form"}
+        </button>
+        {collapsed && (
+          <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted">
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

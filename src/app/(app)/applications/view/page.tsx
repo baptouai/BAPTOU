@@ -10,7 +10,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { dismissOffer, statusLabel } from "@/components/ApplicationList";
-import { ApplicationFormView, coverLetterField } from "@/components/ApplicationFormView";
+import { ApplicationFormView, coverLetterField, formAsksForLetter } from "@/components/ApplicationFormView";
 import { sendApprovedEmail } from "@/components/Contacts";
 import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
@@ -48,6 +48,8 @@ function ApplicationView() {
   const pending = useRef<Partial<Application> | null>(null);
   const loaded = useRef(false);
   const [sending, setSending] = useState(false);
+  const [wantLetter, setWantLetter] = useState(false);
+  const [wantEmail, setWantEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
   const appRef = user ? doc(db, "users", user.uid, "applications", id) : null;
@@ -173,6 +175,9 @@ function ApplicationView() {
   }
   if (!app) return <p className="text-muted">Loading…</p>;
 
+  const showLetter = !!letter || wantLetter || formAsksForLetter(app.applicationForm);
+  const showEmail = !!email || wantEmail;
+
   return (
     <div className="grid gap-6">
       <div>
@@ -219,94 +224,114 @@ function ApplicationView() {
           onChange={(applicationForm) => scheduleSave({ applicationForm })}
         />
 
-        <section id="letter" className="scroll-mt-4 rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium">Motivation letter</h2>
-            <span className="text-xs text-muted">
-              {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes"}
-            </span>
-          </div>
-          <AiBar
-            action={letter ? "Rewrite with BAPTOU" : "Write my letter"}
-            placeholder={letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize"}
-            busyLabel="BAPTOU is researching and writing… (1–3 min)"
-            onRun={writeLetter}
-          />
-          <textarea
-            value={letter}
-            onChange={(e) => {
-              setLetter(e.target.value);
-              scheduleSave({ letter: e.target.value });
-            }}
-            rows={18}
-            className="mt-3 w-full rounded-lg border border-border bg-background p-3 leading-relaxed"
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-              Save as version
-            </button>
-            <CopyButton text={letter} label="Copy letter" />
-          </div>
-          {versions.length > 0 && (
-            <details className="mt-4 text-sm">
-              <summary className="cursor-pointer text-muted">Version history ({versions.length})</summary>
-              <ul className="mt-2 grid gap-2">
-                {versions.map((v) => (
-                  <li key={v.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2">
-                    <span className="text-muted">
-                      {v.author === "baptou" ? "BAPTOU draft" : "Your version"} ·{" "}
-                      {v.createdAt?.toDate().toLocaleString() ?? "just now"}
-                    </span>
-                    <button onClick={() => restore(v)} className="text-accent">Restore</button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </section>
-
-        <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="font-medium">Email draft</h2>
-          <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
-          <AiBar
-            action={email ? "Rewrite email" : "Draft an email"}
-            placeholder={email ? "e.g. Warmer tone, in French" : "Optional: who it's for, what to say"}
-            busyLabel="BAPTOU is writing the email…"
-            onRun={writeEmail}
-          />
-          {email && (
-            <>
-            <div className="mt-3 grid gap-2">
-              <input
-                value={email.to}
-                onChange={(e) => { const next = { ...email, to: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
-                placeholder="To"
-                className="rounded-lg border border-border bg-background px-3 py-2"
-              />
-              <input
-                value={email.subject}
-                onChange={(e) => { const next = { ...email, subject: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
-                placeholder="Subject"
-                className="rounded-lg border border-border bg-background px-3 py-2"
-              />
-              <textarea
-                value={email.body}
-                onChange={(e) => { const next = { ...email, body: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
-                rows={10}
-                className="rounded-lg border border-border bg-background p-3"
-              />
+        {/* The letter box only when the form asks for one (or the user wants one); the email box only on request. */}
+        {showLetter && (
+          <section id="letter" className="scroll-mt-4 rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-medium">Motivation letter</h2>
+              <span className="text-xs text-muted">
+                {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes"}
+              </span>
             </div>
-            <button
-              onClick={approveEmail}
-              disabled={sending || !!app.emailSentAt}
-              className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
-            >
-              {app.emailSentAt ? "Sent" : sending ? "Sending…" : "Approve & send"}
-            </button>
-            {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
-            </>
+            <AiBar
+              action={letter ? "Rewrite with BAPTOU" : "Write my letter"}
+              placeholder={letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize"}
+              busyLabel="BAPTOU is researching and writing… (1–3 min)"
+              onRun={writeLetter}
+            />
+            <textarea
+              value={letter}
+              onChange={(e) => {
+                setLetter(e.target.value);
+                scheduleSave({ letter: e.target.value });
+              }}
+              rows={18}
+              className="mt-3 w-full rounded-lg border border-border bg-background p-3 leading-relaxed"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">
+                Save as version
+              </button>
+              <CopyButton text={letter} label="Copy letter" />
+            </div>
+            {versions.length > 0 && (
+              <details className="mt-4 text-sm">
+                <summary className="cursor-pointer text-muted">Version history ({versions.length})</summary>
+                <ul className="mt-2 grid gap-2">
+                  {versions.map((v) => (
+                    <li key={v.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2">
+                      <span className="text-muted">
+                        {v.author === "baptou" ? "BAPTOU draft" : "Your version"} ·{" "}
+                        {v.createdAt?.toDate().toLocaleString() ?? "just now"}
+                      </span>
+                      <button onClick={() => restore(v)} className="text-accent">Restore</button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </section>
           )}
-        </section>
+
+          {showEmail && (
+          <section className="rounded-xl border border-border bg-card p-5">
+            <h2 className="font-medium">Email draft</h2>
+            <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
+            <AiBar
+              action={email ? "Rewrite email" : "Draft an email"}
+              placeholder={email ? "e.g. Warmer tone, in French" : "Optional: who it's for, what to say"}
+              busyLabel="BAPTOU is writing the email…"
+              onRun={writeEmail}
+            />
+            {email && (
+              <>
+              <div className="mt-3 grid gap-2">
+                <input
+                  value={email.to}
+                  onChange={(e) => { const next = { ...email, to: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
+                  placeholder="To"
+                  className="rounded-lg border border-border bg-background px-3 py-2"
+                />
+                <input
+                  value={email.subject}
+                  onChange={(e) => { const next = { ...email, subject: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
+                  placeholder="Subject"
+                  className="rounded-lg border border-border bg-background px-3 py-2"
+                />
+                <textarea
+                  value={email.body}
+                  onChange={(e) => { const next = { ...email, body: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
+                  rows={10}
+                  className="rounded-lg border border-border bg-background p-3"
+                />
+              </div>
+              <button
+                onClick={approveEmail}
+                disabled={sending || !!app.emailSentAt}
+                className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
+              >
+                {app.emailSentAt ? "Sent" : sending ? "Sending…" : "Approve & send"}
+              </button>
+              {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
+              </>
+            )}
+          </section>
+          )}
+
+          {(!showLetter || !showEmail) && (
+            <div className="flex flex-wrap gap-4 text-sm">
+              {!showLetter && (
+                <button onClick={() => setWantLetter(true)} className="text-muted underline">
+                  {app.applicationForm ? "This form doesn't ask for a letter. Write one anyway" : "Write a motivation letter"}
+                </button>
+              )}
+              {!showEmail && (
+                <button onClick={() => setWantEmail(true)} className="text-muted underline">
+                  Draft an email to the recruiter
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
 

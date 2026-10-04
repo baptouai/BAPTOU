@@ -143,6 +143,8 @@ export type ApplicationForm = {
   platform: string;
   formUrl: string;
   seenOnForm: boolean;
+  loginRequired?: boolean; // the careers site asks to sign in / verify an email before showing the form
+  source?: "read" | "inferred" | "pasted"; // how BAPTOU got the fields
   notes: string;
   sections: { title: string; fields: FormField[] }[];
   preparedAt?: Timestamp;
