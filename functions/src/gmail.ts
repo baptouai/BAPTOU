@@ -102,6 +102,7 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
           email: profile.emailAddress,
           canRead: granted.includes(SCOPES[0]),
           canSend: granted.includes(SCOPES[1]),
+          needsReconnect: false,
           connectedAt: FieldValue.serverTimestamp(),
         },
       },

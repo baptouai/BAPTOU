@@ -8,7 +8,10 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { Contact, GmailConnection } from "@/lib/types";
 
-const findContacts = httpsCallable<{ applicationId?: string }, { found: number; summary: string }>(functions, "findContacts", {
+const findContacts = httpsCallable<
+  { applicationId?: string; full?: boolean },
+  { found: number; summary: string; incremental: boolean }
+>(functions, "findContacts", {
   timeout: 540_000,
 });
 const draftContactEmail = httpsCallable<{ contactId: string; instructions: string }, Contact["draft"]>(
@@ -43,6 +46,7 @@ export function ContactsPanel({ applicationId, organization }: { applicationId?:
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [lastScan, setLastScan] = useState<number | null>(null); // epoch seconds
 
   useEffect(() => {
     if (!user) return;
@@ -53,18 +57,29 @@ export function ContactsPanel({ applicationId, organization }: { applicationId?:
     const unsubContacts = onSnapshot(q, (snap) =>
       setContacts(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Contact) }))),
     );
-    const unsubUser = onSnapshot(doc(db, "users", user.uid), (snap) => setGmail((snap.get("gmail") as GmailConnection) ?? null));
+    const unsubUser = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setGmail((snap.get("gmail") as GmailConnection) ?? null);
+      if (!applicationId) setLastScan((snap.get("contactsScan.generalAt") as number) ?? null);
+    });
+    // Per-offer scans keep their own "last scanned" time on the offer.
+    const unsubApp = applicationId
+      ? onSnapshot(doc(db, "users", user.uid, "applications", applicationId), (snap) =>
+          setLastScan((snap.get("contactsScannedAt") as number) ?? null),
+        )
+      : () => {};
     return () => {
       unsubContacts();
       unsubUser();
+      unsubApp();
     };
   }, [user, applicationId]);
 
-  async function search() {
+  async function search(full = false) {
+    if (full && !confirm("Scan your whole mailbox again? It costs more than scanning only new emails.")) return;
     setBusy(true);
     setMessage(null);
     try {
-      const { data } = await findContacts(applicationId ? { applicationId } : {});
+      const { data } = await findContacts({ ...(applicationId ? { applicationId } : {}), full });
       setMessage(data.found ? data.summary : `No new contacts found. ${data.summary}`);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Something went wrong");
@@ -88,9 +103,23 @@ export function ContactsPanel({ applicationId, organization }: { applicationId?:
           </p>
         </div>
         {connected ? (
-          <button onClick={search} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            {busy ? "Searching your mailbox… (1–3 min)" : contacts.length ? "Search again" : "Search my mailbox"}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => search()}
+              disabled={busy}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {busy ? "Searching your mailbox… (1–3 min)" : lastScan ? "Check new emails" : "Search my mailbox"}
+            </button>
+            {lastScan && !busy && (
+              <p className="text-right text-xs text-muted">
+                Last scan {new Date(lastScan * 1000).toLocaleString()}. Only newer emails are searched.{" "}
+                <button onClick={() => search(true)} className="underline">
+                  Scan everything again
+                </button>
+              </p>
+            )}
+          </div>
         ) : (
           gmail !== undefined && (
             <Link href="/profile" className="rounded-lg border border-accent px-4 py-2 text-sm text-accent">

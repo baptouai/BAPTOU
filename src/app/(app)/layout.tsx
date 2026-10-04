@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { GmailReconnectBanner } from "@/components/GmailConnect";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
@@ -53,6 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
+      <GmailReconnectBanner />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
     </div>
   );

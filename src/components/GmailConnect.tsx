@@ -18,6 +18,27 @@ const callbackMessage: Record<string, string> = {
   error: "Couldn't connect Gmail. Try again.",
 };
 
+/** Shown on every page when Google has expired BAPTOU's Gmail access (weekly while the Google app is in Testing). */
+export function GmailReconnectBanner() {
+  const { user } = useAuth();
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "users", user.uid), (snap) => setExpired(snap.get("gmail.needsReconnect") === true));
+  }, [user]);
+
+  if (!expired) return null;
+  return (
+    <div className="border-b border-amber-500/30 bg-amber-500/10">
+      <p className="mx-auto max-w-5xl px-4 py-2 text-sm text-amber-800 dark:text-amber-300">
+        Your Gmail connection expired. <a href="/profile" className="font-medium underline">Reconnect Gmail</a> to keep
+        finding contacts and sending emails.
+      </p>
+    </div>
+  );
+}
+
 /** Connect / disconnect Gmail. BAPTOU reads to find past contacts and sends only emails approved in the app. */
 export function GmailConnect() {
   const { user } = useAuth();

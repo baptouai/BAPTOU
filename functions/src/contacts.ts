@@ -40,13 +40,19 @@ When done, call submit_contacts exactly once.`;
 
 const contactId = (email: string) => createHash("sha1").update(email.trim().toLowerCase()).digest("hex").slice(0, 20);
 
-function mailboxTools(gmail: Gmail): ClientTool[] {
+function mailboxTools(gmail: Gmail, since: number | null): ClientTool[] {
+  const scope = since
+    ? `Only emails received or sent after ${new Date(since * 1000).toISOString().slice(0, 10)} are searched: older ones were scanned before.`
+    : "Searches the whole mailbox.";
   return [
     {
       name: "search_mailbox",
-      description: "Search the student's whole Gmail mailbox. Returns up to 15 messages: threadId, date, from, to, subject, snippet.",
+      description: `Search the student's Gmail. ${scope} Returns up to 15 messages: threadId, date, from, to, subject, snippet.`,
       schema: z.object({ query: z.string().describe("Gmail search query") }),
-      run: async (input) => searchMail(gmail, (input as { query: string }).query),
+      run: async (input) => {
+        const query = (input as { query: string }).query;
+        return searchMail(gmail, since ? `(${query}) after:${since}` : query);
+      },
     },
     {
       name: "read_thread",
@@ -66,7 +72,10 @@ export const findContacts = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
-    const applicationId = z.string().optional().parse(request.data?.applicationId);
+    const { applicationId, full } = z
+      .object({ applicationId: z.string().optional(), full: z.boolean().default(false) })
+      .parse(request.data ?? {});
+    const startedAt = Math.floor(Date.now() / 1000);
 
     const gmail = await gmailFor(uid);
     const profile = await loadProfile(uid);
@@ -75,8 +84,17 @@ export const findContacts = onCall(
 
     const searches = await db.collection(`users/${uid}/searches`).where("status", "==", "active").get();
     const targets = searches.docs.map((d) => `- ${d.get("roles")} in ${d.get("locations") || "any location"}`).join("\n");
-    const known = await db.collection(`users/${uid}/contacts`).select("email", "status").get();
+    const known = await db.collection(`users/${uid}/contacts`).select("email", "name", "status").get();
     const skip = known.docs.filter((d) => d.get("status") === "dismissed").map((d) => d.get("email"));
+    const alreadyListed = known.docs
+      .filter((d) => d.get("status") !== "dismissed")
+      .map((d) => `${d.get("name")} <${d.get("email")}>`);
+
+    // Incremental scans: after the first scan, only mail newer than the previous scan is searched
+    // (per offer, and separately for the general scan). `full` forces a whole-mailbox scan.
+    const userDoc = await db.doc(`users/${uid}`).get();
+    const lastScan = (applicationId ? app?.contactsScannedAt : userDoc.get("contactsScan.generalAt")) as number | undefined;
+    const since = full || !lastScan ? null : lastScan;
 
     const focus = app
       ? `Focus: people who could help with this specific offer: ${app.title} at ${app.organization}${
@@ -89,8 +107,8 @@ export const findContacts = onCall(
       system: SYSTEM,
       model: MODELS.contacts,
       web: null,
-      clientTools: mailboxTools(gmail),
-      maxToolCalls: 12,
+      clientTools: mailboxTools(gmail, since),
+      maxToolCalls: since ? 8 : 12,
       submit: { name: "submit_contacts", description: "Return the contacts with draft emails.", schema: ContactsSchema },
       prompt: [
         { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },
@@ -101,7 +119,12 @@ Internship searches:
 ${targets || "none yet (use the profile's suggested targets)"}
 
 ${focus}
-${skip.length ? `The student does not want to contact: ${skip.join(", ")}` : ""}`,
+${skip.length ? `The student does not want to contact: ${skip.join(", ")}` : ""}
+${
+  since
+    ? `This is a follow-up scan: only emails since the last scan are searchable. Already suggested (only include them again if a new email changes the situation): ${alreadyListed.join(", ") || "none"}. If nothing new is relevant, return no contacts.`
+    : ""
+}`,
         },
       ],
     });
@@ -139,7 +162,13 @@ ${skip.length ? `The student does not want to contact: ${skip.join(", ")}` : ""}
       );
       saved.push(email);
     }
-    return { found: saved.length, summary: result.summary };
+    // Remember up to when the mailbox was scanned (start time, so mail arriving during the scan is not missed).
+    if (applicationId) {
+      await db.doc(`users/${uid}/applications/${applicationId}`).update({ contactsScannedAt: startedAt });
+    } else {
+      await db.doc(`users/${uid}`).set({ contactsScan: { generalAt: startedAt } }, { merge: true });
+    }
+    return { found: saved.length, summary: result.summary, incremental: !!since };
   },
 );
 
@@ -237,8 +266,19 @@ export const sendApprovedEmail = onCall({ region: REGION, secrets: GMAIL_SECRETS
   await db.doc(`private/${uid}`).set({ sends: { [day]: FieldValue.increment(1) } }, { merge: true });
   await ref.update(
     kind === "contact"
-      ? { status: "sent", sentAt: FieldValue.serverTimestamp(), sentMessageId: sent.id, updatedAt: FieldValue.serverTimestamp() }
-      : { emailSentAt: FieldValue.serverTimestamp(), sentMessageId: sent.id, updatedAt: FieldValue.serverTimestamp() },
+      ? {
+          status: "sent",
+          sentAt: FieldValue.serverTimestamp(),
+          sentMessageId: sent.id,
+          sentThreadId: sent.threadId, // watched later for replies (Gmail API only, no AI)
+          updatedAt: FieldValue.serverTimestamp(),
+        }
+      : {
+          emailSentAt: FieldValue.serverTimestamp(),
+          sentMessageId: sent.id,
+          sentThreadId: sent.threadId,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
   );
   return { ok: true };
 });
