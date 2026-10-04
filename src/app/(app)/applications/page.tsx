@@ -1,12 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ApplicationList, type ApplicationItem } from "@/components/ApplicationList";
 import { kindOf, SearchCard, SearchForm, type SearchItem } from "@/components/Searches";
+import { SearchTab } from "@/components/SearchTab";
 import type { Application, Search } from "@/lib/types";
 
 // The selected tab lives in the URL (?search=<id>, or ?search=new), so "Back" from an offer returns to it.
@@ -20,23 +21,39 @@ export default function ApplicationsPage() {
 
 const OTHER = "other"; // offers whose search was deleted
 
+const LAST_TAB_KEY = "baptou.applications.tab";
+function readLastTab() {
+  try {
+    return localStorage.getItem(LAST_TAB_KEY);
+  } catch {
+    return null; // storage blocked (private window…): fall back to the default tab
+  }
+}
+function saveLastTab(id: string) {
+  try {
+    localStorage.setItem(LAST_TAB_KEY, id);
+  } catch {
+    // not essential
+  }
+}
+
 function Applications() {
   const { user } = useAuth();
-  const router = useRouter();
-  const selected = useSearchParams().get("search");
+  // Switching tabs is plain state: changing ?search= in the URL makes Next rebuild the page (reloading
+  // the data and losing a tab being renamed). ?search= is only read on arrival (e.g. "Back" from an
+  // offer); the last tab is remembered in this browser for the next visit.
+  const fromUrl = useSearchParams().get("search");
+  const [selected, setSelected] = useState<string | null>(() => fromUrl ?? readLastTab());
+  const showTab = (id: string | null) => {
+    setSelected(id);
+    if (id && id !== "new") saveLastTab(id);
+  };
   const [searches, setSearches] = useState<SearchItem[] | null>(null);
   const [apps, setApps] = useState<ApplicationItem[] | null>(null);
-  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
-  // Double-click a tab to rename it; Enter or leaving the field saves, Esc cancels.
-  async function saveRename() {
-    if (!user || !renaming) return;
-    const name = renaming.name.trim();
-    const search = searches?.find((s) => s.id === renaming.id);
-    setRenaming(null);
-    if (name && search && name !== search.name) {
-      await updateDoc(doc(db, "users", user.uid, "searches", renaming.id), { name, updatedAt: serverTimestamp() });
-    }
+  async function rename(id: string, name: string) {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.uid, "searches", id), { name, updatedAt: serverTimestamp() });
   }
 
   useEffect(() => {
@@ -61,7 +78,7 @@ function Applications() {
   // A stopped search keeps its tab while it has offers; one with none disappears.
   const tabs = searches.filter((s) => s.status !== "stopped" || offersOf(s.id).length > 0);
   const orphans = offersOf(OTHER);
-  const select = (id: string) => router.replace(`/applications?search=${id}`);
+  const select = (id: string) => showTab(id);
 
   const creating = selected === "new" || tabs.length === 0;
   const current = creating
@@ -79,48 +96,18 @@ function Applications() {
       </p>
 
       <div role="tablist" className="mt-5 flex gap-1 overflow-x-auto border-b border-border">
-        {tabs.map((s) => {
-          const toReview = offersOf(s.id).filter((a) => a.status === "suggested").length;
-          const active = current?.id === s.id;
-          if (renaming?.id === s.id) {
-            return (
-              <input
-                key={s.id}
-                autoFocus
-                value={renaming.name}
-                onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
-                onBlur={saveRename}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveRename();
-                  if (e.key === "Escape") setRenaming(null);
-                }}
-                aria-label="Tab name"
-                className="-mb-px w-48 border-b-2 border-accent bg-transparent px-4 py-2.5 text-sm font-medium outline-none"
-              />
-            );
-          }
-          return (
-            <button
-              key={s.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => select(s.id)}
-              onDoubleClick={() => setRenaming({ id: s.id, name: s.name })}
-              title="Double-click to rename"
-              className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm ${
-                active ? "border-accent font-medium text-accent" : "border-transparent text-muted hover:text-foreground"
-              } ${s.status === "stopped" || s.status === "ended" ? "opacity-60" : ""}`}
-            >
-              {s.name}
-              {kindOf(s) === "masters" && <span className="rounded border border-border px-1 text-[10px] uppercase">Master&apos;s</span>}
-              {toReview > 0 && (
-                <span className="rounded-full bg-accent px-1.5 text-xs font-medium text-white" title={`${toReview} to review`}>
-                  {toReview}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {tabs.map((s) => (
+          <SearchTab
+            key={s.id}
+            name={s.name}
+            active={current?.id === s.id}
+            dimmed={s.status === "stopped" || s.status === "ended"}
+            masters={kindOf(s) === "masters"}
+            badge={offersOf(s.id).filter((a) => a.status === "suggested").length}
+            onSelect={() => select(s.id)}
+            onRename={(name) => rename(s.id, name)}
+          />
+        ))}
         {orphans.length > 0 && (
           <button
             role="tab"
@@ -157,7 +144,7 @@ function Applications() {
             <SearchForm
               takenNames={searches.map((x) => x.name)}
               onDone={() => {
-                if (tabs.length) router.replace("/applications");
+                if (tabs.length) showTab(null);
               }}
               onCreated={(id) => select(id)}
             />
