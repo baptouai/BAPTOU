@@ -109,7 +109,11 @@ export function ApplicationFormView({
 
   const fields = local?.sections.flatMap((s) => s.fields) ?? [];
   const coverField = coverLetterField(local);
-  const todo = fields.filter((f) => f.needsUser && !f.value).length;
+  // Only the parts that need work are laid out; routine fields (name, phone, address, consents…) are
+  // just listed. Older forms have no flag, so they're judged by field type.
+  const needsWork = (f: FormField) =>
+    f === coverField || (f.worthPreparing ?? (f.kind === "file" || f.kind === "entries" || f.kind === "long_text"));
+  const routine = fields.filter((f) => !needsWork(f));
 
   return (
     <section className="rounded-xl border border-border bg-card p-5">
@@ -177,20 +181,19 @@ export function ApplicationFormView({
             <PasteForm collapsed intro="The real form looks different? Paste it here and BAPTOU will follow it exactly." onSubmit={prepare} />
           )}
           <Checklist fields={fields} docs={docs} letter={letter} />
-          {todo > 0 && (
-            <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
-              {todo} field{todo > 1 ? "s" : ""} only you can answer — marked “Your answer” below.
-            </p>
-          )}
 
           <div className="mt-4 grid gap-6">
-            {local.sections.map((section, si) => (
+            {local.sections.map((section, si) => {
+              // Keep each field's position in the stored form, so edits land in the right place.
+              const shown = section.fields.map((field, fi) => ({ field, fi })).filter(({ field }) => needsWork(field));
+              if (!shown.length) return null;
+              return (
               <div key={si}>
                 <h3 className="border-b border-border pb-1 text-sm font-semibold uppercase tracking-wide text-muted">
                   {section.title}
                 </h3>
                 <ul className="mt-3 grid gap-4">
-                  {section.fields.map((field, fi) => (
+                  {shown.map(({ field, fi }) => (
                     <li key={fi}>
                       <FieldView
                         field={field}
@@ -204,8 +207,31 @@ export function ApplicationFormView({
                   ))}
                 </ul>
               </div>
-            ))}
+              );
+            })}
           </div>
+
+          {routine.length > 0 && (
+            <details className="mt-6 rounded-lg border border-border p-3 text-sm">
+              <summary className="cursor-pointer text-muted">
+                Also on the form, quick to fill in yourself ({routine.length}):{" "}
+                {routine
+                  .slice(0, 4)
+                  .map((f) => f.label.replace(/\s*\(.*\)$/, ""))
+                  .join(", ")}
+                {routine.length > 4 ? "…" : ""}
+              </summary>
+              <ul className="mt-2 grid gap-1 text-muted">
+                {routine.map((f, i) => (
+                  <li key={i}>
+                    {f.label}
+                    {f.required && <span className="text-red-600"> *</span>}
+                    {f.value && <span className="text-foreground"> · {f.value}</span>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
 
           <a
             href={local.formUrl}
@@ -296,7 +322,7 @@ const docLabel: Record<string, string> = {
   other: "Other document",
 };
 
-/** "What you need": files to attach and information only the student can give, ticked when ready. */
+/** "What you need": the files to attach, ticked when ready. */
 function Checklist({
   fields, docs, letter,
 }: {
@@ -316,16 +342,11 @@ function Checklist({
           : `Upload your ${docLabel[f.suggestedDocument].toLowerCase()} on the Profile page`;
       return { label: f.label, required: f.required, ready, hint };
     });
-  const info = fields
-    .filter((f) => f.needsUser)
-    .map((f) => ({ label: f.label, required: f.required, ready: !!f.value, hint: f.value || "To fill in below" }));
-
-  if (!files.length && !info.length) return null;
+  if (!files.length) return null;
 
   return (
-    <div className="mt-4 grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
+    <div className="mt-4 rounded-lg border border-border p-4">
       <ChecklistColumn title="Files to attach" items={files} empty="No files requested." />
-      <ChecklistColumn title="Information only you can give" items={info} empty="BAPTOU has prepared everything else." />
     </div>
   );
 }

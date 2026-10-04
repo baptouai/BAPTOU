@@ -25,6 +25,11 @@ const Field = z.object({
     .describe("For file fields: which of the student's documents to attach"),
   entries: z.array(Entry).describe("For 'entries' fields (experience, education lists), otherwise empty"),
   needsUser: z.boolean().describe("True for facts BAPTOU cannot know: phone, address, work permit, salary, consents"),
+  worthPreparing: z
+    .boolean()
+    .describe(
+      "True for fields that need real work: CV and other documents, cover letter, education and experience entries, written answers (why us, motivation, projects). False for routine facts typed in seconds: name, email, phone, address, links, consents, availability, eligibility, diversity questions",
+    ),
   isCoverLetter: z
     .boolean()
     .describe("True only for the field asking for the cover/motivation letter itself (text box or file upload)"),

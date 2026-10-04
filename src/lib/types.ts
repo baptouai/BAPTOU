@@ -137,6 +137,7 @@ export type FormField = {
   needsUser: boolean;
   note: string;
   isCoverLetter?: boolean; // missing on forms prepared before this flag existed
+  worthPreparing?: boolean; // needs real work (documents, education, experience, written answers); missing on older forms
 };
 
 export type ApplicationForm = {

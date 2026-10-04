@@ -36,8 +36,20 @@ const dayOf = (ms: number) => new Date(ms).toDateString();
 
 export function ApplicationList({ type, empty }: { type: ApplicationType; empty: string }) {
   const { user } = useAuth();
-  const [apps, setApps] = useState<Item[] | null>(null);
+  const [loaded, setApps] = useState<Item[] | null>(null);
   const [tab, setTab] = useState<Tab>("latest");
+  const [searchFilter, setSearchFilter] = useState<string>("all");
+  const [searches, setSearches] = useState<{ id: string; name: string; status: string }[]>([]);
+
+  // Offers are grouped by the search that found them, so different searches don't mix.
+  useEffect(() => {
+    if (!user || type !== "internship") return;
+    return onSnapshot(collection(db, "users", user.uid, "searches"), (snap) =>
+      setSearches(
+        snap.docs.map((d) => ({ id: d.id, name: (d.get("name") as string) || "Search", status: d.get("status") as string })),
+      ),
+    );
+  }, [user, type]);
 
   useEffect(() => {
     if (!user) return;
@@ -45,7 +57,23 @@ export function ApplicationList({ type, empty }: { type: ApplicationType; empty:
     return onSnapshot(q, (snap) => setApps(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Application) }))));
   }, [user, type]);
 
-  if (!apps) return <p className="mt-6 text-muted">Loading…</p>;
+  if (!loaded) return <p className="mt-6 text-muted">Loading…</p>;
+  let apps = loaded;
+
+  // One tab per search that has offers (stopped searches keep their tab while they have offers).
+  const searchTabs = [
+    ...searches
+      .map((s) => ({ ...s, count: apps.filter((a) => a.searchId === s.id).length }))
+      .filter((s) => s.count > 0 || s.status === "active"),
+    ...(apps.some((a) => !a.searchId || !searches.some((s) => s.id === a.searchId))
+      ? [{ id: "other", name: "Other", status: "", count: apps.filter((a) => !a.searchId || !searches.some((s) => s.id === a.searchId)).length }]
+      : []),
+  ];
+  const inSearch = (a: Item) =>
+    searchFilter === "all" ||
+    (searchFilter === "other" ? !a.searchId || !searches.some((s) => s.id === a.searchId) : a.searchId === searchFilter);
+  const allApps = apps;
+  apps = apps.filter(inSearch);
 
   // The latest batch is everything from the most recent day the searches ran (several searches can run that morning).
   const latestDay = apps.length ? dayOf(Math.max(...apps.map(batchTime))) : null;
@@ -72,6 +100,24 @@ export function ApplicationList({ type, empty }: { type: ApplicationType; empty:
 
   return (
     <div className="mt-4">
+      {type === "internship" && searchTabs.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Searches">
+          {[{ id: "all", name: "All searches", status: "", count: allApps.length }, ...searchTabs].map((s) => (
+            <button
+              key={s.id}
+              role="tab"
+              aria-selected={searchFilter === s.id}
+              onClick={() => setSearchFilter(s.id)}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                searchFilter === s.id ? "border-accent bg-accent/10 font-medium text-accent" : "border-border text-muted"
+              }`}
+            >
+              {s.name}
+              {s.status && s.status !== "active" ? ` (${s.status})` : ""} <span className="text-xs">({s.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
         {tabs.map((t) => (
           <button
