@@ -81,7 +81,8 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
       </div>
 
       {segments.length > 0 ? (
-        <ul className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        // One aligned list, kept narrow so each amount sits close to its label (a wide grid drifted apart).
+        <ul className="mt-4 grid max-w-sm gap-y-1.5 text-sm">
           {segments.map((s) => (
             <li
               key={s.id}
@@ -91,8 +92,8 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: `var(--task-${s.id})` }} />
               <span className="flex-1 truncate">{s.label}</span>
-              <span className="tabular-nums">{usd(s.usd)}</span>
-              <span className="w-10 text-right tabular-nums text-muted">{pct(s.usd, spent)}%</span>
+              <span className="w-16 text-right tabular-nums">{usd(s.usd)}</span>
+              <span className="w-12 text-right tabular-nums text-muted">{pct(s.usd, spent)}%</span>
             </li>
           ))}
         </ul>
