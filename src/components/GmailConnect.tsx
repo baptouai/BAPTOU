@@ -8,7 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { GmailConnection } from "@/lib/types";
 
-const gmailAuthUrl = httpsCallable<void, { url: string }>(functions, "gmailAuthUrl");
+const gmailAuthUrl = httpsCallable<{ returnTo: string }, { url: string }>(functions, "gmailAuthUrl");
 const gmailDisconnect = httpsCallable(functions, "gmailDisconnect");
 
 const callbackMessage: Record<string, string> = {
@@ -57,7 +57,8 @@ export function GmailConnect() {
     setBusy(true);
     setError(null);
     try {
-      const { data } = await gmailAuthUrl();
+      // Google sends the user back to this copy of the app (deployed or local).
+      const { data } = await gmailAuthUrl({ returnTo: window.location.origin });
       window.location.href = data.url;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");

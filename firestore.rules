@@ -49,6 +49,11 @@ service cloud.firestore {
       }
     }
 
+    // Invite list (email -> optional monthly limit), managed by the owner in the console. Server-only.
+    match /access/{email} {
+      allow read, write: if false;
+    }
+
     // Server-only: Gmail tokens, usage counters, subscription status.
     match /private/{uid} {
       allow read, write: if false;

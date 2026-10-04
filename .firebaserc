@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "baptou-5041c"
-  }
+  },
+  "targets": {
+    "baptou-5041c": {
+      "hosting": {
+        "site": [
+          "baptou-5041c"
+        ],
+        "app": [
+          "baptou-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

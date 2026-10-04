@@ -24,10 +24,25 @@ See [src/lib/types.ts](src/lib/types.ts). Everything a user owns lives under `us
 
 ```
 GOOGLE_OAUTH_CLIENT_ID=421746504296-s2gj4leri7bmngo3lp6j44mklpeofjbj.apps.googleusercontent.com
-APP_URL=http://localhost:3000
+APP_URL=https://baptou-app.web.app
 ```
 
 Secrets in Secret Manager: `ANTHROPIC_API_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`.
+
+## Deployment
+
+- App: https://baptou-app.web.app (static export in `out/`, Firebase Hosting target `app`)
+- Home page and privacy policy: https://baptou-5041c.web.app (`site/`, target `site`)
+
+```bash
+npx firebase deploy --only hosting,functions,firestore:rules
+```
+
+## Invite-only access
+
+AI features only work for invited users. To invite someone, create a document in Firestore
+(database `baptou`) at `access/<their email in lowercase>`, optionally with a number field
+`monthlyLimitUsd` (default 5).
 
 ## Deploy rules
 

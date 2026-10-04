@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
@@ -24,8 +24,17 @@ const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>
   timeout: 300_000,
 });
 
+// The app is exported as static files, so the offer id travels in the query (?id=...) rather than the path.
 export default function ApplicationPage() {
-  const { id } = useParams<{ id: string }>();
+  return (
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+      <ApplicationView />
+    </Suspense>
+  );
+}
+
+function ApplicationView() {
+  const id = useSearchParams().get("id") ?? "";
   const router = useRouter();
   const [missing, setMissing] = useState(false);
   const { user } = useAuth();

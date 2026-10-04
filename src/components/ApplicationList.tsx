@@ -117,7 +117,7 @@ function OfferCard({ app: a }: { app: Item }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
-      <Link href={`/applications/${a.id}`} className="block hover:text-accent">
+      <Link href={`/applications/view?id=${a.id}`} className="block hover:text-accent">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-medium">{a.title}</p>

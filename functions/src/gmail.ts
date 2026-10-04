@@ -10,7 +10,9 @@ import { db, REGION } from "./shared.js";
 const clientId = defineString("GOOGLE_OAUTH_CLIENT_ID");
 export const clientSecret = defineSecret("GOOGLE_OAUTH_CLIENT_SECRET");
 export const tokenKey = defineSecret("TOKEN_ENCRYPTION_KEY"); // 32 random bytes, base64
-const appUrl = defineString("APP_URL", { default: "http://localhost:3000" });
+const appUrl = defineString("APP_URL", { default: "https://baptou-app.web.app" });
+// Where Google may send the user back after consent: the deployed app and local development.
+const RETURN_ORIGINS = ["https://baptou-app.web.app", "http://localhost:3000"];
 
 // Read to find past conversations; send only for emails the user approved in the app.
 const SCOPES = [
@@ -43,7 +45,9 @@ export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
   const state = randomBytes(24).toString("hex");
-  await db.doc(`private/${uid}`).set({ gmailOAuth: { state, createdAt: Date.now() } }, { merge: true });
+  const origin = String(request.data?.returnTo ?? "");
+  const returnTo = RETURN_ORIGINS.includes(origin) ? origin : appUrl.value();
+  await db.doc(`private/${uid}`).set({ gmailOAuth: { state, returnTo, createdAt: Date.now() } }, { merge: true });
   const params = new URLSearchParams({
     client_id: clientId.value(),
     redirect_uri: redirectUri(),
@@ -60,14 +64,16 @@ export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
 
 /** Google redirects here after consent. Stores the encrypted refresh token, then returns to the app. */
 export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SECRETS }, async (req, res) => {
-  const back = (status: string) => res.redirect(`${appUrl.value()}/profile?gmail=${status}`);
+  let returnTo = appUrl.value();
+  const back = (status: string) => res.redirect(`${returnTo}/profile?gmail=${status}`);
   try {
     const [uid, state] = String(req.query.state ?? "").split(".");
     const code = String(req.query.code ?? "");
     if (!uid || !state || !code) return back("cancelled");
 
     const priv = await db.doc(`private/${uid}`).get();
-    const pending = priv.get("gmailOAuth") as { state: string; createdAt: number } | undefined;
+    const pending = priv.get("gmailOAuth") as { state: string; returnTo?: string; createdAt: number } | undefined;
+    if (pending?.returnTo && RETURN_ORIGINS.includes(pending.returnTo)) returnTo = pending.returnTo;
     if (!pending || pending.state !== state || Date.now() - pending.createdAt > 10 * 60_000) return back("expired");
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {

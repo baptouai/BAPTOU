@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { HttpsError } from "firebase-functions/v2/https";
@@ -71,10 +72,30 @@ export function estimateCostUsd(model: Model, usage: Usage) {
 
 const month = () => new Date().toISOString().slice(0, 7); // "2026-10"
 
-/** Refuses the call when the user has used up this month's budget. Call before every Claude request. */
+/**
+ * Monthly budget for a user, or null if they have no access. BAPTOU is invite-only: a user needs either
+ * an entry in access/{email} (added by the owner) or a personal `monthlyLimitUsd` on private/{uid}.
+ */
+async function limitFor(uid: string, priv: FirebaseFirestore.DocumentSnapshot): Promise<number | null> {
+  const personal = priv.get("monthlyLimitUsd") as number | undefined;
+  if (personal != null) return personal;
+  const email = (await getAuth().getUser(uid)).email?.toLowerCase();
+  if (!email) return null;
+  const invite = await db.doc(`access/${email}`).get();
+  if (!invite.exists) return null;
+  return (invite.get("monthlyLimitUsd") as number | undefined) ?? DEFAULT_MONTHLY_LIMIT_USD;
+}
+
+/** Refuses the call when the user isn't invited or has used up this month's budget. Call before every Claude request. */
 export async function assertBudget(uid: string) {
   const snap = await db.doc(`private/${uid}`).get();
-  const limit = (snap.get("monthlyLimitUsd") as number | undefined) ?? DEFAULT_MONTHLY_LIMIT_USD;
+  const limit = await limitFor(uid, snap);
+  if (limit == null) {
+    throw new HttpsError(
+      "permission-denied",
+      "BAPTOU is invite-only for now. Ask the person who shared it with you to add your email address.",
+    );
+  }
   const spent = (snap.get(`spendUsd.${month()}`) as number | undefined) ?? 0;
   if (spent >= limit) {
     throw new HttpsError(
@@ -112,7 +133,7 @@ export async function recordUsage(uid: string, model: Model, usage: Usage) {
       usageSummary: {
         month: m,
         spentUsd: priv.get(`spendUsd.${m}`) ?? cost,
-        limitUsd: priv.get("monthlyLimitUsd") ?? DEFAULT_MONTHLY_LIMIT_USD,
+        limitUsd: (await limitFor(uid, priv)) ?? 0,
       },
     },
     { merge: true },

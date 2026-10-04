@@ -40,12 +40,27 @@
       ]
     }
   ],
-  "hosting": {
-    "public": "site",
-    "cleanUrls": true,
-    "ignore": [
-      "firebase.json",
-      "**/.*"
-    ]
-  }
+  "hosting": [
+    {
+      "target": "site",
+      "public": "site",
+      "cleanUrls": true,
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ]
+    },
+    {
+      "target": "app",
+      "public": "out",
+      "cleanUrls": true,
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "predeploy": [
+        "npm run build"
+      ]
+    }
+  ]
 }
