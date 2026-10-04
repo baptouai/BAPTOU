@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BAPTOU">
+  <rect width="512" height="512" rx="112" fill="#4f46e5"/>
+  <g fill="none" stroke="#ffffff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M166 136V376"/>
+    <path d="M166 136H274a60 60 0 0 1 0 120H166"/>
+    <path d="M166 256H286a60 60 0 0 1 0 120H166"/>
+  </g>
+  <circle cx="392" cy="120" r="24" fill="#a5b4fc"/>
+</svg>
