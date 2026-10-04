@@ -21,6 +21,11 @@ service cloud.firestore {
           && request.resource.data.get('sentAt', null) == resource.data.get('sentAt', null);
       }
 
+      // Correspondents index built from email headers by the server (no AI). Read-only for the owner.
+      match /mailIndex/{entryId} {
+        allow read: if isOwner(uid);
+      }
+
       // Offers the user turned down (the offer itself is deleted). Written by dismissOffer only.
       match /dismissedOffers/{offerId} {
         allow read: if isOwner(uid);

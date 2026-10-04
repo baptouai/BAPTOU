@@ -35,9 +35,13 @@
       <li><strong>Send email on your behalf</strong> (<code>gmail.send</code>): used only to send an email you approved by clicking “Approve &amp; send” in the app. BAPTOU never sends anything on its own.</li>
     </ul>
     <p>
-      BAPTOU does not store your mailbox. It stores only what it produces for you: the suggested contacts (name,
-      email address, organization, a short summary of your past exchanges) and the email drafts. The access token
-      Google gives BAPTOU is stored encrypted. You can disconnect Gmail at any time in the app, which revokes
+      BAPTOU does not store the content of your emails. To recognise people you know at the organizations you
+      apply to, it keeps an <strong>index of your correspondents</strong>, built from email headers only: their
+      name and email address, how many emails you exchanged, the date and subject of your last exchange.
+      Newsletters and automated senders are left out. It also stores what it produces for you: the contacts you
+      ask it to write to (with a short summary of your past exchanges) and the email drafts. To write a draft, it
+      reads your last conversation with that person at that moment, without storing it. The access token Google
+      gives BAPTOU is stored encrypted, and disconnecting Gmail deletes the index. You can disconnect Gmail at any time in the app, which revokes
       BAPTOU's access immediately; you can also revoke it from your Google account settings.
     </p>
     <p>

@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
+import { getFunctions } from "firebase-admin/functions";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -114,6 +115,12 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
       },
       { merge: true },
     );
+    // Build the contact index (headers only, no AI). Queued by name to avoid importing mailIndex.ts here.
+    await db.doc(`users/${uid}`).set({ mailIndex: { status: "queued" } }, { merge: true });
+    await getFunctions()
+      .taskQueue(`locations/${REGION}/functions/indexMailboxTask`)
+      .enqueue({ uid })
+      .catch((e) => logger.error("Couldn't queue mail index", { error: String(e) }));
     back("connected");
   } catch (e) {
     logger.error("Gmail OAuth callback failed", { error: String(e) });
@@ -133,7 +140,9 @@ export const gmailDisconnect = onCall({ region: REGION, secrets: GMAIL_SECRETS }
     );
   }
   await db.doc(`private/${uid}`).update({ gmail: FieldValue.delete() });
-  await db.doc(`users/${uid}`).update({ gmail: FieldValue.delete() });
+  await db.doc(`users/${uid}`).update({ gmail: FieldValue.delete(), mailIndex: FieldValue.delete() });
+  // The contact index is built from the mailbox, so it goes with the connection.
+  await db.recursiveDelete(db.collection(`users/${uid}/mailIndex`));
   return { ok: true };
 });
 

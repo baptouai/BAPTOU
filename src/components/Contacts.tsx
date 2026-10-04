@@ -39,7 +39,13 @@ const relationshipLabel: Record<Contact["relationship"], string> = {
  * People from the mailbox to contact, with draft emails. With `applicationId`, only people found for
  * that offer, and the search focuses on its organization.
  */
-export function ContactsPanel({ applicationId, organization }: { applicationId?: string; organization?: string }) {
+export function ContactsPanel({
+  applicationId,
+  listOnly = false,
+}: {
+  applicationId?: string;
+  listOnly?: boolean; // only the drafted emails, without the AI mailbox search (used on offers)
+}) {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<(Contact & { id: string })[]>([]);
   const [gmail, setGmail] = useState<GmailConnection | null | undefined>(undefined);
@@ -92,14 +98,26 @@ export function ContactsPanel({ applicationId, organization }: { applicationId?:
   const visible = contacts.filter((c) => showAll || c.status !== "dismissed");
   const dismissed = contacts.length - contacts.filter((c) => c.status !== "dismissed").length;
 
+  if (listOnly) {
+    return visible.length ? (
+      <ul className="grid gap-4">
+        {visible.map((c) => (
+          <li key={c.id}>
+            <ContactCard contact={c} />
+          </li>
+        ))}
+      </ul>
+    ) : null;
+  }
+
   return (
     <section className="rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-xl">
-          <h2 className="font-medium">{applicationId ? `People you know${organization ? ` at or near ${organization}` : ""}` : "People to contact"}</h2>
+          <h2 className="font-medium">Drafted emails</h2>
           <p className="mt-1 text-sm text-muted">
-            BAPTOU searches your Gmail for people who could help and drafts an email that follows on from your past
-            conversations. Nothing is sent until you approve it.
+            Emails BAPTOU drafted for people in your mailbox. Nothing is sent until you approve it. The deep search reads
+            your conversations with AI to suggest people and uses credits (about $0.05–0.20); the list above is free.
           </p>
         </div>
         {connected ? (
@@ -107,9 +125,9 @@ export function ContactsPanel({ applicationId, organization }: { applicationId?:
             <button
               onClick={() => search()}
               disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
             >
-              {busy ? "Searching your mailbox… (1–3 min)" : lastScan ? "Check new emails" : "Search my mailbox"}
+              {busy ? "Searching with AI… (1–3 min)" : lastScan ? "Deep search new emails (AI)" : "Deep search with AI"}
             </button>
             {lastScan && !busy && (
               <p className="text-right text-xs text-muted">

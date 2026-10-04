@@ -4,5 +4,6 @@ export { draftEmail, draftLetter } from "./writing.js";
 export { askAboutOffer } from "./ask.js";
 export { prepareApplication } from "./form.js";
 export { gmailAuthUrl, gmailDisconnect, gmailOAuthCallback } from "./gmail.js";
-export { draftContactEmail, findContacts, sendApprovedEmail } from "./contacts.js";
+export { draftContactEmail, draftFromIndex, findContacts, sendApprovedEmail } from "./contacts.js";
 export { dismissOffer } from "./offers.js";
+export { dailyMailIndex, indexMailboxTask, refreshMailIndex } from "./mailIndex.js";
