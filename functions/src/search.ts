@@ -87,13 +87,15 @@ async function runSearch(uid: string, searchId: string) {
       .filter((d) => d.get("status") === "dismissed" && d.get("dismissReason"))
       .slice(0, 20)
       .map((d) => `- ${d.get("title")} at ${d.get("organization")}: ${d.get("dismissReason")}`);
-    const maxPerRun = Math.min(Math.max(search.maxPerRun || 5, 1), 10);
+    // No product limit on offers per run; 50 only guards against typos (e.g. 500) and oversized answers.
+    const maxPerRun = Math.min(Math.max(Math.round(search.maxPerRun) || 5, 1), 50);
 
     const result = await runAgent({
       uid,
       system: SYSTEM,
       model: MODELS.search,
-      web: { searches: 6, fetches: 4 },
+      web: { searches: 4 + Math.ceil(maxPerRun / 2), fetches: 2 + Math.ceil(maxPerRun / 2) },
+      maxRunUsd: 0.5 + 0.08 * maxPerRun,
       submit: { name: "submit_offers", description: "Return the internship offers found in this run.", schema: OffersSchema },
       prompt: [
         { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },

@@ -5,7 +5,7 @@ import { assertBudget, claude, db, fallbackFor, type Model, recordUsage } from "
 
 const MAX_CONTINUATIONS = 4;
 // Hard ceiling per task run: past it, BAPTOU is told to answer with what it already has.
-const MAX_RUN_USD = 0.75;
+const DEFAULT_MAX_RUN_USD = 0.75;
 // Web pages are cut to this size. Whole career sites can be 50k+ tokens and were the main cost.
 const MAX_PAGE_TOKENS = 6000;
 
@@ -61,6 +61,7 @@ export async function runAgent<T>(opts: {
   web: WebBudget | null;
   clientTools?: ClientTool[];
   maxToolCalls?: number; // ceiling on client tool calls, default 10
+  maxRunUsd?: number; // spending ceiling for this run, default $0.75
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
   await assertBudget(opts.uid);
@@ -106,7 +107,7 @@ export async function runAgent<T>(opts: {
     }
 
     messages.push({ role: "assistant", content: response.content });
-    const overBudget = runCost >= MAX_RUN_USD || toolCalls >= maxToolCalls;
+    const overBudget = runCost >= (opts.maxRunUsd ?? DEFAULT_MAX_RUN_USD) || toolCalls >= maxToolCalls;
 
     if (response.stop_reason === "tool_use" && uses.length) {
       // All results go back in one user message, as the API expects.

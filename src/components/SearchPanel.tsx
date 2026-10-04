@@ -217,11 +217,15 @@ function SearchForm({ existing, onDone }: { existing?: Search & { id: string }; 
         <input value={form.languages} onChange={set("languages")} placeholder="e.g. English, French" className={input} />
       </Field>
       <Field label="New offers per day">
-        <select value={form.maxPerRun} onChange={set("maxPerRun")} className={input}>
-          {[3, 5, 8, 10].map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
+        <input
+          type="number"
+          min={1}
+          max={MAX_OFFERS}
+          value={form.maxPerRun}
+          onChange={set("maxPerRun")}
+          className={input}
+        />
+        <OffersCostHint offers={form.maxPerRun} />
       </Field>
       <Field label="Search until">
         <input type="date" value={form.endsOn} onChange={set("endsOn")} className={input} />
@@ -241,6 +245,26 @@ function SearchForm({ existing, onDone }: { existing?: Search & { id: string }; 
         </button>
       </div>
     </form>
+  );
+}
+
+const RECOMMENDED_OFFERS = 5;
+const MAX_OFFERS = 50; // the server also caps here; guards against typos like 500
+
+// Rough cost of one daily run on Sonnet 5 with capped browsing: a fixed part for searching plus a part
+// per offer (reading the posting, writing the match reason). An estimate, refined as real usage comes in.
+const estimateMonthlyUsd = (offers: number) => 30 * (0.08 + 0.025 * offers);
+
+function OffersCostHint({ offers }: { offers: number }) {
+  if (!offers || offers < 1) return <span className="text-xs text-muted">At least 1.</span>;
+  if (offers > MAX_OFFERS) return <span className="text-xs text-red-600">At most {MAX_OFFERS} per day.</span>;
+  const monthly = estimateMonthlyUsd(offers);
+  return (
+    <span className={`text-xs ${monthly > 8 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
+      {offers === RECOMMENDED_OFFERS ? "Recommended. " : `Recommended: ${RECOMMENDED_OFFERS}. `}
+      About ${monthly.toFixed(0)}/month if it runs every day
+      {monthly > 8 ? ", which leaves little of a $10 budget for letters." : "."}
+    </span>
   );
 }
 
