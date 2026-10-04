@@ -128,7 +128,10 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
   }
 });
 
-/** Revokes BAPTOU's Gmail access and deletes the stored token. */
+/**
+ * Revokes BAPTOU's Gmail access and deletes the stored token. The contact index is kept (offers still
+ * match against it) unless `clearIndex` is set.
+ */
 export const gmailDisconnect = onCall({ region: REGION, secrets: GMAIL_SECRETS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
@@ -139,11 +142,14 @@ export const gmailDisconnect = onCall({ region: REGION, secrets: GMAIL_SECRETS }
       () => {},
     );
   }
+  const clearIndex = request.data?.clearIndex === true;
   await db.doc(`private/${uid}`).update({ gmail: FieldValue.delete() });
-  await db.doc(`users/${uid}`).update({ gmail: FieldValue.delete(), mailIndex: FieldValue.delete() });
-  // The contact index is built from the mailbox, so it goes with the connection.
-  await db.recursiveDelete(db.collection(`users/${uid}/mailIndex`));
-  return { ok: true };
+  await db.doc(`users/${uid}`).update({
+    gmail: FieldValue.delete(),
+    ...(clearIndex ? { mailIndex: FieldValue.delete() } : {}),
+  });
+  if (clearIndex) await db.recursiveDelete(db.collection(`users/${uid}/mailIndex`));
+  return { ok: true, indexCleared: clearIndex };
 });
 
 // --- Gmail API (plain REST; googleapis is too heavy to load within the deploy timeout)

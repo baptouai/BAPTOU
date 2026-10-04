@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { GmailConnection } from "@/lib/types";
 
 const gmailAuthUrl = httpsCallable<{ returnTo: string }, { url: string }>(functions, "gmailAuthUrl");
-const gmailDisconnect = httpsCallable(functions, "gmailDisconnect");
+const gmailDisconnect = httpsCallable<{ clearIndex: boolean }, { ok: boolean }>(functions, "gmailDisconnect");
 
 const callbackMessage: Record<string, string> = {
   connected: "Gmail connected.",
@@ -66,10 +66,13 @@ export function GmailConnect() {
     }
   }
 
-  async function disconnect() {
-    if (!confirm("Disconnect Gmail? BAPTOU will lose access to your mailbox immediately.")) return;
+  async function disconnect(clearIndex: boolean) {
+    const question = clearIndex
+      ? "Disconnect Gmail and delete the index of people in your mailbox? Offers will no longer show people you know until you reconnect and the index is rebuilt."
+      : "Disconnect Gmail? BAPTOU loses access to your mailbox immediately. The index of people you know is kept, so offers still show them.";
+    if (!confirm(question)) return;
     setBusy(true);
-    await gmailDisconnect().catch(() => {});
+    await gmailDisconnect({ clearIndex }).catch(() => {});
     setBusy(false);
   }
 
@@ -90,9 +93,14 @@ export function GmailConnect() {
           )}
         </div>
         {connected ? (
-          <button onClick={disconnect} disabled={busy} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50">
-            Disconnect
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button onClick={() => disconnect(false)} disabled={busy} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50">
+              Disconnect
+            </button>
+            <button onClick={() => disconnect(true)} disabled={busy} className="text-xs text-red-600 underline disabled:opacity-50">
+              Disconnect and clear index
+            </button>
+          </div>
         ) : (
           <button onClick={connect} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
             {busy ? "Opening Google…" : gmail?.needsReconnect ? "Reconnect Gmail" : "Connect Gmail"}

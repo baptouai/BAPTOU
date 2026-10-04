@@ -64,8 +64,8 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
     );
   }, [user, tokens]);
 
-  if (!connected) return null; // nothing to match against
-  if (status?.status !== "ready" && !people.length) {
+  if (!connected && !people.length) return null; // no index to match against
+  if (connected && status?.status !== "ready" && !people.length) {
     return (
       <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted">
         BAPTOU is indexing your mailbox (no credit used). People you know at {organization} will show up here.
@@ -80,7 +80,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
       <p className="mt-1 text-sm text-muted">Found in your mailbox automatically, without using credits.</p>
       <ul className="mt-3 grid gap-2">
         {people.map((p) => (
-          <PersonRow key={p.id} person={p} applicationId={applicationId} />
+          <PersonRow key={p.id} person={p} applicationId={applicationId} canDraft={connected} />
         ))}
       </ul>
       <div className="mt-4">
@@ -90,7 +90,15 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   );
 }
 
-function PersonRow({ person: p, applicationId }: { person: Person & { id: string }; applicationId?: string }) {
+function PersonRow({
+  person: p,
+  applicationId,
+  canDraft,
+}: {
+  person: Person & { id: string };
+  applicationId?: string;
+  canDraft: boolean; // drafting reads the last conversation, so it needs Gmail connected
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,9 +125,15 @@ function PersonRow({ person: p, applicationId }: { person: Person & { id: string
           {p.lastSubject && ` · “${p.lastSubject}”`}
         </p>
       </div>
-      <button onClick={draft} disabled={busy} className="rounded-lg border border-accent px-3 py-1.5 text-accent disabled:opacity-50">
-        {busy ? "Writing…" : "Draft an email"}
-      </button>
+      {canDraft ? (
+        <button onClick={draft} disabled={busy} className="rounded-lg border border-accent px-3 py-1.5 text-accent disabled:opacity-50">
+          {busy ? "Writing…" : "Draft an email"}
+        </button>
+      ) : (
+        <Link href="/profile" className="text-xs text-muted underline">
+          Reconnect Gmail to draft
+        </Link>
+      )}
       {error && <p className="w-full text-red-600">{error}</p>}
     </li>
   );
@@ -139,7 +153,7 @@ export function MailIndexPanel() {
   const [now] = useState(() => Date.now()); // for recency scoring; stable during the session
 
   useEffect(() => {
-    if (!user || !connected) return;
+    if (!user) return;
     const q = query(collection(db, "users", user.uid, "mailIndex"), orderBy("lastAt", "desc"), limit(1000));
     return onSnapshot(q, (snap) => setPeople(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Person) }))));
   }, [user, connected]);
@@ -170,7 +184,7 @@ export function MailIndexPanel() {
     }
   }
 
-  if (!connected) {
+  if (!connected && !people.length) {
     return (
       <section className="rounded-xl border border-border bg-card p-5 text-sm">
         <Link href="/profile" className="text-accent">Connect Gmail</Link> to see the people in your mailbox.
@@ -194,9 +208,15 @@ export function MailIndexPanel() {
                   }. Built from email headers only, without credits.`}
           </p>
         </div>
-        <button onClick={refresh} disabled={working} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
-          {working ? "Updating…" : "Update now"}
-        </button>
+        {connected ? (
+          <button onClick={refresh} disabled={working} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
+            {working ? "Updating…" : "Update now"}
+          </button>
+        ) : (
+          <Link href="/profile" className="text-sm text-accent">
+            Reconnect Gmail to update
+          </Link>
+        )}
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
@@ -211,7 +231,7 @@ export function MailIndexPanel() {
       />
       <ul className="mt-3 grid gap-2">
         {ranked.slice(0, shown).map((p) => (
-          <PersonRow key={p.id} person={p} />
+          <PersonRow key={p.id} person={p} canDraft={connected} />
         ))}
       </ul>
       {ranked.length > shown && (
