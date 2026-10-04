@@ -6,8 +6,8 @@ import { UsageMeter } from "@/components/UsageMeter";
 
 const steps = [
   { href: "/profile", title: "1. Add your documents", text: "CVs, transcripts, past motivation letters." },
-  { href: "/applications", title: "2. Review suggestions", text: "Internships BAPTOU found for you, with drafted letters." },
-  { href: "/universities", title: "3. Master's applications", text: "Programmes, deadlines and application packs." },
+  { href: "/applications?search=new", title: "2. Start a search", text: "An internship or a master's programme. Each search gets its own tab." },
+  { href: "/applications", title: "3. Review suggestions", text: "Say what interests you; BAPTOU prepares those applications." },
 ];
 
 export default function Dashboard() {

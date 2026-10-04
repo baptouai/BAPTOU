@@ -11,6 +11,7 @@ import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 type Search = {
+  kind?: "internship" | "masters"; // missing on searches created before master's searches existed
   name: string;
   roles: string;
   locations: string;
@@ -20,6 +21,7 @@ type Search = {
   industries: string;
   languages: string;
   notes: string;
+  tuitionBudget?: string; // master's searches
   maxPerRun: number;
   status: "active" | "paused" | "stopped" | "ended";
   endsAt: Timestamp | null; // null = until the user stops it
@@ -58,6 +60,43 @@ Rules:
 - If you run out of searches, return the good offers you found so far rather than nothing.
 When you are done, call submit_offers exactly once.`;
 
+// Master's programmes reuse the offer fields: title = programme, organization = university,
+// url = the programme's admissions page, startDate = intake, companyBrief = programme facts.
+export const ProgrammesSchema = z.object({
+  offers: z.array(
+    z.object({
+      title: z.string().describe("Programme name, e.g. MSc Mechanical Engineering"),
+      organization: z.string().describe("University"),
+      location: z.string().describe("City"),
+      country: z.string(),
+      url: z.string().describe("The programme's page or its application page on the university's website"),
+      deadline: z.string().describe("Next application deadline for the requested intake, YYYY-MM-DD, or empty if not stated"),
+      startDate: z.string().describe("Intake, e.g. September 2027"),
+      duration: z.string().describe("Programme length, e.g. 1 year"),
+      postingLanguage: z.string().describe("Language of instruction"),
+      matchScore: z.number().describe("0 to 100"),
+      matchReason: z.string().describe("2-3 sentences: why this programme fits the student's degree, grades and goals"),
+      companyBrief: z
+        .string()
+        .describe("4-6 short lines: tuition per year for this student, admission requirements (degree, grades, tests such as GRE/IELTS), reputation, career outcomes"),
+    }),
+  ),
+  summary: z.string().describe("One or two sentences on this search run, for the student"),
+});
+
+const MASTERS_SYSTEM = `You are BAPTOU's admissions scout. You search the web for master's programmes that fit a student who already holds a bachelor's degree, for programmes they apply to directly on the university's website.
+
+Rules:
+- Only return programmes you actually found during this run, with their official university page. Never invent a programme, university or link.
+- The url must be the programme's own page or its application page on the university's website (not a ranking or aggregator site).
+- The application window for the requested intake must still be open, or open later. Skip programmes whose deadline has passed.
+- Respect the criteria (fields, countries, intake, teaching language, tuition budget). Check the student's degree and grades against the admission requirements and say so in matchReason; mention any compromise.
+- Give real figures in the brief when the university publishes them (tuition for the student's situation, requirements, deadlines).
+- Quality over quantity: return fewer programmes rather than weak matches. Rank by matchScore, highest first.
+- Skip anything in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
+- If you run out of searches, return the good programmes you found so far rather than nothing.
+When you are done, call submit_offers exactly once.`;
+
 function parseDate(s: string): Timestamp | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const d = new Date(`${s}T23:59:59Z`);
@@ -72,9 +111,10 @@ async function runSearch(uid: string, searchId: string) {
   await searchRef.update({ runState: "running", lastError: FieldValue.delete() });
   try {
     const profile = await loadProfile(uid);
+    const kind = search.kind ?? "internship";
     const existing = await db
       .collection(`users/${uid}/applications`)
-      .where("type", "==", "internship")
+      .where("type", "==", kind)
       .select("applyUrl", "title", "organization")
       .get();
     const seen = existing.docs.map((d) => d.get("applyUrl")).filter(Boolean);
@@ -86,19 +126,33 @@ async function runSearch(uid: string, searchId: string) {
 
     const result = await runAgent({
       uid,
-      system: SYSTEM,
+      system: kind === "masters" ? MASTERS_SYSTEM : SYSTEM,
       model: MODELS.search,
       task: "search",
       // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
       web: { searches: Math.min(8 + maxPerRun, 40), fetches: Math.min(3 + maxPerRun, 25) },
       maxRunUsd: 0.5 + 0.08 * maxPerRun,
-      submit: { name: "submit_offers", description: "Return the internship offers found in this run.", schema: OffersSchema },
+      submit:
+        kind === "masters"
+          ? { name: "submit_offers", description: "Return the master's programmes found in this run.", schema: ProgrammesSchema }
+          : { name: "submit_offers", description: "Return the internship offers found in this run.", schema: OffersSchema },
       prompt: [
         { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },
         {
           type: "text",
           text: `Today is ${today()}.
-Search criteria:
+${
+  kind === "masters"
+    ? `Search criteria:
+- Fields / programmes: ${search.roles}
+- Countries: ${search.locations || "any"}
+- Intake: ${search.startDate || "any"}
+- Programme length: ${search.duration || "any"}
+- Teaching languages: ${search.languages || "any"}
+- Tuition budget per year: ${search.tuitionBudget || "not stated"}
+- Notes from the student: ${search.notes || "none"}
+`
+    : `Search criteria:
 - Roles / keywords: ${search.roles}
 - Locations: ${search.locations || "any"}
 - Work mode: ${search.workMode}
@@ -107,8 +161,9 @@ Search criteria:
 - Industries: ${search.industries || "any"}
 - Languages: ${search.languages || "any"}
 - Notes from the student: ${search.notes || "none"}
-
-${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new internship offers.
+`
+}
+${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new ${kind === "masters" ? "master's programmes" : "internship offers"}.
 Already suggested (skip these): ${seen.length ? seen.slice(0, 150).join("\n") : "none"}
 Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slice(0, 150).join("\n") : "none"}`,
         },
@@ -126,7 +181,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       const ref = db.doc(`users/${uid}/applications/${id}`);
       try {
         await ref.create({
-          type: "internship",
+          type: kind,
           status: "suggested",
           searchId,
           batchAt,

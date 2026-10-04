@@ -86,7 +86,10 @@ export type Profile = {
 // users/{uid}/searches/{searchId}. Created by the user; the daily job only runs "active" ones.
 export type SearchStatus = "active" | "paused" | "stopped" | "ended";
 
+export type SearchKind = "internship" | "masters";
+
 export type Search = {
+  kind?: SearchKind; // missing = internship (searches created before master's searches)
   name: string;
   roles: string;
   locations: string;
@@ -96,6 +99,7 @@ export type Search = {
   industries: string;
   languages: string;
   notes: string;
+  tuitionBudget?: string; // master's searches
   maxPerRun: number;
   status: SearchStatus;
   endsAt: Timestamp | null; // null = until the user stops it
