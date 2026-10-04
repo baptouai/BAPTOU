@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BAPTOU Admin</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #fafaf9; --card: #ffffff; --fg: #1c1917; --muted: #78716c; --border: #e7e5e4;
+      --accent: #4f46e5; --danger: #dc2626; --warn: #b45309;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0c0a09; --card: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --border: #292524;
+        --accent: #818cf8; --danger: #f87171; --warn: #fbbf24; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+    main { max-width: 940px; margin: 0 auto; padding: 20px 16px 40px; }
+    header { display: flex; align-items: center; gap: 10px; }
+    header img { width: 28px; height: 28px; }
+    header h1 { font-size: 18px; margin: 0; flex: 1; }
+    .muted { color: var(--muted); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 16px; }
+    h2 { font-size: 14px; margin: 0 0 10px; }
+    form { display: flex; flex-wrap: wrap; gap: 8px; }
+    input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; }
+    input[type=email] { flex: 1; min-width: 220px; }
+    input.limit { width: 90px; }
+    #invite input.limit { width: 120px; }
+    button { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    button.danger { color: var(--danger); border-color: transparent; }
+    button:disabled { opacity: .5; cursor: default; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
+    th { font-weight: 600; color: var(--muted); font-size: 12px; border-top: 0; }
+    td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 3px; width: 110px; }
+    .bar > div { height: 100%; background: var(--accent); }
+    .bar.full > div { background: var(--danger); }
+    .tag { font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; color: var(--muted); }
+    .row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+    #status { min-height: 20px; margin-top: 10px; }
+    .error { color: var(--danger); }
+    .ok { color: var(--accent); }
+    .scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="/logo.svg" alt="">
+      <h1>BAPTOU Admin</h1>
+      <span class="muted" id="totals"></span>
+      <button id="refresh" title="Refresh">Refresh</button>
+    </header>
+    <div id="status"></div>
+
+    <section class="card">
+      <h2>Invite a tester</h2>
+      <form id="invite">
+        <input type="email" name="email" placeholder="tester@example.com" required>
+        <input class="limit" type="number" name="limit" min="0" max="1000" step="0.5" placeholder="$ per month">
+        <button class="primary">Invite</button>
+      </form>
+      <p class="muted" style="margin:8px 0 0">Leave the limit empty for the default (<span id="default"></span>/month). They sign in at baptou-app.web.app with this Google address.</p>
+    </section>
+
+    <section class="card">
+      <h2>Users <span class="muted" id="month"></span></h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>User</th><th>Access</th><th>Spent this month</th><th>Monthly limit</th><th></th></tr></thead>
+          <tbody id="users"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="pendingCard" hidden>
+      <h2>Invited, not signed in yet</h2>
+      <table><tbody id="pending"></tbody></table>
+    </section>
+  </main>
+
+  <script>
+    const TOKEN = "__TOKEN__";
+    const $ = (id) => document.getElementById(id);
+    const money = (n) => "$" + Number(n).toFixed(2);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+    async function api(name, body) {
+      const res = await fetch("/api/" + name, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": TOKEN },
+        body: JSON.stringify(body ?? {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
+
+    function status(text, kind = "") {
+      $("status").innerHTML = text ? `<span class="${kind}">${esc(text)}</span>` : "";
+    }
+
+    async function run(label, fn) {
+      status(label + "…", "muted");
+      try {
+        await fn();
+        await load();
+        status(label + " done.", "ok");
+      } catch (e) {
+        status(e.message, "error");
+      }
+    }
+
+    async function load() {
+      const d = await api("overview");
+      $("default").textContent = money(d.defaultLimit);
+      $("month").textContent = "· " + d.month;
+      const spent = d.users.reduce((s, u) => s + u.spentUsd, 0);
+      $("totals").textContent = `${d.users.filter((u) => u.invited).length} active · ${money(spent)} spent this month`;
+
+      $("users").innerHTML = d.users
+        .sort((a, b) => b.spentUsd - a.spentUsd)
+        .map((u) => {
+          const pct = u.limitUsd ? Math.min(100, (u.spentUsd / u.limitUsd) * 100) : 0;
+          return `<tr data-email="${esc(u.email)}" data-uid="${esc(u.uid)}">
+            <td><div>${esc(u.name || u.email)}</div><div class="muted">${esc(u.email)}</div></td>
+            <td>${u.invited ? `<span class="tag">${u.limitSource === "personal" ? "owner" : "invited"}</span>` : `<span class="tag">no access</span>`}
+                ${u.gmail ? ` <span class="tag">Gmail</span>` : ""}</td>
+            <td class="num">${money(u.spentUsd)}${u.limitUsd ? `<div class="bar ${pct >= 100 ? "full" : ""}"><div style="width:${pct}%"></div></div>` : ""}</td>
+            <td class="num">${u.invited ? `<input class="limit" type="number" min="0" max="1000" step="0.5" value="${u.limitUsd}">` : "–"}</td>
+            <td><div class="row-actions">
+              ${u.invited ? `<button data-act="save">Save</button>` : `<button class="primary" data-act="grant">Invite</button>`}
+              ${u.limitSource === "invite" ? `<button class="danger" data-act="remove">Remove</button>` : ""}
+            </div></td>
+          </tr>`;
+        })
+        .join("") || `<tr><td colspan="5" class="muted">No users yet.</td></tr>`;
+
+      $("pendingCard").hidden = d.pending.length === 0;
+      $("pending").innerHTML = d.pending
+        .map((p) => `<tr data-email="${esc(p.email)}">
+            <td>${esc(p.email)}</td><td class="num">${money(p.limitUsd)} / month</td>
+            <td><div class="row-actions"><button class="danger" data-act="remove">Remove</button></div></td></tr>`)
+        .join("");
+    }
+
+    $("invite").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      run("Inviting " + f.get("email"), async () => {
+        await api("invite", { email: f.get("email"), limitUsd: f.get("limit") });
+        e.target.reset();
+      });
+    });
+
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const row = btn.closest("tr");
+      const email = row.dataset.email;
+      const uid = row.dataset.uid;
+      if (btn.dataset.act === "save") {
+        const limitUsd = row.querySelector("input.limit").value;
+        run(`Setting ${email}'s limit to ${money(limitUsd)}`, () => api("setLimit", { email, uid, limitUsd }));
+      } else if (btn.dataset.act === "grant") {
+        run("Inviting " + email, () => api("invite", { email }));
+      } else if (btn.dataset.act === "remove") {
+        if (confirm(`Remove ${email}'s access? Their data stays, but BAPTOU's AI features stop working for them.`)) {
+          run("Removing " + email, () => api("removeInvite", { email }));
+        }
+      }
+    });
+
+    $("refresh").addEventListener("click", () => run("Refreshing", async () => {}));
+    // Keeps the local server alive while this window is open.
+    setInterval(() => api("ping").catch(() => {}), 5000);
+    load().catch((e) => status(e.message, "error"));
+  </script>
+</body>
+</html>
