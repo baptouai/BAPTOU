@@ -18,6 +18,17 @@ See [src/lib/types.ts](src/lib/types.ts). Everything a user owns lives under `us
 2. `npm install`
 3. `npm run dev` and open http://localhost:3000
 
+## Server configuration
+
+`functions/.env` (not committed):
+
+```
+GOOGLE_OAUTH_CLIENT_ID=421746504296-s2gj4leri7bmngo3lp6j44mklpeofjbj.apps.googleusercontent.com
+APP_URL=http://localhost:3000
+```
+
+Secrets in Secret Manager: `ANTHROPIC_API_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`.
+
 ## Deploy rules
 
 ```bash
