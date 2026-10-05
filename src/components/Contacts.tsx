@@ -224,7 +224,7 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
   }
 
   return (
-    <div className={`min-w-0 rounded-lg border border-border p-4 ${contact.status === "dismissed" ? "opacity-60" : ""}`}>
+    <div className={`min-w-0 rounded-lg border border-card-edge-soft p-4 ${contact.status === "dismissed" ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium [overflow-wrap:anywhere]">

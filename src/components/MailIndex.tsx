@@ -152,7 +152,7 @@ export function PersonRow({
   }
 
   return (
-    <li className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+    <li className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-card-edge-soft p-3 text-sm">
       {onToggleFavourite && (
         <button
           onClick={onToggleFavourite}
