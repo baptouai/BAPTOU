@@ -18,7 +18,7 @@ export default function Dashboard() {
       <p className="mt-1 text-muted">Here&apos;s where to start.</p>
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {steps.map((s) => (
-          <Link key={s.href} href={s.href} className="rounded-xl border border-border bg-card p-5 hover:border-accent">
+          <Link key={s.href} href={s.href} className="rounded-xl border border-card-edge bg-card p-5 hover:border-accent">
             <h2 className="font-medium">{s.title}</h2>
             <p className="mt-1 text-sm text-muted">{s.text}</p>
           </Link>

@@ -79,7 +79,7 @@ export function GmailConnect() {
   const connected = !!gmail?.email && !gmail.needsReconnect;
 
   return (
-    <section className="mt-8 rounded-xl border border-border bg-card p-5">
+    <section className="mt-8 rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-xl">
           <h2 className="text-xl font-semibold">Gmail</h2>

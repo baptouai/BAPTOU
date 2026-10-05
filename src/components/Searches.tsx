@@ -112,7 +112,7 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
   const kind = kindOf(s);
   const masters = kind === "masters";
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">{KINDS[kind].label}</p>
@@ -293,7 +293,7 @@ export function SearchForm({
   const input = "rounded-lg border border-border bg-background px-3 py-2";
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-border bg-card p-5 sm:grid-cols-2">
+    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-card-edge bg-card p-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <p className="text-sm font-medium">What are you looking for?</p>
         <div className="mt-2 flex flex-wrap gap-2">

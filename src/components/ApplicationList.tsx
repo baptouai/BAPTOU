@@ -96,7 +96,7 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
       <p className="mt-2 text-sm text-muted">{tabs.find((t) => t.id === tab)?.hint}</p>
 
       {sorted.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-border bg-card p-5 text-muted">
+        <p className="mt-4 rounded-xl border border-card-edge bg-card p-5 text-muted">
           {apps.length === 0 && tab !== "latest"
             ? empty
             : tab === "latest"
@@ -130,7 +130,7 @@ function OfferCard({ app: a }: { app: Item }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-xl border border-card-edge bg-card p-5">
       <Link href={`/applications/view?id=${a.id}`} className="block hover:text-accent">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">

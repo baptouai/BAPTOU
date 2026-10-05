@@ -205,13 +205,13 @@ function ApplicationView() {
       {(app.matchReason || app.research) && (
         <div className="grid gap-4 md:grid-cols-2">
           {app.matchReason && (
-            <section className="rounded-xl border border-border bg-card p-5 text-sm">
+            <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
               <h2 className="font-medium">Why it fits you</h2>
               <RichText text={app.matchReason} className="mt-2" />
             </section>
           )}
           {app.research && (
-            <section className="rounded-xl border border-border bg-card p-5 text-sm">
+            <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
               <h2 className="font-medium">About {app.organization}</h2>
               <RichText text={app.research} className="mt-2 text-muted" />
             </section>
@@ -220,7 +220,7 @@ function ApplicationView() {
       )}
 
       {app.status === "suggested" && (
-        <section className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-5">
+        <section className="flex flex-wrap items-start gap-3 rounded-xl border border-card-edge bg-card p-5">
           <p className="w-full text-sm text-muted">Is this offer for you?</p>
           <button onClick={() => setStatus("interested")} className="rounded-lg bg-accent px-4 py-2 font-medium text-white">
             I&apos;m interested
@@ -245,7 +245,7 @@ function ApplicationView() {
 
         {/* The letter box only when the form asks for one (or the user wants one); the email box only on request. */}
         {showLetter && (
-          <section id="letter" className="scroll-mt-4 rounded-xl border border-border bg-card p-5">
+          <section id="letter" className="scroll-mt-4 rounded-xl border border-card-edge bg-card p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-medium">Motivation letter</h2>
               <span className="text-xs text-muted">
@@ -299,7 +299,7 @@ function ApplicationView() {
           )}
 
           {showEmail && (
-          <section className="rounded-xl border border-border bg-card p-5">
+          <section className="rounded-xl border border-card-edge bg-card p-5">
             <h2 className="font-medium">Email draft</h2>
             <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
             <AiBar
@@ -364,7 +364,7 @@ function ApplicationView() {
 
       <FitCheck applicationId={id} />
 
-      <section className="rounded-xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-card-edge bg-card p-5">
         {!app.applicationForm && !!app.packFields?.length && (
           <>
             <h2 className="font-medium">Quick answers</h2>

@@ -54,7 +54,7 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
   const left = Math.max(0, limit - spent);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <p className="font-medium">BAPTOU usage this month</p>
         <p className="text-muted">

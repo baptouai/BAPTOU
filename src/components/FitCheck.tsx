@@ -51,7 +51,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
   const last = [...messages].reverse().find((m) => m.role === "baptou");
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section className="rounded-xl border border-card-edge bg-card p-5">
       <h2 className="font-medium">Is this for me?</h2>
       <p className="mt-1 text-sm text-muted">
         Ask BAPTOU anything about this offer. It researches the organization and gives you an honest opinion.

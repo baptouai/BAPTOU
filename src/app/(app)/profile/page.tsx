@@ -75,7 +75,7 @@ export default function ProfilePage() {
         BAPTOU uses these to understand your background and to write letters in your style.
       </p>
 
-      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-card p-5 sm:flex-row sm:items-center">
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-card-edge bg-card p-5 sm:flex-row sm:items-center">
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as DocumentKind)}
@@ -99,7 +99,7 @@ export default function ProfilePage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
-      <ul className="mt-6 divide-y divide-border rounded-xl border border-border bg-card">
+      <ul className="mt-6 divide-y divide-border rounded-xl border border-card-edge bg-card">
         {docs.length === 0 && <li className="p-5 text-muted">No documents yet.</li>}
         {docs.map((d) => (
           <li key={d.id} className="flex items-center justify-between gap-4 p-4">

@@ -8,6 +8,8 @@
   --muted: #78716c;
   --card: #ffffff;
   --border: #e7e5e4;
+  /* Outline of the main blocks (cards): clearly visible, unlike the discreet --border used inside them. */
+  --card-edge: #a8a29e;
   --accent: #4f46e5;
   /* Usage breakdown: one fixed color per task (validated categorical palette, light surface). */
   --task-search: #2a78d6;
@@ -26,6 +28,7 @@
   --color-muted: var(--muted);
   --color-card: var(--card);
   --color-border: var(--border);
+  --color-card-edge: var(--card-edge);
   --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -38,6 +41,7 @@
     --muted: #a8a29e;
     --card: #1c1917;
     --border: #292524;
+    --card-edge: #e7e5e4;
     --accent: #818cf8;
     --task-search: #3987e5;
     --task-letter: #d95926;

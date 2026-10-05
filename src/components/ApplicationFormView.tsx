@@ -117,7 +117,7 @@ export function ApplicationFormView({
   const routine = fields.filter((f) => !needsWork(f));
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-medium">Application form</h2>

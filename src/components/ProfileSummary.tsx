@@ -56,7 +56,7 @@ export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {profile && (
-        <div className="mt-4 grid gap-4 rounded-xl border border-border bg-card p-5 text-sm">
+        <div className="mt-4 grid gap-4 rounded-xl border border-card-edge bg-card p-5 text-sm">
           <div>
             <p className="text-lg font-medium">{profile.fullName}</p>
             <p className="text-muted">{profile.headline}</p>

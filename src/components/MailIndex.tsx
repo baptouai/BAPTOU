@@ -91,7 +91,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   if (!connected && !people.length) return null; // no index to match against
   if (connected && status?.status !== "ready" && !people.length) {
     return (
-      <section className="rounded-xl border border-border bg-card p-5 text-sm text-muted">
+      <section className="rounded-xl border border-card-edge bg-card p-5 text-sm text-muted">
         BAPTOU is indexing your mailbox (no credit used). People you know at {organization} will show up here.
       </section>
     );
@@ -99,7 +99,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   if (!people.length) return null; // nobody known there: stay quiet
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section className="rounded-xl border border-card-edge bg-card p-5">
       <h2 className="font-medium">People you know at {organization}</h2>
       <p className="mt-1 text-sm text-muted">Found in your mailbox automatically, without using credits.</p>
       <ul className="mt-3 grid grid-cols-1 gap-2">
@@ -239,7 +239,7 @@ export function MailIndexPanel() {
 
   if (!connected && !people.length) {
     return (
-      <section className="rounded-xl border border-border bg-card p-5 text-sm">
+      <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
         <Link href="/profile" className="text-accent">Connect Gmail</Link> to see the people in your mailbox.
       </section>
     );
@@ -247,7 +247,7 @@ export function MailIndexPanel() {
 
   const working = status?.status === "queued" || status?.status === "running";
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-medium">People in your mailbox</h2>

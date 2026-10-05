@@ -43,7 +43,7 @@ export function Nationalities() {
   }
 
   return (
-    <section className="mt-8 rounded-xl border border-border bg-card p-5">
+    <section className="mt-8 rounded-xl border border-card-edge bg-card p-5">
       <h2 className="text-xl font-semibold">Nationalities</h2>
       <p className="mt-1 text-sm text-muted">
         BAPTOU uses them for work permits, visa questions on application forms, and tuition fees for master&apos;s programmes.
