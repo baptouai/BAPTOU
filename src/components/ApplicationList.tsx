@@ -8,6 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { DismissForm } from "@/components/DismissForm";
 import { verdictLabel } from "@/components/FitCheck";
+import type { Timestamp } from "firebase/firestore";
 import type { Application } from "@/lib/types";
 
 export const statusLabel: Record<Application["status"], string> = {
@@ -37,13 +38,20 @@ const dayOf = (ms: number) => new Date(ms).toDateString();
 export type ApplicationItem = Item;
 
 /** One search's offers, split into Latest batch / To review / Interested. */
-export function ApplicationList({ apps, empty }: { apps: Item[]; empty: string }) {
+/** The search's most recent run, so "Latest batch" shows that run, even when it found nothing. */
+export type LastRun = { at?: Timestamp; batchAt?: Timestamp; summary?: string };
+
+export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty: string; lastRun?: LastRun }) {
   const [tab, setTab] = useState<Tab>("latest");
 
-  // The latest batch is everything from the most recent day this search ran.
+  // Latest batch = the offers of the search's last run. Runs from before runs were recorded fall back
+  // to the most recent day that produced offers.
+  const runBatch = lastRun?.batchAt?.toMillis();
   const latestDay = apps.length ? dayOf(Math.max(...apps.map(batchTime))) : null;
   const lists: Record<Tab, Item[]> = {
-    latest: apps.filter((a) => dayOf(batchTime(a)) === latestDay),
+    latest: runBatch
+      ? apps.filter((a) => a.batchAt?.toMillis() === runBatch)
+      : apps.filter((a) => dayOf(batchTime(a)) === latestDay),
     review: apps.filter((a) => a.status === "suggested"),
     interested: apps.filter((a) => INTERESTED.includes(a.status)),
   };
@@ -57,7 +65,11 @@ export function ApplicationList({ apps, empty }: { apps: Item[]; empty: string }
     {
       id: "latest",
       label: "Latest batch",
-      hint: latestDay ? `Found by this search's last run, on ${new Date(latestDay).toLocaleDateString()}.` : "",
+      hint: runBatch
+        ? `Found by this search's last run, ${new Date(runBatch).toLocaleString()}.`
+        : latestDay
+          ? `Found by this search's last run, on ${new Date(latestDay).toLocaleDateString()}.`
+          : "",
     },
     { id: "review", label: "To review", hint: "Everything from this search you haven't decided on yet." },
     { id: "interested", label: "Interested", hint: "The ones you're interested in or working on." },
@@ -84,7 +96,15 @@ export function ApplicationList({ apps, empty }: { apps: Item[]; empty: string }
 
       {sorted.length === 0 ? (
         <p className="mt-4 rounded-xl border border-border bg-card p-5 text-muted">
-          {apps.length === 0 ? empty : tab === "interested" ? "Mark offers as interesting to keep them here." : "Nothing here."}
+          {apps.length === 0 && tab !== "latest"
+            ? empty
+            : tab === "latest"
+              ? runBatch
+                ? `The last run (${new Date(runBatch).toLocaleString()}) found nothing new. ${lastRun?.summary ?? ""} Earlier suggestions are under “To review”.`
+                : empty
+              : tab === "interested"
+                ? "Mark offers as interesting to keep them here."
+                : "Nothing here."}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">

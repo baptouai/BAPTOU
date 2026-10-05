@@ -22,6 +22,7 @@ type Search = {
   languages: string;
   notes: string;
   tuitionBudget?: string; // master's searches
+  nextLeads?: string[]; // what the previous run didn't have time to check
   maxPerRun: number;
   status: "active" | "paused" | "stopped" | "ended";
   endsAt: Timestamp | null; // null = until the user stops it
@@ -46,6 +47,9 @@ export const OffersSchema = z.object({
     }),
   ),
   summary: z.string().describe("One or two sentences on this search run, for the student"),
+  leadsToCheckNext: z
+    .array(z.string())
+    .describe("Up to 8 promising companies or careers pages you did not have time to check this run, for the next run"),
 });
 
 const SYSTEM = `You are BAPTOU's internship scout. You search the web for real, currently open internship postings that fit a student's profile and search criteria.
@@ -57,7 +61,8 @@ Rules:
 - Respect the search criteria (roles, locations, work mode, duration, start date, languages). Mention any compromise in matchReason.
 - Quality over quantity: return fewer offers rather than weak matches. Rank by matchScore, highest first.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- If you run out of searches, return the good offers you found so far rather than nothing.
+- Start with the leads the previous run didn't have time to check, if any.
+- If you run out of searches, return the good offers you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
 // Master's programmes reuse the offer fields: title = programme, organization = university,
@@ -82,6 +87,9 @@ export const ProgrammesSchema = z.object({
     }),
   ),
   summary: z.string().describe("One or two sentences on this search run, for the student"),
+  leadsToCheckNext: z
+    .array(z.string())
+    .describe("Up to 8 promising companies or careers pages you did not have time to check this run, for the next run"),
 });
 
 const MASTERS_SYSTEM = `You are BAPTOU's admissions scout. You search the web for master's programmes that fit a student who already holds a bachelor's degree, for programmes they apply to directly on the university's website.
@@ -94,7 +102,8 @@ Rules:
 - Give real figures in the brief when the university publishes them (tuition for the student's situation, requirements, deadlines).
 - Quality over quantity: return fewer programmes rather than weak matches. Rank by matchScore, highest first.
 - Skip anything in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- If you run out of searches, return the good programmes you found so far rather than nothing.
+- Start with the leads the previous run didn't have time to check, if any.
+- If you run out of searches, return the good programmes you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
 function parseDate(s: string): Timestamp | null {
@@ -130,7 +139,7 @@ async function runSearch(uid: string, searchId: string) {
       model: MODELS.search,
       task: "search",
       // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
-      web: { searches: Math.min(8 + maxPerRun, 40), fetches: Math.min(3 + maxPerRun, 25) },
+      web: { searches: Math.min(10 + maxPerRun, 40), fetches: Math.min(5 + maxPerRun, 25) },
       maxRunUsd: 0.5 + 0.08 * maxPerRun,
       submit:
         kind === "masters"
@@ -163,7 +172,7 @@ ${
 - Notes from the student: ${search.notes || "none"}
 `
 }
-${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}Find up to ${maxPerRun} new ${kind === "masters" ? "master's programmes" : "internship offers"}.
+${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run didn't have time to check these leads; start with them:\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}Find up to ${maxPerRun} new ${kind === "masters" ? "master's programmes" : "internship offers"}.
 Already suggested (skip these): ${seen.length ? seen.slice(0, 150).join("\n") : "none"}
 Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slice(0, 150).join("\n") : "none"}`,
         },
@@ -213,6 +222,8 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       runState: "idle",
       lastRunAt: FieldValue.serverTimestamp(),
       lastBatchAt: batchAt,
+      lastRunCreated: created,
+      nextLeads: result.leadsToCheckNext.slice(0, 8),
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${result.summary}`,
       totalFound: FieldValue.increment(created),
     });

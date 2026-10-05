@@ -155,6 +155,7 @@ function Applications() {
             <ApplicationList
               key={`list-${current.id}`}
               apps={offersOf(current.id)}
+              lastRun={{ at: current.lastRunAt, batchAt: current.lastBatchAt, summary: current.lastRunSummary }}
               empty={`No ${kindOf(current) === "masters" ? "programmes" : "offers"} yet. BAPTOU lists what this search finds here (the first run takes a few minutes).`}
             />
           </>

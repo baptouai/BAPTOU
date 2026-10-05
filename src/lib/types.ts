@@ -106,6 +106,8 @@ export type Search = {
   runState?: "idle" | "queued" | "running" | "error";
   lastRunAt?: Timestamp;
   lastRunSummary?: string;
+  lastBatchAt?: Timestamp; // the last run; its offers carry the same batchAt
+  lastRunCreated?: number; // offers that run added
   lastError?: string;
   totalFound?: number;
   createdAt: Timestamp;
