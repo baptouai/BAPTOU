@@ -10,6 +10,7 @@
   --border: #e7e5e4;
   /* Outline of the main blocks (cards): clearly visible, unlike the discreet --border used inside them. */
   --card-edge: #a8a29e;
+  --card-edge-soft: #d6d3d1; /* items in a list (offer cards): quieter than the main blocks */
   --accent: #4f46e5;
   /* Usage breakdown: one fixed color per task (validated categorical palette, light surface). */
   --task-search: #2a78d6;
@@ -29,6 +30,7 @@
   --color-card: var(--card);
   --color-border: var(--border);
   --color-card-edge: var(--card-edge);
+  --color-card-edge-soft: var(--card-edge-soft);
   --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -41,7 +43,8 @@
     --muted: #a8a29e;
     --card: #1c1917;
     --border: #292524;
-    --card-edge: #e7e5e4;
+    --card-edge: #8f8a85;
+    --card-edge-soft: #57534e;
     --accent: #818cf8;
     --task-search: #3987e5;
     --task-letter: #d95926;
