@@ -62,6 +62,7 @@ Rules:
 - Prefer the company's own careers page or the original job-board posting. The url must lead to that specific posting.
 - Skip postings that are closed, expired, or whose deadline has passed.
 - Respect the search criteria (roles, locations, work mode, duration, start date, languages). Mention any compromise in matchReason.
+- Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
 - Quality over quantity: return fewer offers rather than weak matches. Rank by matchScore, highest first.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
 - Start with the leads the previous run didn't have time to check, if any.
@@ -102,6 +103,7 @@ Rules:
 - The url must be the programme's own page or its application page on the university's website (not a ranking or aggregator site).
 - The application window for the requested intake must still be open, or open later. Skip programmes whose deadline has passed.
 - Respect the criteria (fields, countries, intake, teaching language, tuition budget). Check the student's degree and grades against the admission requirements and say so in matchReason; mention any compromise.
+- Use the student's nationalities (in the profile) for tuition: give the fee that applies to them (home, EU or international) and any visa need.
 - Give real figures in the brief when the university publishes them (tuition for the student's situation, requirements, deadlines).
 - Quality over quantity: return fewer programmes rather than weak matches. Rank by matchScore, highest first.
 - Skip anything in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.

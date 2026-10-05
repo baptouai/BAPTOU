@@ -153,7 +153,10 @@ export async function loadProfile(uid: string) {
   const snap = await db.doc(`users/${uid}`).get();
   const profile = snap.get("profile");
   if (!profile) throw new HttpsError("failed-precondition", "Build your profile first (Profile page).");
-  return profile as Record<string, unknown>;
+  // Nationalities are entered by the student on the Profile page (kept apart from the AI-built profile,
+  // so rebuilding it never erases them). They decide work permits, visas and tuition fee status.
+  const nationalities = (snap.get("nationalities") as string[] | undefined) ?? [];
+  return { ...(profile as Record<string, unknown>), ...(nationalities.length ? { nationalities } : {}) };
 }
 
 export const today = () => new Date().toISOString().slice(0, 10);
