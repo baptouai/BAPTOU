@@ -78,7 +78,7 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
 
   return (
     <div className="mt-6">
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
+      <div role="tablist" className="flex gap-1 scroll-row border-b border-border">
         {tabs.map((t) => (
           <button
             key={t.id}

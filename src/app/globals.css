@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  /* Native scrollbars and form controls follow the theme (without this they stay white in dark mode). */
+  color-scheme: light dark;
   --background: #fafaf9;
   --foreground: #1c1917;
   --muted: #78716c;
@@ -52,4 +54,20 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Where scrolling is real (long letters, text boxes, the page itself): a thin, quiet scrollbar. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
+}
+
+/* Rows that may scroll sideways when there are many tabs: no visible scrollbar, never vertical. */
+@utility scroll-row {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }

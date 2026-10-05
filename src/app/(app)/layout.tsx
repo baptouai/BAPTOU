@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Image src="/logo.svg" alt="" width={24} height={24} />
             BAPTOU
           </Link>
-          <nav className="flex flex-1 gap-4 overflow-x-auto text-sm">
+          <nav className="flex flex-1 gap-4 scroll-row text-sm">
             {nav.map((item) => (
               <Link
                 key={item.href}
