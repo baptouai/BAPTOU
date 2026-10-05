@@ -12,8 +12,8 @@ const Input = z.object({
 });
 
 export const LetterSchema = z.object({
-  research: z.string().describe("Updated brief on the organization: what it does, recent news, values, the team if known"),
-  approachNote: z.string().describe("2-4 sentences for the student: the angle the letter takes and why"),
+  research: z.string().describe("4-6 facts on the organization: what it does, recent news, values, the team if known. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
+  approachNote: z.string().describe("2-4 points for the student: the angle the letter takes and why. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
   letter: z.string().describe("The full motivation letter, ready to send, in plain text"),
   packFields: z
     .array(z.object({ label: z.string(), value: z.string() }))

@@ -8,6 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { DismissForm } from "@/components/DismissForm";
 import { verdictLabel } from "@/components/FitCheck";
+import { RichText } from "@/components/RichText";
 import type { Timestamp } from "firebase/firestore";
 import type { Application } from "@/lib/types";
 
@@ -100,7 +101,7 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
             ? empty
             : tab === "latest"
               ? runBatch
-                ? `The last run (${new Date(runBatch).toLocaleString()}) found nothing new. ${lastRun?.summary ?? ""} Earlier suggestions are under “To review”.`
+                ? `The last run (${new Date(runBatch).toLocaleString()}) found nothing new. Earlier suggestions are under “To review”.`
                 : empty
               : tab === "interested"
                 ? "Mark offers as interesting to keep them here."
@@ -152,7 +153,7 @@ function OfferCard({ app: a }: { app: Item }) {
             <span className="rounded-full border border-border px-2 py-0.5 text-xs text-foreground">{statusLabel[a.status]}</span>
           </div>
         </div>
-        {a.matchReason && <p className="mt-2 line-clamp-2 text-sm text-muted">{a.matchReason}</p>}
+        {a.matchReason && <RichText text={a.matchReason} limit={2} className="mt-2 text-sm text-muted" />}
       </Link>
 
       {a.status === "suggested" && (

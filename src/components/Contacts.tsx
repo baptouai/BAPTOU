@@ -6,6 +6,7 @@ import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { RichText } from "@/components/RichText";
 import type { Contact, GmailConnection } from "@/lib/types";
 
 const findContacts = httpsCallable<
@@ -240,8 +241,14 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
       </div>
 
       <div className="mt-3 grid gap-2 text-sm">
-        <p><span className="font-medium">Your history: </span><span className="text-muted">{contact.history}</span></p>
-        <p><span className="font-medium">Why contact them: </span><span className="text-muted">{contact.whyContact}</span></p>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your history</p>
+          <RichText text={contact.history} className="mt-1" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Why contact them</p>
+          <RichText text={contact.whyContact} className="mt-1" />
+        </div>
       </div>
 
       <div className="mt-4 grid gap-2">

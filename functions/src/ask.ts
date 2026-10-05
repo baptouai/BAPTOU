@@ -10,7 +10,11 @@ const Input = z.object({
 });
 
 export const AnswerSchema = z.object({
-  answer: z.string().describe("Direct, honest answer to the student's question, in the student's language"),
+  answer: z
+    .string()
+    .describe(
+      "Direct, honest answer in the student's language. Start with one short sentence, then bullet points grouped under '**Pros**' and '**Cons**' (or other short bold headings when they fit better). Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs.",
+    ),
   verdict: z.enum(["good_fit", "uncertain", "poor_fit"]),
   verdictReason: z.string().describe("One sentence explaining the verdict"),
   followUpQuestions: z

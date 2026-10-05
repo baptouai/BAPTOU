@@ -6,6 +6,7 @@ import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref } from "firebase/storage";
 import { db, functions, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { RichText } from "@/components/RichText";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
 
 const prepareApplication = httpsCallable<{ applicationId: string; formText?: string }, ApplicationForm | null>(functions, "prepareApplication", {
@@ -162,7 +163,7 @@ export function ApplicationFormView({
 
       {local && (
         <>
-          {local.notes && <p className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">{local.notes}</p>}
+          {local.notes && <RichText text={local.notes} className="mt-3 rounded-lg bg-accent/10 p-3 text-sm" />}
           {local.source !== "pasted" && (!local.seenOnForm || local.loginRequired) ? (
             <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-800 dark:text-amber-300">

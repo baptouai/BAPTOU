@@ -18,6 +18,14 @@ const statusLabel: Record<SearchStatus, string> = {
 const runLabel = { queued: "Queued…", running: "Searching now…", idle: "", error: "" } as const;
 
 export type SearchItem = Search & { id: string };
+
+const FREQUENCIES = [
+  { days: 1, label: "Every day" },
+  { days: 3, label: "Every 3 days" },
+  { days: 7, label: "Every week" },
+];
+const frequencyLabel = (days?: number) =>
+  days === 7 ? "each week" : days === 3 ? "every 3 days" : "each day";
 export const kindOf = (s: Pick<Search, "kind">): SearchKind => s.kind ?? "internship";
 
 /** The selected search, at the top of its tab: what it looks for, its last run, and its controls. */
@@ -54,7 +62,7 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
               .join(" · ")}
           </p>
           <p className="mt-0.5 text-sm text-muted">
-            {s.maxPerRun} new {masters ? "programmes" : "offers"} a day ·{" "}
+            Up to {s.maxPerRun} new {masters ? "programmes" : "offers"} {frequencyLabel(s.frequencyDays)} ·{" "}
             {s.endsAt ? `until ${s.endsAt.toDate().toLocaleDateString()}` : "until you stop it"}
           </p>
         </div>
@@ -62,10 +70,21 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
           {s.runState && runLabel[s.runState] ? runLabel[s.runState] : statusLabel[s.status]}
         </span>
       </div>
-      {s.lastRunSummary && (
-        <p className="mt-2 text-sm text-muted">
-          Last run {s.lastRunAt?.toDate().toLocaleString()}: {s.lastRunSummary}
-        </p>
+      {s.lastRunAt && (
+        <div className="mt-3 grid gap-1 rounded-lg bg-accent/5 p-3 text-sm">
+          <p>
+            <span className="font-medium">Last run</span>{" "}
+            <span className="text-muted">
+              {s.lastRunAt.toDate().toLocaleString()} · {s.lastRunCreated ?? 0} new
+              {s.lastRunCostUsd != null && ` · $${s.lastRunCostUsd.toFixed(2)}`}
+              {s.status === "active" && s.nextRunAt && ` · next run ${s.nextRunAt.toDate().toLocaleDateString()}`}
+            </span>
+          </p>
+          {/* Older summaries began with "N new offers." and could be long: keep the first sentence. */}
+          {s.lastRunSummary && (
+            <p className="text-muted">{s.lastRunSummary.replace(/^\d+ new offers?\.\s*/, "").split(/(?<=[.!?])\s/)[0]}</p>
+          )}
+        </div>
       )}
       {s.runState === "error" && s.lastError && <p className="mt-2 text-sm text-red-600">{s.lastError}</p>}
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
@@ -144,11 +163,12 @@ export function SearchForm({
     tuitionBudget: existing?.tuitionBudget ?? "",
     notes: existing?.notes ?? "",
     maxPerRun: existing?.maxPerRun ?? 5,
+    frequencyDays: existing?.frequencyDays ?? 1,
     endsOn: toDateInput(existing?.endsAt), // empty = until stopped
   });
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [k]: k === "maxPerRun" ? Number(e.target.value) : e.target.value }));
+    setForm((f) => ({ ...f, [k]: k === "maxPerRun" || k === "frequencyDays" ? Number(e.target.value) : e.target.value }));
   const masters = form.kind === "masters";
 
   async function submit(e: React.FormEvent) {
@@ -169,6 +189,9 @@ export function SearchForm({
         name,
         endsAt,
         ...(revive ? { status: "active" } : {}),
+        // New criteria deserve a fresh try: run at the next morning slot, forget the back-off.
+        nextRunAt: null,
+        emptyStreak: 0,
         updatedAt: serverTimestamp(),
       });
       setBusy(false);
@@ -273,9 +296,19 @@ export function SearchForm({
       <Field label={masters ? "Teaching languages" : "Working languages"}>
         <input value={form.languages} onChange={set("languages")} placeholder="e.g. English, French" className={input} />
       </Field>
-      <Field label={masters ? "New programmes per day" : "New offers per day"}>
+      <Field label="How often">
+        <select value={form.frequencyDays} onChange={set("frequencyDays")} className={input}>
+          {FREQUENCIES.map((f) => (
+            <option key={f.days} value={f.days}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted">Runs that find nothing automatically wait longer before the next one.</span>
+      </Field>
+      <Field label={masters ? "New programmes per run" : "New offers per run"}>
         <input type="number" min={1} max={MAX_OFFERS} value={form.maxPerRun} onChange={set("maxPerRun")} className={input} />
-        <OffersCostHint offers={form.maxPerRun} />
+        <OffersCostHint offers={form.maxPerRun} frequencyDays={form.frequencyDays} />
       </Field>
       <Field label="Search until">
         <input type="date" value={form.endsOn} onChange={set("endsOn")} className={input} />
@@ -307,19 +340,20 @@ export function SearchForm({
 const RECOMMENDED_OFFERS = 5;
 const MAX_OFFERS = 50; // the server also caps here; guards against typos like 500
 
-// Rough cost of one daily run on Sonnet 5 with capped browsing: a fixed part for searching plus a part
-// per offer (reading the posting, writing the match reason). An estimate, refined as real usage comes in.
-const estimateMonthlyUsd = (offers: number) => 30 * (0.08 + 0.025 * offers);
+// Rough cost of one run (Sonnet 5, low effort, capped browsing): a fixed part for searching plus a part
+// per offer. An estimate; the real cost of each run is shown on the search after it runs.
+const estimateRunUsd = (offers: number) => 0.1 + 0.03 * offers;
 
-function OffersCostHint({ offers }: { offers: number }) {
+function OffersCostHint({ offers, frequencyDays }: { offers: number; frequencyDays: number }) {
   if (!offers || offers < 1) return <span className="text-xs text-muted">At least 1.</span>;
-  if (offers > MAX_OFFERS) return <span className="text-xs text-red-600">At most {MAX_OFFERS} per day.</span>;
-  const monthly = estimateMonthlyUsd(offers);
+  if (offers > MAX_OFFERS) return <span className="text-xs text-red-600">At most {MAX_OFFERS} per run.</span>;
+  const run = estimateRunUsd(offers);
+  const monthly = (run * 30) / (frequencyDays || 1);
   return (
-    <span className={`text-xs ${monthly > 8 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
+    <span className={`text-xs ${monthly > 6 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
       {offers === RECOMMENDED_OFFERS ? "Recommended. " : `Recommended: ${RECOMMENDED_OFFERS}. `}
-      About ${monthly.toFixed(0)}/month if it runs every day
-      {monthly > 8 ? ", which leaves little of a $10 budget for letters." : "."}
+      About ${run.toFixed(2)} a run, at most ${monthly.toFixed(0)}/month
+      {monthly > 6 ? ", which leaves little of a $10 budget for letters." : "."}
     </span>
   );
 }

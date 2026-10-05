@@ -40,6 +40,8 @@ export type Application = {
   matchReason?: string; // why BAPTOU suggests it
   matchScore?: number; // 0-100
   location?: string;
+  startDate?: string; // as stated in the posting (or the programme's intake)
+  duration?: string;
   searchId?: string; // the search that found it
   batchAt?: Timestamp; // when the search run that found it happened
   dismissReason?: string; // why the user turned it down; future searches learn from it
@@ -108,6 +110,9 @@ export type Search = {
   lastRunSummary?: string;
   lastBatchAt?: Timestamp; // the last run; its offers carry the same batchAt
   lastRunCreated?: number; // offers that run added
+  lastRunCostUsd?: number;
+  frequencyDays?: number; // 1, 3 or 7; missing = every day
+  nextRunAt?: Timestamp | null; // the daily job skips the search until then (backs off after empty runs)
   lastError?: string;
   totalFound?: number;
   createdAt: Timestamp;

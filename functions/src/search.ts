@@ -23,6 +23,9 @@ type Search = {
   notes: string;
   tuitionBudget?: string; // master's searches
   nextLeads?: string[]; // what the previous run didn't have time to check
+  frequencyDays?: number; // 1, 3 or 7; missing = every day
+  emptyStreak?: number; // consecutive runs that found nothing
+  nextRunAt?: Timestamp | null; // the daily job skips the search until then
   maxPerRun: number;
   status: "active" | "paused" | "stopped" | "ended";
   endsAt: Timestamp | null; // null = until the user stops it
@@ -42,11 +45,11 @@ export const OffersSchema = z.object({
       duration: z.string().describe("As stated in the posting, or empty"),
       postingLanguage: z.string().describe("Language the posting is written in"),
       matchScore: z.number().describe("0 to 100"),
-      matchReason: z.string().describe("2-3 sentences: why this fits the student, citing their profile"),
-      companyBrief: z.string().describe("3-5 short lines on the company: what it does, size, recent news, culture"),
+      matchReason: z.string().describe("2-4 reasons this fits the student, citing their profile. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
+      companyBrief: z.string().describe("3-5 facts on the company: what it does, size, recent news, culture. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
   ),
-  summary: z.string().describe("One or two sentences on this search run, for the student"),
+  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found"),
   leadsToCheckNext: z
     .array(z.string())
     .describe("Up to 8 promising companies or careers pages you did not have time to check this run, for the next run"),
@@ -80,13 +83,13 @@ export const ProgrammesSchema = z.object({
       duration: z.string().describe("Programme length, e.g. 1 year"),
       postingLanguage: z.string().describe("Language of instruction"),
       matchScore: z.number().describe("0 to 100"),
-      matchReason: z.string().describe("2-3 sentences: why this programme fits the student's degree, grades and goals"),
+      matchReason: z.string().describe("2-4 reasons this programme fits the student's degree, grades and goals. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
       companyBrief: z
         .string()
-        .describe("4-6 short lines: tuition per year for this student, admission requirements (degree, grades, tests such as GRE/IELTS), reputation, career outcomes"),
+        .describe("4-6 facts: tuition per year for this student, admission requirements (degree, grades, tests such as GRE/IELTS), reputation, career outcomes. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
   ),
-  summary: z.string().describe("One or two sentences on this search run, for the student"),
+  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found"),
   leadsToCheckNext: z
     .array(z.string())
     .describe("Up to 8 promising companies or careers pages you did not have time to check this run, for the next run"),
@@ -105,6 +108,19 @@ Rules:
 - Start with the leads the previous run didn't have time to check, if any.
 - If you run out of searches, return the good programmes you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
+
+/**
+ * When the daily job should run this search next: after its normal interval when the run found
+ * something, and backing off (2x, 4x… up to a week) after runs that found nothing.
+ */
+function nextRunAfter(search: Search, created: number) {
+  const base = search.frequencyDays ?? 1;
+  const emptyStreak = created > 0 ? 0 : (search.emptyStreak ?? 0) + 1;
+  const days = Math.min(base * 2 ** emptyStreak, Math.max(7, base));
+  // An hour early, so the 07:00 job on that day picks it up.
+  const nextRunAt = Timestamp.fromMillis(Date.now() + days * 86_400_000 - 3_600_000);
+  return { emptyStreak, nextRunAt };
+}
 
 function parseDate(s: string): Timestamp | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -133,6 +149,7 @@ async function runSearch(uid: string, searchId: string) {
     // No product limit on offers per run; 50 only guards against typos (e.g. 500) and oversized answers.
     const maxPerRun = Math.min(Math.max(Math.round(search.maxPerRun) || 5, 1), 50);
 
+    const stats = { costUsd: 0 };
     const result = await runAgent({
       uid,
       system: kind === "masters" ? MASTERS_SYSTEM : SYSTEM,
@@ -140,7 +157,10 @@ async function runSearch(uid: string, searchId: string) {
       task: "search",
       // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
       web: { searches: Math.min(10 + maxPerRun, 40), fetches: Math.min(5 + maxPerRun, 25) },
-      maxRunUsd: 0.5 + 0.08 * maxPerRun,
+      effort: "low",
+      maxPageTokens: 4000,
+      maxRunUsd: 0.2 + 0.04 * maxPerRun,
+      stats,
       submit:
         kind === "masters"
           ? { name: "submit_offers", description: "Return the master's programmes found in this run.", schema: ProgrammesSchema }
@@ -223,6 +243,8 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       lastRunAt: FieldValue.serverTimestamp(),
       lastBatchAt: batchAt,
       lastRunCreated: created,
+      lastRunCostUsd: Math.round(stats.costUsd * 100) / 100,
+      ...nextRunAfter(search, created),
       nextLeads: result.leadsToCheckNext.slice(0, 8),
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${result.summary}`,
       totalFound: FieldValue.increment(created),
@@ -264,6 +286,8 @@ export const dailySearches = onSchedule(
         await doc.ref.update({ status: "ended", runState: "idle" });
         continue;
       }
+      const nextRunAt = doc.get("nextRunAt") as Timestamp | null | undefined;
+      if (nextRunAt && nextRunAt.toMillis() > now.toMillis()) continue; // not due yet
       await doc.ref.update({ runState: "queued" });
       await queue().enqueue({ uid, searchId: doc.id });
     }

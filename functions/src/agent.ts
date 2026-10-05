@@ -11,9 +11,12 @@ const MAX_PAGE_TOKENS = 6000;
 
 export type WebBudget = { searches: number; fetches: number };
 
-export const webTools = ({ searches, fetches }: WebBudget): Anthropic.Beta.BetaToolUnion[] => [
+export const webTools = (
+  { searches, fetches }: WebBudget,
+  pageTokens = MAX_PAGE_TOKENS,
+): Anthropic.Beta.BetaToolUnion[] => [
   { type: "web_search_20260209", name: "web_search", max_uses: searches },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: fetches, max_content_tokens: MAX_PAGE_TOKENS },
+  { type: "web_fetch_20260209", name: "web_fetch", max_uses: fetches, max_content_tokens: pageTokens },
 ];
 
 // JSON Schema keywords strict tool use rejects. Zod adds some implicitly (z.int() emits min/max),
@@ -63,12 +66,14 @@ export async function runAgent<T>(opts: {
   clientTools?: ClientTool[];
   maxToolCalls?: number; // ceiling on client tool calls, default 10
   maxRunUsd?: number; // spending ceiling for this run, default $0.75
+  maxPageTokens?: number; // size cap for each fetched web page
+  stats?: { costUsd: number }; // filled with this run's cost
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
   await assertBudget(opts.uid);
   const clientTools = opts.clientTools ?? [];
   const tools = [
-    ...(opts.web ? webTools(opts.web) : []),
+    ...(opts.web ? webTools(opts.web, opts.maxPageTokens) : []),
     ...clientTools.map((t) => submitTool(t.name, t.description, t.schema)),
     submitTool(opts.submit.name, opts.submit.description, opts.submit.schema),
   ];
@@ -94,6 +99,7 @@ export async function runAgent<T>(opts: {
       })
       .finalMessage();
     runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
+    if (opts.stats) opts.stats.costUsd = runCost;
 
     if (response.stop_reason === "refusal") {
       throw new HttpsError("internal", "BAPTOU couldn't complete this request.");

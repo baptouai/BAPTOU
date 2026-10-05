@@ -43,7 +43,7 @@ export const FormSchema = z.object({
   loginRequired: z
     .boolean()
     .describe("True if the form is behind a sign-in, account creation or email verification step you could not get past"),
-  notes: z.string().describe("1-3 sentences for the student: how to apply, deadline, anything unusual"),
+  notes: z.string().describe("2-4 points for the student: how to apply, deadline, anything unusual. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
   sections: z.array(
     z.object({
       title: z.string().describe("e.g. Attachments, Personal information, Experience, Education, Questions"),

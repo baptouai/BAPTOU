@@ -5,6 +5,7 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { RichText } from "@/components/RichText";
 import type { ChatMessage, FitVerdict } from "@/lib/types";
 
 const askAboutOffer = httpsCallable<{ applicationId: string; question: string }>(functions, "askAboutOffer", {
@@ -76,7 +77,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
                 <span className="ml-2 text-muted">{m.verdictReason}</span>
               </p>
             )}
-            <p className="whitespace-pre-wrap">{m.text}</p>
+            {m.role === "user" ? <p className="whitespace-pre-wrap">{m.text}</p> : <RichText text={m.text} />}
           </li>
         ))}
       </ul>

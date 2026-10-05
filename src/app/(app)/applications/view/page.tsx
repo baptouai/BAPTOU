@@ -15,6 +15,7 @@ import { sendApprovedEmail } from "@/components/Contacts";
 import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
+import { RichText } from "@/components/RichText";
 import type { Application, LetterVersion } from "@/lib/types";
 
 const AUTOSAVE_MS = 800;
@@ -187,7 +188,8 @@ function ApplicationView() {
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">{app.title}</h1>
-            <p className="text-muted">{app.organization}{app.country ? ` · ${app.country}` : ""}</p>
+            <p className="text-muted">{app.organization}</p>
+            <FactTags app={app} />
           </div>
           <div className="flex gap-2">
             {app.fitVerdict && (
@@ -199,6 +201,23 @@ function ApplicationView() {
           </div>
         </div>
       </div>
+
+      {(app.matchReason || app.research) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {app.matchReason && (
+            <section className="rounded-xl border border-border bg-card p-5 text-sm">
+              <h2 className="font-medium">Why it fits you</h2>
+              <RichText text={app.matchReason} className="mt-2" />
+            </section>
+          )}
+          {app.research && (
+            <section className="rounded-xl border border-border bg-card p-5 text-sm">
+              <h2 className="font-medium">About {app.organization}</h2>
+              <RichText text={app.research} className="mt-2 text-muted" />
+            </section>
+          )}
+        </div>
+      )}
 
       {app.status === "suggested" && (
         <section className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-5">
@@ -233,6 +252,12 @@ function ApplicationView() {
                 {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes"}
               </span>
             </div>
+            {app.approachNote && (
+              <div className="mt-2 rounded-lg bg-accent/5 p-3 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">The angle BAPTOU took</p>
+                <RichText text={app.approachNote} className="mt-1" />
+              </div>
+            )}
             <AiBar
               action={letter ? "Rewrite with BAPTOU" : "Write my letter"}
               placeholder={letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize"}
@@ -335,14 +360,6 @@ function ApplicationView() {
         </>
       )}
 
-      {(app.matchReason || app.research || app.approachNote) && (
-        <section className="grid gap-3 rounded-xl border border-border bg-card p-5 text-sm">
-          {app.matchReason && <Info title="Why BAPTOU suggests it" text={app.matchReason} />}
-          {app.research && <Info title="Research" text={app.research} />}
-          {app.approachNote && <Info title="Approach taken in the letter" text={app.approachNote} />}
-        </section>
-      )}
-
       <KnownPeople applicationId={id} organization={app.organization} applyUrl={app.applyUrl} />
 
       <FitCheck applicationId={id} />
@@ -426,11 +443,33 @@ function AiBar({
   );
 }
 
-function Info({ title, text }: { title: string; text: string }) {
+/** Location, start, duration and deadline as small tags under the title. */
+function FactTags({ app }: { app: Application }) {
+  const [now] = useState(() => Date.now());
+  const deadline = app.deadline?.toDate();
+  const soon = deadline && deadline.getTime() - now < 7 * 86_400_000;
+  const facts = [
+    [app.location, app.country].filter(Boolean).join(", "),
+    app.startDate && `Starts ${app.startDate}`,
+    app.duration,
+  ].filter(Boolean) as string[];
+  if (!facts.length && !deadline) return null;
   return (
-    <div>
-      <p className="font-medium">{title}</p>
-      <p className="mt-0.5 whitespace-pre-wrap text-muted">{text}</p>
+    <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+      {facts.map((f) => (
+        <span key={f} className="rounded-full border border-border px-2 py-0.5 text-muted">
+          {f}
+        </span>
+      ))}
+      {deadline && (
+        <span
+          className={`rounded-full border px-2 py-0.5 ${
+            soon ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border text-muted"
+          }`}
+        >
+          Deadline {deadline.toLocaleDateString()}
+        </span>
+      )}
     </div>
   );
 }
