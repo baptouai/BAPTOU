@@ -28,6 +28,74 @@ const frequencyLabel = (days?: number) =>
   days === 7 ? "each week" : days === 3 ? "every 3 days" : "each day";
 export const kindOf = (s: Pick<Search, "kind">): SearchKind => s.kind ?? "internship";
 
+// Wording and examples per kind of search. Each kind also has its own extra fields (see SearchForm).
+const KINDS: Record<
+  SearchKind,
+  {
+    choice: string;
+    label: string;
+    tab: string; // default tab name
+    noun: string;
+    roles: [string, string];
+    locations: [string, string];
+    start: [string, string];
+    duration?: [string, string];
+    languages?: string;
+    notes: string;
+  }
+> = {
+  internship: {
+    choice: "An internship",
+    label: "Internship",
+    tab: "Internship",
+    noun: "offers",
+    roles: ["Roles or keywords *", "e.g. mechanical design intern, thermal engineering"],
+    locations: ["Locations", "e.g. Milton Keynes, Paris, Remote EU"],
+    start: ["Start date", "e.g. November 2026"],
+    duration: ["Duration", "e.g. 6 months"],
+    languages: "Working languages",
+    notes: "e.g. Prefer mid-size firms, no unpaid internships",
+  },
+  job: {
+    choice: "A job",
+    label: "Job",
+    tab: "Job",
+    noun: "offers",
+    roles: ["Roles or keywords *", "e.g. junior mechanical engineer, graduate programme"],
+    locations: ["Locations", "e.g. London, Lyon, Remote EU"],
+    start: ["Start date", "e.g. September 2027"],
+    languages: "Working languages",
+    notes: "e.g. Graduate schemes welcome, no consulting",
+  },
+  alternance: {
+    choice: "An alternance",
+    label: "Alternance",
+    tab: "Alternance",
+    noun: "offers",
+    roles: ["Roles or keywords *", "e.g. ingénieur mécanique, bureau d'études"],
+    locations: ["Locations", "e.g. Île-de-France, Lyon"],
+    start: ["Start date", "e.g. September 2027"],
+    duration: ["Contract length", "e.g. 2 years"],
+    notes: "e.g. Less than an hour from Paris, large companies preferred",
+  },
+  masters: {
+    choice: "A master's programme",
+    label: "Master's programmes",
+    tab: "Master's",
+    noun: "programmes",
+    roles: ["Fields or programmes *", "e.g. MSc mechanical engineering, motorsport engineering"],
+    locations: ["Countries", "e.g. UK, Netherlands, Switzerland"],
+    start: ["Intake", "e.g. September 2027"],
+    duration: ["Programme length", "e.g. 1 to 2 years"],
+    languages: "Teaching languages",
+    notes: "e.g. Programmes with an industrial placement, scholarships for EU students",
+  },
+};
+
+/** Small tag on a search tab saying what it looks for (internships, the default, have none). */
+export const kindTag = (kind: SearchKind) => (kind === "internship" ? undefined : KINDS[kind].tab);
+export const kindNoun = (kind: SearchKind) => KINDS[kind].noun;
+
 /** The selected search, at the top of its tab: what it looks for, its last run, and its controls. */
 export function SearchCard({ search: s }: { search: SearchItem }) {
   const { user } = useAuth();
@@ -41,28 +109,31 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
 
   if (editing) return <SearchForm existing={s} onDone={() => setEditing(false)} />;
 
-  const masters = kindOf(s) === "masters";
+  const kind = kindOf(s);
+  const masters = kind === "masters";
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">
-            {masters ? "Master's programmes" : "Internship"}
-          </p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">{KINDS[kind].label}</p>
           <p className="mt-0.5 text-sm">
             {[
               s.roles,
               s.locations || (masters ? "any country" : "anywhere"),
               s.startDate && `${masters ? "intake" : "starting"} ${s.startDate}`,
               s.duration,
-              !masters && s.workMode !== "any" && s.workMode,
+              (kind === "internship" || kind === "job") && s.workMode !== "any" && s.workMode,
+              s.contractType,
+              kind === "job" && s.salaryMin && `from ${s.salaryMin}`,
+              kind === "alternance" && s.rhythm,
+              kind === "alternance" && (s.school ? `school: ${s.school}` : "school to find"),
               masters && s.tuitionBudget && `tuition ≤ ${s.tuitionBudget}`,
             ]
               .filter(Boolean)
               .join(" · ")}
           </p>
           <p className="mt-0.5 text-sm text-muted">
-            Up to {s.maxPerRun} new {masters ? "programmes" : "offers"} {frequencyLabel(s.frequencyDays)} ·{" "}
+            Up to {s.maxPerRun} new {KINDS[kind].noun} {frequencyLabel(s.frequencyDays)} ·{" "}
             {s.endsAt ? `until ${s.endsAt.toDate().toLocaleDateString()}` : "until you stop it"}
           </p>
         </div>
@@ -126,18 +197,18 @@ const toDateInput = (t: Timestamp | null | undefined) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** Creates a search (internship or master's programmes), or edits `existing`. Changes apply from the next run. */
 /**
  * Default tab name when the user leaves it empty: the kind and start date ("Internship · November 2026"),
  * numbered if that name is taken, so two tabs never read the same.
  */
 export function defaultTabName(kind: SearchKind, startDate: string, taken: string[]) {
-  const base = `${kind === "masters" ? "Master's" : "Internship"}${startDate.trim() ? ` · ${startDate.trim()}` : ""}`;
+  const base = `${KINDS[kind].tab}${startDate.trim() ? ` · ${startDate.trim()}` : ""}`;
   const names = new Set(taken.map((n) => n.toLowerCase()));
   if (!names.has(base.toLowerCase())) return base;
   for (let i = 2; ; i++) if (!names.has(`${base} (${i})`.toLowerCase())) return `${base} (${i})`;
 }
 
+/** Creates a search (internship, job, alternance or master's programmes), or edits `existing`. */
 export function SearchForm({
   existing,
   onDone,
@@ -161,6 +232,10 @@ export function SearchForm({
     industries: existing?.industries ?? "",
     languages: existing?.languages ?? "",
     tuitionBudget: existing?.tuitionBudget ?? "",
+    contractType: existing?.contractType ?? "",
+    salaryMin: existing?.salaryMin ?? "",
+    rhythm: existing?.rhythm ?? "",
+    school: existing?.school ?? "",
     notes: existing?.notes ?? "",
     maxPerRun: existing?.maxPerRun ?? 5,
     frequencyDays: existing?.frequencyDays ?? 1,
@@ -169,7 +244,7 @@ export function SearchForm({
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: k === "maxPerRun" || k === "frequencyDays" ? Number(e.target.value) : e.target.value }));
-  const masters = form.kind === "masters";
+  const k = KINDS[form.kind];
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -221,18 +296,18 @@ export function SearchForm({
     <form onSubmit={submit} className="grid gap-3 rounded-xl border border-border bg-card p-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <p className="text-sm font-medium">What are you looking for?</p>
-        <div className="mt-2 flex gap-2">
-          {(["internship", "masters"] as const).map((k) => (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(Object.keys(KINDS) as SearchKind[]).map((kind) => (
             <button
-              key={k}
+              key={kind}
               type="button"
               disabled={!!existing}
-              onClick={() => setForm((f) => ({ ...f, kind: k }))}
+              onClick={() => setForm((f) => ({ ...f, kind, contractType: "" }))}
               className={`rounded-lg border px-4 py-2 text-sm disabled:cursor-default ${
-                form.kind === k ? "border-accent bg-accent/10 font-medium text-accent" : "border-border text-muted"
+                form.kind === kind ? "border-accent bg-accent/10 font-medium text-accent" : "border-border text-muted"
               }`}
             >
-              {k === "internship" ? "An internship" : "A master's programme"}
+              {KINDS[kind].choice}
             </button>
           ))}
         </div>
@@ -246,56 +321,78 @@ export function SearchForm({
           className={input}
         />
       </Field>
-      <Field label={masters ? "Fields or programmes *" : "Roles or keywords *"}>
-        <input
-          required
-          value={form.roles}
-          onChange={set("roles")}
-          placeholder={masters ? "e.g. MSc mechanical engineering, motorsport engineering" : "e.g. mechanical design intern, thermal engineering"}
-          className={input}
-        />
+      <Field label={k.roles[0]}>
+        <input required value={form.roles} onChange={set("roles")} placeholder={k.roles[1]} className={input} />
       </Field>
-      <Field label={masters ? "Countries" : "Locations"}>
-        <input
-          value={form.locations}
-          onChange={set("locations")}
-          placeholder={masters ? "e.g. UK, Netherlands, Switzerland" : "e.g. Milton Keynes, Paris, Remote EU"}
-          className={input}
-        />
+      <Field label={k.locations[0]}>
+        <input value={form.locations} onChange={set("locations")} placeholder={k.locations[1]} className={input} />
       </Field>
-      <Field label={masters ? "Intake" : "Start date"}>
-        <input
-          value={form.startDate}
-          onChange={set("startDate")}
-          placeholder={masters ? "e.g. September 2027" : "e.g. November 2026"}
-          className={input}
-        />
+      <Field label={k.start[0]}>
+        <input value={form.startDate} onChange={set("startDate")} placeholder={k.start[1]} className={input} />
       </Field>
-      <Field label={masters ? "Programme length" : "Duration"}>
-        <input value={form.duration} onChange={set("duration")} placeholder={masters ? "e.g. 1 to 2 years" : "e.g. 6 months"} className={input} />
-      </Field>
-      {masters ? (
+      {k.duration && (
+        <Field label={k.duration[0]}>
+          <input value={form.duration} onChange={set("duration")} placeholder={k.duration[1]} className={input} />
+        </Field>
+      )}
+
+      {form.kind === "masters" && (
         <Field label="Tuition budget per year">
           <input value={form.tuitionBudget} onChange={set("tuitionBudget")} placeholder="e.g. €15,000" className={input} />
         </Field>
-      ) : (
-        <Field label="Work mode">
-          <select value={form.workMode} onChange={set("workMode")} className={input}>
-            <option value="any">Any</option>
-            <option value="onsite">On-site</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="remote">Remote</option>
-          </select>
+      )}
+      {form.kind === "job" && (
+        <>
+          <Field label="Contract">
+            <select value={form.contractType} onChange={set("contractType")} className={input}>
+              <option value="">Any</option>
+              <option value="Permanent (CDI)">Permanent (CDI)</option>
+              <option value="Fixed-term (CDD)">Fixed-term (CDD)</option>
+              <option value="Graduate programme">Graduate programme</option>
+            </select>
+          </Field>
+          <Field label="Minimum salary">
+            <input value={form.salaryMin} onChange={set("salaryMin")} placeholder="e.g. €38,000 a year" className={input} />
+          </Field>
+        </>
+      )}
+      {form.kind === "alternance" && (
+        <>
+          <Field label="Contract">
+            <select value={form.contractType} onChange={set("contractType")} className={input}>
+              <option value="">Either</option>
+              <option value="Contrat d'apprentissage">Contrat d&apos;apprentissage</option>
+              <option value="Contrat de professionnalisation">Contrat de professionnalisation</option>
+            </select>
+          </Field>
+          <Field label="Rhythm">
+            <input value={form.rhythm} onChange={set("rhythm")} placeholder="e.g. 3 weeks company / 1 week school" className={input} />
+          </Field>
+          <Field label="Your school">
+            <input value={form.school} onChange={set("school")} placeholder="Leave empty if you still need one" className={input} />
+          </Field>
+        </>
+      )}
+      {(form.kind === "internship" || form.kind === "job") && (
+        <>
+          <Field label="Work mode">
+            <select value={form.workMode} onChange={set("workMode")} className={input}>
+              <option value="any">Any</option>
+              <option value="onsite">On-site</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="remote">Remote</option>
+            </select>
+          </Field>
+          <Field label="Industries">
+            <input value={form.industries} onChange={set("industries")} placeholder="e.g. motorsport, aerospace" className={input} />
+          </Field>
+        </>
+      )}
+      {k.languages && (
+        <Field label={k.languages}>
+          <input value={form.languages} onChange={set("languages")} placeholder="e.g. English, French" className={input} />
         </Field>
       )}
-      {!masters && (
-        <Field label="Industries">
-          <input value={form.industries} onChange={set("industries")} placeholder="e.g. motorsport, aerospace" className={input} />
-        </Field>
-      )}
-      <Field label={masters ? "Teaching languages" : "Working languages"}>
-        <input value={form.languages} onChange={set("languages")} placeholder="e.g. English, French" className={input} />
-      </Field>
       <Field label="How often">
         <select value={form.frequencyDays} onChange={set("frequencyDays")} className={input}>
           {FREQUENCIES.map((f) => (
@@ -306,7 +403,7 @@ export function SearchForm({
         </select>
         <span className="text-xs text-muted">Runs that find nothing automatically wait longer before the next one.</span>
       </Field>
-      <Field label={masters ? "New programmes per run" : "New offers per run"}>
+      <Field label={`New ${k.noun} per run`}>
         <input type="number" min={1} max={MAX_OFFERS} value={form.maxPerRun} onChange={set("maxPerRun")} className={input} />
         <OffersCostHint offers={form.maxPerRun} frequencyDays={form.frequencyDays} />
       </Field>
@@ -320,7 +417,7 @@ export function SearchForm({
             value={form.notes}
             onChange={set("notes")}
             rows={3}
-            placeholder={masters ? "e.g. Programmes with an industrial placement, scholarships for EU students" : "e.g. Prefer mid-size firms, no unpaid internships"}
+            placeholder={k.notes}
             className={input}
           />
         </Field>
@@ -350,10 +447,10 @@ function OffersCostHint({ offers, frequencyDays }: { offers: number; frequencyDa
   const run = estimateRunUsd(offers);
   const monthly = (run * 30) / (frequencyDays || 1);
   return (
-    <span className={`text-xs ${monthly > 6 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
+    <span className={`text-xs ${monthly > 8 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
       {offers === RECOMMENDED_OFFERS ? "Recommended. " : `Recommended: ${RECOMMENDED_OFFERS}. `}
       About ${run.toFixed(2)} a run, at most ${monthly.toFixed(0)}/month
-      {monthly > 6 ? ", which leaves little of a $10 budget for letters." : "."}
+      {monthly > 8 ? ", which leaves little of a $10 budget for letters." : "."}
     </span>
   );
 }

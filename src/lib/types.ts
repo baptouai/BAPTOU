@@ -18,7 +18,7 @@ export type UploadedDocument = {
   uploadedAt: Timestamp;
 };
 
-export type ApplicationType = "internship" | "masters";
+export type ApplicationType = "internship" | "job" | "alternance" | "masters";
 
 export type ApplicationStatus =
   | "suggested" // created by BAPTOU, not reviewed yet
@@ -42,6 +42,10 @@ export type Application = {
   location?: string;
   startDate?: string; // as stated in the posting (or the programme's intake)
   duration?: string;
+  contractType?: string; // jobs and alternances
+  salary?: string;
+  rhythm?: string; // alternances
+  school?: string; // alternances: partner school named in the posting
   searchId?: string; // the search that found it
   batchAt?: Timestamp; // when the search run that found it happened
   dismissReason?: string; // why the user turned it down; future searches learn from it
@@ -88,7 +92,7 @@ export type Profile = {
 // users/{uid}/searches/{searchId}. Created by the user; the daily job only runs "active" ones.
 export type SearchStatus = "active" | "paused" | "stopped" | "ended";
 
-export type SearchKind = "internship" | "masters";
+export type SearchKind = ApplicationType;
 
 export type Search = {
   kind?: SearchKind; // missing = internship (searches created before master's searches)
@@ -102,6 +106,10 @@ export type Search = {
   languages: string;
   notes: string;
   tuitionBudget?: string; // master's searches
+  contractType?: string; // jobs: permanent / fixed-term; alternances: apprentissage / professionnalisation
+  salaryMin?: string; // jobs
+  rhythm?: string; // alternances, e.g. "3 weeks company / 1 week school"
+  school?: string; // alternances: the student's school, empty if they still need one
   maxPerRun: number;
   status: SearchStatus;
   endsAt: Timestamp | null; // null = until the user stops it

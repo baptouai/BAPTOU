@@ -10,7 +10,7 @@ export function SearchTab({
   name,
   active,
   dimmed = false,
-  masters = false,
+  tag,
   badge = 0,
   onSelect,
   onRename,
@@ -18,7 +18,7 @@ export function SearchTab({
   name: string;
   active: boolean;
   dimmed?: boolean;
-  masters?: boolean;
+  tag?: string; // what the search looks for, e.g. "Job", "Alternance", "Master's"
   badge?: number; // offers to review
   onSelect: () => void;
   onRename: (name: string) => void;
@@ -63,7 +63,7 @@ export function SearchTab({
       } ${dimmed ? "opacity-60" : ""}`}
     >
       {name}
-      {masters && <span className="rounded border border-border px-1 text-[10px] uppercase">Master&apos;s</span>}
+      {tag && <span className="rounded border border-border px-1 text-[10px] uppercase">{tag}</span>}
       {badge > 0 && (
         <span className="rounded-full bg-accent px-1.5 text-xs font-medium text-white" title={`${badge} to review`}>
           {badge}

@@ -452,6 +452,10 @@ function FactTags({ app }: { app: Application }) {
     [app.location, app.country].filter(Boolean).join(", "),
     app.startDate && `Starts ${app.startDate}`,
     app.duration,
+    app.contractType,
+    app.rhythm,
+    app.salary,
+    app.school && `School: ${app.school}`,
   ].filter(Boolean) as string[];
   if (!facts.length && !deadline) return null;
   return (

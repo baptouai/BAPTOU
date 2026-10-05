@@ -4,7 +4,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { toContentBlock } from "./profile.js";
-import { anthropicKey, db, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -26,7 +26,7 @@ export const EmailSchema = z.object({
   body: z.string(),
 });
 
-const WRITER_SYSTEM = `You are BAPTOU, a writing assistant for students applying to internships and master's programmes.
+const WRITER_SYSTEM = `You are BAPTOU, a writing assistant for students applying to internships, jobs, alternances and master's programmes.
 You write in the student's own voice, using their writing style notes and past letters as a model.
 
 Rules:
@@ -55,7 +55,7 @@ async function loadContext(uid: string, applicationId: string) {
 }
 
 function describeApplication(app: FirebaseFirestore.DocumentData) {
-  return `${app.type === "masters" ? "Master's programme" : "Internship"}: ${app.title}
+  return `${kindLabel(app.type)}: ${app.title}
 Organization: ${app.organization}${app.location ? `, ${app.location}` : ""}${app.country ? ` (${app.country})` : ""}
 Link: ${app.applyUrl ?? "none"}
 Posting language: ${app.postingLanguage ?? "unknown"}

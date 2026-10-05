@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -22,7 +22,7 @@ export const AnswerSchema = z.object({
     .describe("Up to 3 questions to ask the student that would help decide, if anything important is unclear"),
 });
 
-const SYSTEM = `You are BAPTOU, a frank career advisor. A student is deciding whether an internship or programme is really right for them.
+const SYSTEM = `You are BAPTOU, a frank career advisor. A student is deciding whether an internship, job, alternance or master's programme is really right for them.
 - Answer honestly, including downsides (pay, location, workload, team reputation, career value, visa, timing). Do not oversell.
 - Base claims about the organization on web research done now; say when something could not be verified.
 - Relate everything to the student's profile, goals and earlier answers in this conversation.
@@ -60,7 +60,7 @@ export const askAboutOffer = onCall(
         {
           type: "text",
           text: `Today is ${today()}.
-${app.type === "masters" ? "Master's programme" : "Internship"}: ${app.title} at ${app.organization}${app.location ? `, ${app.location}` : ""}
+${kindLabel(app.type)}: ${app.title} at ${app.organization}${app.location ? `, ${app.location}` : ""}
 Link: ${app.applyUrl ?? "none"}
 Why BAPTOU suggested it: ${app.matchReason ?? ""}
 Research notes: ${app.research ?? "none"}

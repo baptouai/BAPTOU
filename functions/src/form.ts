@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
 
 const Entry = z.object({
   title: z.string().describe("Job title, or degree"),
@@ -94,7 +94,7 @@ async function readForm(
       {
         type: "text",
         text: `Today is ${today()}.
-${app.type === "masters" ? "Master's programme" : "Internship"}: ${app.title} at ${app.organization}
+${kindLabel(app.type)}: ${app.title} at ${app.organization}
 Posting link: ${app.applyUrl}
 
 Student's uploaded documents:

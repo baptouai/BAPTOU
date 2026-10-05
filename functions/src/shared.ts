@@ -15,6 +15,16 @@ export const bucket = () => getStorage().bucket();
 
 export const REGION = "europe-west1";
 
+// What a search looks for, and what kind of opportunity an application is.
+export type Kind = "internship" | "job" | "alternance" | "masters";
+export const KIND_LABEL: Record<Kind, string> = {
+  internship: "Internship",
+  job: "Job",
+  alternance: "Alternance (French work-study contract)",
+  masters: "Master's programme",
+};
+export const kindLabel = (type: unknown) => KIND_LABEL[(type as Kind) in KIND_LABEL ? (type as Kind) : "internship"];
+
 export type Model = "claude-opus-5" | "claude-sonnet-5" | "claude-haiku-4-5";
 
 // What a Claude call was for, so spending can be shown per task.

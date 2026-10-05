@@ -6,7 +6,7 @@ import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ApplicationList, type ApplicationItem } from "@/components/ApplicationList";
-import { kindOf, SearchCard, SearchForm, type SearchItem } from "@/components/Searches";
+import { kindNoun, kindOf, kindTag, SearchCard, SearchForm, type SearchItem } from "@/components/Searches";
 import { SearchTab } from "@/components/SearchTab";
 import type { Application, Search } from "@/lib/types";
 
@@ -102,7 +102,7 @@ function Applications() {
             name={s.name}
             active={current?.id === s.id}
             dimmed={s.status === "stopped" || s.status === "ended"}
-            masters={kindOf(s) === "masters"}
+            tag={kindTag(kindOf(s))}
             badge={offersOf(s.id).filter((a) => a.status === "suggested").length}
             onSelect={() => select(s.id)}
             onRename={(name) => rename(s.id, name)}
@@ -137,8 +137,9 @@ function Applications() {
           <>
             {tabs.length === 0 && (
               <p className="mb-4 text-muted">
-                Tell BAPTOU what you&apos;re looking for. Each search gets its own tab, for example one internship
-                starting in November and another starting in April.
+                Tell BAPTOU what you&apos;re looking for: an internship, a job, an alternance or a master&apos;s
+                programme. Each search gets its own tab, for example one internship starting in November and another
+                starting in April.
               </p>
             )}
             <SearchForm
@@ -156,7 +157,7 @@ function Applications() {
               key={`list-${current.id}`}
               apps={offersOf(current.id)}
               lastRun={{ at: current.lastRunAt, batchAt: current.lastBatchAt, summary: current.lastRunSummary }}
-              empty={`No ${kindOf(current) === "masters" ? "programmes" : "offers"} yet. BAPTOU lists what this search finds here (the first run takes a few minutes).`}
+              empty={`No ${kindNoun(kindOf(current))} yet. BAPTOU lists what this search finds here (the first run takes a few minutes).`}
             />
           </>
         ) : (
