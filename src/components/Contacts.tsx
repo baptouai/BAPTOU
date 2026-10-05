@@ -101,7 +101,7 @@ export function ContactsPanel({
 
   if (listOnly) {
     return visible.length ? (
-      <ul className="grid gap-4">
+      <ul className="grid grid-cols-1 gap-4">
         {visible.map((c) => (
           <li key={c.id}>
             <ContactCard contact={c} />
@@ -149,7 +149,7 @@ export function ContactsPanel({
       </div>
       {message && <p className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">{message}</p>}
 
-      <ul className="mt-4 grid gap-4">
+      <ul className="mt-4 grid grid-cols-1 gap-4">
         {visible.map((c) => (
           <li key={c.id}>
             <ContactCard contact={c} />
@@ -224,10 +224,10 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
   }
 
   return (
-    <div className={`rounded-lg border border-border p-4 ${contact.status === "dismissed" ? "opacity-60" : ""}`}>
+    <div className={`min-w-0 rounded-lg border border-border p-4 ${contact.status === "dismissed" ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-medium">
+          <p className="font-medium [overflow-wrap:anywhere]">
             {contact.name} <span className="font-normal text-muted">&lt;{contact.email}&gt;</span>
           </p>
           <p className="text-sm text-muted">

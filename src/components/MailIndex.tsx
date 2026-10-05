@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, limit, onSnapshot, orderBy, query, where, type Timestamp } from "firebase/firestore";
+import {
+  arrayRemove, arrayUnion, collection, doc, limit, onSnapshot, orderBy, query, setDoc, where, type Timestamp,
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -28,6 +30,27 @@ const draftFromIndex = httpsCallable<{ indexId: string; applicationId?: string }
 );
 const refreshMailIndex = httpsCallable<void, { queued: boolean }>(functions, "refreshMailIndex");
 
+/** Favourite people, by email, on users/{uid}.favouriteContacts. */
+function useFavourites() {
+  const { user } = useAuth();
+  const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "users", user.uid), (snap) =>
+      setFavourites(new Set((snap.get("favouriteContacts") as string[]) ?? [])),
+    );
+  }, [user]);
+  const toggle = (email: string) => {
+    if (!user) return;
+    setDoc(
+      doc(db, "users", user.uid),
+      { favouriteContacts: favourites.has(email) ? arrayRemove(email) : arrayUnion(email) },
+      { merge: true },
+    );
+  };
+  return { favourites, toggle };
+}
+
 function useIndexStatus() {
   const { user } = useAuth();
   const [status, setStatus] = useState<IndexStatus | null | undefined>(undefined);
@@ -51,6 +74,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   const { status, connected } = useIndexStatus();
   const [people, setPeople] = useState<(Person & { id: string })[]>([]);
   const tokens = useMemo(() => offerTokens(organization, applyUrl), [organization, applyUrl]);
+  const { favourites, toggle } = useFavourites();
 
   useEffect(() => {
     if (!user || !tokens.length) return;
@@ -78,10 +102,19 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
     <section className="rounded-xl border border-border bg-card p-5">
       <h2 className="font-medium">People you know at {organization}</h2>
       <p className="mt-1 text-sm text-muted">Found in your mailbox automatically, without using credits.</p>
-      <ul className="mt-3 grid gap-2">
-        {people.map((p) => (
-          <PersonRow key={p.id} person={p} applicationId={applicationId} canDraft={connected} />
-        ))}
+      <ul className="mt-3 grid grid-cols-1 gap-2">
+        {[...people]
+          .sort((a, b) => Number(favourites.has(b.email)) - Number(favourites.has(a.email)))
+          .map((p) => (
+            <PersonRow
+              key={p.id}
+              person={p}
+              applicationId={applicationId}
+              canDraft={connected}
+              favourite={favourites.has(p.email)}
+              onToggleFavourite={() => toggle(p.email)}
+            />
+          ))}
       </ul>
       <div className="mt-4">
         <ContactsPanel applicationId={applicationId} listOnly />
@@ -90,14 +123,18 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   );
 }
 
-function PersonRow({
+export function PersonRow({
   person: p,
   applicationId,
   canDraft,
+  favourite = false,
+  onToggleFavourite,
 }: {
   person: Person & { id: string };
   applicationId?: string;
   canDraft: boolean; // drafting reads the last conversation, so it needs Gmail connected
+  favourite?: boolean;
+  onToggleFavourite?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,10 +152,21 @@ function PersonRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
-      <div className="min-w-0">
-        <p className="font-medium">
-          {p.name || p.email} <span className="font-normal text-muted">&lt;{p.email}&gt;</span>
+    <li className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+      {onToggleFavourite && (
+        <button
+          onClick={onToggleFavourite}
+          aria-label={favourite ? `Remove ${p.name || p.email} from favourites` : `Add ${p.name || p.email} to favourites`}
+          aria-pressed={favourite}
+          title={favourite ? "Remove from favourites" : "Add to favourites"}
+          className={`-m-1 shrink-0 p-1 text-lg leading-none ${favourite ? "text-amber-500" : "text-muted hover:text-amber-500"}`}
+        >
+          {favourite ? "★" : "☆"}
+        </button>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="font-medium [overflow-wrap:anywhere]">
+          {p.name || p.email} {p.name && <span className="font-normal text-muted">&lt;{p.email}&gt;</span>}
         </p>
         <p className="truncate text-muted">
           {p.sent} sent · {p.received} received · last {new Date(p.lastAt).toLocaleDateString()}
@@ -151,6 +199,8 @@ export function MailIndexPanel() {
   const [shown, setShown] = useState(20);
   const [error, setError] = useState<string | null>(null);
   const [now] = useState(() => Date.now()); // for recency scoring; stable during the session
+  const { favourites, toggle } = useFavourites();
+  const [onlyFavourites, setOnlyFavourites] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -162,6 +212,7 @@ export function MailIndexPanel() {
     const f = filter.trim().toLowerCase();
     const yearMs = 365 * 24 * 3600 * 1000;
     return people
+      .filter((p) => !onlyFavourites || favourites.has(p.email))
       .filter((p) => !f || `${p.name} ${p.email} ${p.lastSubject}`.toLowerCase().includes(f))
       .map((p) => ({
         p,
@@ -173,7 +224,9 @@ export function MailIndexPanel() {
       }))
       .sort((a, b) => b.score - a.score)
       .map((x) => x.p);
-  }, [people, filter, now]);
+  }, [people, filter, now, onlyFavourites, favourites]);
+  const favouriteRows = ranked.filter((p) => favourites.has(p.email));
+  const otherRows = ranked.filter((p) => !favourites.has(p.email));
 
   async function refresh() {
     setError(null);
@@ -229,16 +282,48 @@ export function MailIndexPanel() {
         placeholder="Search by name, email, company or subject"
         className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
       />
-      <ul className="mt-3 grid gap-2">
-        {ranked.slice(0, shown).map((p) => (
-          <PersonRow key={p.id} person={p} canDraft={connected} />
-        ))}
-      </ul>
-      {ranked.length > shown && (
-        <button onClick={() => setShown((n) => n + 20)} className="mt-3 text-sm text-muted">
-          Show more ({ranked.length - shown} left)
-        </button>
+      {favourites.size > 0 && (
+        <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={onlyFavourites} onChange={(e) => setOnlyFavourites(e.target.checked)} />
+          Favourites only
+        </label>
       )}
+
+      {favouriteRows.length > 0 && (
+        <>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">★ Favourites</p>
+          <ul className="mt-2 grid grid-cols-1 gap-2">
+            {favouriteRows.map((p) => (
+              <PersonRow key={p.id} person={p} canDraft={connected} favourite onToggleFavourite={() => toggle(p.email)} />
+            ))}
+          </ul>
+        </>
+      )}
+
+      {otherRows.length > 0 && (
+        <>
+          {favouriteRows.length > 0 && (
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Everyone else</p>
+          )}
+          <ul className="mt-2 grid grid-cols-1 gap-2">
+            {otherRows.slice(0, shown).map((p) => (
+              <PersonRow key={p.id} person={p} canDraft={connected} onToggleFavourite={() => toggle(p.email)} />
+            ))}
+          </ul>
+        </>
+      )}
+      <div className="mt-3 flex gap-4 text-sm text-muted">
+        {otherRows.length > shown && (
+          <button onClick={() => setShown((n) => n + 20)} className="hover:text-foreground">
+            Show more ({otherRows.length - shown} left)
+          </button>
+        )}
+        {shown > 20 && (
+          <button onClick={() => setShown(20)} className="hover:text-foreground">
+            Show less
+          </button>
+        )}
+      </div>
     </section>
   );
 }
