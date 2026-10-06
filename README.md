@@ -25,9 +25,24 @@ See [src/lib/types.ts](src/lib/types.ts). Everything a user owns lives under `us
 ```
 GOOGLE_OAUTH_CLIENT_ID=421746504296-s2gj4leri7bmngo3lp6j44mklpeofjbj.apps.googleusercontent.com
 APP_URL=https://baptou-app.web.app
+ANTHROPIC_FEDERATION_RULE_ID=fdrl_01EAQt2atGc6oWsX6iM6kpAS
+ANTHROPIC_ORGANIZATION_ID=8dcbcd16-bd93-4af7-88f0-b9efc4828b62
+ANTHROPIC_SERVICE_ACCOUNT_ID=svac_01WovSZskYYVwNfniyeUpUsr
+ANTHROPIC_WORKSPACE_ID=wrkspc_01Gii9L2hccKRfym4sdYo39H
 ```
 
-Secrets in Secret Manager: `ANTHROPIC_API_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`.
+Secrets in Secret Manager: `GOOGLE_OAUTH_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, and `ANTHROPIC_API_KEY` (only used if the federation IDs above are missing).
+
+### Claude API authentication (workload identity federation)
+
+No long-lived API key: the functions (running as the default compute service account) mint a Google ID
+token for `baptou-claude@baptou-5041c.iam.gserviceaccount.com` (they hold
+`roles/iam.serviceAccountOpenIdTokenCreator` on it), and the Anthropic SDK exchanges it for a short-lived
+Claude access token. Anthropic side: Claude Console > Settings > Workload identity, issuer `google-cloud`
+(accounts.google.com), rule `baptou-functions` (audience `https://api.anthropic.com`, sub
+`100226828464799307803`, email as above) targeting service account `baptou-server` in the Default
+workspace. `claudeAuthCheck` (Mondays, or run from Cloud Scheduler) logs which method is in use.
 
 ## Deployment
 
