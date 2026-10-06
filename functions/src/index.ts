@@ -15,3 +15,4 @@ export { dailyReplies, scanRepliesNow, scanRepliesTask } from "./replies.js";
 export { sendGiftInvitation } from "./invites.js";
 export { deleteMyAccount, exportMyData } from "./account.js";
 export { commitmentReminders } from "./reminders.js";
+export { claudeAuthCheck } from "./health.js";

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { oidcFederationProvider } from "@anthropic-ai/sdk/lib/credentials/oidc-federation";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
@@ -61,8 +62,58 @@ export const PLAN_BUDGET_USD = Math.round(PLAN_BUDGET_EUR * EUR_TO_USD * 100) / 
 // Stored in Google Secret Manager: `npx firebase functions:secrets:set ANTHROPIC_API_KEY`
 export const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 
+// Workload identity federation (no long-lived API key): once the IDs from the Claude Console are set in
+// functions/.env, BAPTOU proves its identity with a short-lived Google ID token for its dedicated service
+// account (baptou-claude), and Anthropic answers with an access token that expires within the hour.
+// Until then, the API key from Secret Manager is used.
+const FEDERATION = {
+  ruleId: process.env.ANTHROPIC_FEDERATION_RULE_ID,
+  organizationId: process.env.ANTHROPIC_ORGANIZATION_ID,
+  serviceAccountId: process.env.ANTHROPIC_SERVICE_ACCOUNT_ID,
+  workspaceId: process.env.ANTHROPIC_WORKSPACE_ID || undefined,
+  googleAccount: process.env.CLAUDE_GOOGLE_SERVICE_ACCOUNT ?? "baptou-claude@baptou-5041c.iam.gserviceaccount.com",
+};
+export const usesFederation = () => !!(FEDERATION.ruleId && FEDERATION.organizationId);
+
+/** A Google-signed ID token for baptou-claude, minted with the functions' own runtime identity. */
+async function googleIdToken() {
+  const meta = await fetch("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", {
+    headers: { "Metadata-Flavor": "Google" },
+  });
+  const { access_token } = (await meta.json()) as { access_token: string };
+  const res = await fetch(
+    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${FEDERATION.googleAccount}:generateIdToken`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ audience: "https://api.anthropic.com", includeEmail: true }),
+    },
+  );
+  if (!res.ok) throw new Error(`Couldn't get a Google ID token (${res.status})`);
+  return ((await res.json()) as { token: string }).token;
+}
+
+// One client per instance, so a federated access token is cached and refreshed rather than re-exchanged.
+let client: Anthropic | null = null;
 export function claude() {
-  return new Anthropic({ apiKey: anthropicKey.value() });
+  if (client) return client;
+  client = usesFederation()
+    ? new Anthropic({
+        // An API key in the environment would take precedence over federation, so it is switched off here.
+        apiKey: null,
+        authToken: null,
+        credentials: oidcFederationProvider({
+          identityTokenProvider: googleIdToken,
+          federationRuleId: FEDERATION.ruleId!,
+          organizationId: FEDERATION.organizationId!,
+          serviceAccountId: FEDERATION.serviceAccountId,
+          workspaceId: FEDERATION.workspaceId,
+          baseURL: "https://api.anthropic.com",
+          fetch,
+        }),
+      })
+    : new Anthropic({ apiKey: anthropicKey.value() });
+  return client;
 }
 
 // Server-side refusal fallback for Opus 5: if it declines, the API re-runs on a fallback model.
