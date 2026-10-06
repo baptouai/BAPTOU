@@ -77,6 +77,15 @@
     </section>
 
     <section class="card">
+      <h2>Sender email</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+        <p id="sender" style="margin:0" class="muted">Loading…</p>
+        <button id="connectSender">Connect</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0">Invitations, new-offer emails and cancellation confirmations are sent from this address.</p>
+    </section>
+
+    <section class="card">
       <h2>Users <span class="muted" id="month"></span></h2>
       <div class="scroll">
         <table>
@@ -132,6 +141,14 @@
       const d = await api("overview");
       $("month").textContent = "· " + d.month;
       $("gmailSlots").textContent = `Gmail reading places used: ${d.gmailRead.granted} / ${d.gmailRead.cap} (Google's limit until its audit).`;
+      const s = d.sender;
+      $("sender").innerHTML =
+        s.email && !s.error
+          ? `<span class="ok">Connected:</span> ${esc(s.email)} <span class="muted">since ${esc(date(s.connectedAt))}</span>`
+          : s.email
+            ? `<span class="error">${esc(s.email)}: ${esc(s.error)} Reconnect it.</span>`
+            : `<span class="error">Not connected: BAPTOU can't send emails until you connect ${esc(s.expected)}.</span>`;
+      $("connectSender").textContent = s.email && !s.error ? "Reconnect" : `Connect ${s.expected}`;
       const spent = d.users.reduce((s, u) => s + u.spentUsd, 0);
       const active = d.users.filter((u) => !["none", "gift expired"].includes(u.access.kind)).length;
       $("totals").textContent = `${active} with access · ${money(spent)} spent this month`;
@@ -190,6 +207,14 @@
         }
       }
     });
+
+    $("connectSender").addEventListener("click", () =>
+      run("Opening Google", async () => {
+        const { url } = await api("connectSender");
+        // Sign in there with BAPTOU's address. The page says when it's done; then click Refresh here.
+        window.open(url, "_blank", "width=520,height=720");
+      }),
+    );
 
     $("refresh").addEventListener("click", () => run("Refreshing", async () => {}));
     // Keeps the local server alive while this window is open.

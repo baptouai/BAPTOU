@@ -46,9 +46,10 @@ AI features only work for invited users. To invite someone, create a document in
 
 ## Emails to users
 
-Invitations, new-offer emails and cancellation confirmations are sent from the owner's Gmail
-(`config/app.ownerUid`, which must have Gmail connected), with "BAPTOU" as the sender name
-(`functions/src/notify.ts`). New offers: one summary per search run, or a dedicated email for each
+Invitations, new-offer emails and cancellation confirmations are sent from BAPTOU's own Gmail,
+baptouai@gmail.com, with "BAPTOU" as the sender name (`functions/src/notify.ts`). Connect it once
+from BAPTOU Admin (Sender email > Connect): it asks Google for send permission only and stores the
+encrypted token in `config/mailer`. Until it's connected, these emails aren't sent. New offers: one summary per search run, or a dedicated email for each
 offer scoring 90% or more. Users turn them off on their Profile page.
 
 ## Legal pages

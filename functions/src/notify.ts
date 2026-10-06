@@ -1,21 +1,14 @@
 import { getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions/v2";
-import { type Gmail, gmailFor, sendMail } from "./gmail.js";
+import { senderGmail, sendMail } from "./gmail.js";
 import { db } from "./shared.js";
 
-// Emails BAPTOU sends to users (invitations, new offers). They go out from the owner's Gmail for now;
-// before a large launch this should move to a transactional email service with BAPTOU's own domain.
+// Emails BAPTOU sends to users (invitations, new offers, cancellations). They go out from BAPTOU's own
+// Gmail (baptouai@gmail.com, see senderGmail); before a large launch this should move to a transactional
+// email service with BAPTOU's own domain.
 
 export const APP_URL = "https://baptou-app.web.app";
 export const IDEAL_SCORE = 90; // offers at or above this match score get their own email
-
-/** The owner's Gmail (config/app.ownerUid), used as BAPTOU's sender. */
-export async function ownerMailer(): Promise<{ gmail: Gmail; name: string }> {
-  const ownerUid = (await db.doc("config/app").get()).get("ownerUid") as string | undefined;
-  if (!ownerUid) throw new Error("config/app.ownerUid is not set");
-  const owner = await db.doc(`users/${ownerUid}`).get();
-  return { gmail: await gmailFor(ownerUid), name: (owner.get("displayName") as string | undefined) ?? "BAPTOU" };
-}
 
 export type NewOffer = {
   id: string;
@@ -91,8 +84,7 @@ export async function emailUser(uid: string, mail: { subject: string; body: stri
   try {
     const to = (await getAuth().getUser(uid)).email;
     if (!to) return false;
-    const { gmail } = await ownerMailer();
-    await sendMail(gmail, { to, fromName: "BAPTOU", ...mail });
+    await sendMail(await senderGmail(), { to, fromName: "BAPTOU", ...mail });
     return true;
   } catch (e) {
     logger.error("Email to user failed", { uid, subject: mail.subject, error: String(e) });

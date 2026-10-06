@@ -21,6 +21,8 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
 ];
+// The account's address, from the ID token: Gmail's profile endpoint needs read access, which not everyone has.
+const IDENTITY = ["openid", "email"];
 const redirectUri = () => `https://${REGION}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/gmailOAuthCallback`;
 export const GMAIL_SECRETS = [clientSecret, tokenKey];
 
@@ -55,7 +57,7 @@ export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
     redirect_uri: redirectUri(),
     response_type: "code",
     // Reading is only requested while one of the 100 Gmail-reading places is available (see access.ts).
-    scope: ((await gmailReadAvailable(uid)) ? SCOPES : SCOPES.slice(1)).join(" "),
+    scope: [...IDENTITY, ...((await gmailReadAvailable(uid)) ? SCOPES : SCOPES.slice(1))].join(" "),
     access_type: "offline", // refresh token, so the daily jobs work without the user present
     prompt: "consent",
     include_granted_scopes: "true",
@@ -65,6 +67,36 @@ export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
   return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
 });
 
+type Tokens = { refresh_token?: string; access_token?: string; scope?: string; id_token?: string };
+
+/** Exchanges the consent code for tokens; null if Google refused. */
+async function exchangeCode(code: string): Promise<Tokens | null> {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId.value(),
+      client_secret: clientSecret.value(),
+      redirect_uri: redirectUri(),
+      grant_type: "authorization_code",
+    }),
+  });
+  const tokens = (await res.json()) as Tokens;
+  if (!res.ok || !tokens.refresh_token || !tokens.access_token) {
+    logger.error("Gmail token exchange failed", { status: res.status });
+    return null;
+  }
+  return tokens;
+}
+
+/** The Google account's email address. The ID token comes straight from Google's token endpoint. */
+async function accountEmail(tokens: Tokens) {
+  const claims = tokens.id_token ? JSON.parse(Buffer.from(tokens.id_token.split(".")[1], "base64url").toString("utf8")) : {};
+  if (claims.email) return String(claims.email);
+  return ((await gmailFetch(tokens.access_token!, "profile")) as { emailAddress: string }).emailAddress;
+}
+
 /** Google redirects here after consent. Stores the encrypted refresh token, then returns to the app. */
 export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SECRETS }, async (req, res) => {
   let returnTo = appUrl.value();
@@ -72,6 +104,10 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
   try {
     const [uid, state] = String(req.query.state ?? "").split(".");
     const code = String(req.query.code ?? "");
+    if (uid === "sender") {
+      await connectSender(state, code, res);
+      return;
+    }
     if (!uid || !state || !code) return back("cancelled");
 
     const priv = await db.doc(`private/${uid}`).get();
@@ -79,29 +115,15 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
     if (pending?.returnTo && RETURN_ORIGINS.includes(pending.returnTo)) returnTo = pending.returnTo;
     if (!pending || pending.state !== state || Date.now() - pending.createdAt > 10 * 60_000) return back("expired");
 
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId.value(),
-        client_secret: clientSecret.value(),
-        redirect_uri: redirectUri(),
-        grant_type: "authorization_code",
-      }),
-    });
-    const tokens = (await tokenRes.json()) as { refresh_token?: string; access_token?: string; scope?: string };
-    if (!tokenRes.ok || !tokens.refresh_token || !tokens.access_token) {
-      logger.error("Gmail token exchange failed", { status: tokenRes.status });
-      return back("error");
-    }
+    const tokens = await exchangeCode(code);
+    if (!tokens) return back("error");
     const granted = tokens.scope?.split(" ") ?? [];
     if (granted.includes(SCOPES[0])) await claimGmailRead(uid);
-    const profile = (await gmailFetch(tokens.access_token, "profile")) as { emailAddress: string };
+    const email = await accountEmail(tokens);
 
     await db.doc(`private/${uid}`).set(
       {
-        gmail: { refreshToken: encrypt(tokens.refresh_token), email: profile.emailAddress, scopes: granted },
+        gmail: { refreshToken: encrypt(tokens.refresh_token!), email, scopes: granted },
         gmailOAuth: FieldValue.delete(),
       },
       { merge: true },
@@ -109,7 +131,7 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
     await db.doc(`users/${uid}`).set(
       {
         gmail: {
-          email: profile.emailAddress,
+          email,
           canRead: granted.includes(SCOPES[0]),
           canSend: granted.includes(SCOPES[1]),
           needsReconnect: false,
@@ -130,6 +152,55 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
     back("error");
   }
 });
+
+// --- BAPTOU's own mailbox (baptouai@gmail.com), which sends BAPTOU's emails to users (invitations, new
+// offers, cancellations). Connected from BAPTOU Admin: it writes config/mailer.pending and opens Google's
+// consent page with state "sender.<nonce>"; the callback lands here. Send permission only.
+
+const page = (text: string) =>
+  `<!doctype html><meta charset="utf-8"><title>BAPTOU</title><body style="font:16px/1.5 system-ui,sans-serif;max-width:560px;margin:60px auto;padding:0 16px">${text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")}</body>`;
+
+async function connectSender(state: string, code: string, res: { status(n: number): { send(b: string): unknown } }) {
+  const done = (text: string) => res.status(200).send(page(text));
+  const ref = db.doc("config/mailer");
+  const pending = (await ref.get()).get("pending") as { state: string; email: string; createdAt: number } | undefined;
+  if (!code) return done("Cancelled. Start again from BAPTOU Admin.");
+  if (!pending || pending.state !== state || Date.now() - pending.createdAt > 10 * 60_000) {
+    return done("This link has expired. Start again from BAPTOU Admin.");
+  }
+  const tokens = await exchangeCode(code);
+  if (!tokens) return done("Google didn't give access. Try again from BAPTOU Admin.");
+  if (!(tokens.scope?.split(" ") ?? []).includes(SCOPES[1])) {
+    return done("Sending emails wasn't allowed. Try again from BAPTOU Admin and tick the Gmail box.");
+  }
+  const email = (await accountEmail(tokens)).toLowerCase();
+  if (email !== pending.email) {
+    return done(`You signed in as ${email}, not ${pending.email}. Try again from BAPTOU Admin and choose ${pending.email}.`);
+  }
+  await ref.set({
+    refreshToken: encrypt(tokens.refresh_token!),
+    email,
+    connectedAt: FieldValue.serverTimestamp(),
+  });
+  logger.info("Sender mailbox connected", { email });
+  return done(`Done: BAPTOU now sends its emails from ${email}. You can close this window.`);
+}
+
+/** BAPTOU's own mailbox, for the emails it sends to users. Throws if it isn't connected. */
+export async function senderGmail(): Promise<Gmail> {
+  const ref = db.doc("config/mailer");
+  const config = await ref.get();
+  const enc = config.get("refreshToken") as string | undefined;
+  if (!enc) throw new Error("BAPTOU's sender email isn't connected (BAPTOU Admin > Sender email).");
+  const access = await accessFrom(enc);
+  if (!access) {
+    await ref.set({ error: "Google access expired or was revoked." }, { merge: true });
+    throw new Error("BAPTOU's sender email needs to be reconnected (BAPTOU Admin > Sender email).");
+  }
+  return { email: config.get("email") as string, call: (path, init) => gmailFetch(access, path, init) };
+}
 
 /** Revokes the user's Gmail grant at Google (best effort). */
 export async function revokeGmail(uid: string) {
@@ -183,11 +254,8 @@ export async function requireGmailRead(uid: string) {
   }
 }
 
-/** A Gmail client for this user, or an error asking them to connect Gmail. */
-export async function gmailFor(uid: string): Promise<Gmail> {
-  const priv = await db.doc(`private/${uid}`).get();
-  const enc = priv.get("gmail.refreshToken") as string | undefined;
-  if (!enc) throw new HttpsError("failed-precondition", "Connect your Gmail first (Profile page).");
+/** A fresh access token from a stored refresh token; null when Google revoked or expired it. */
+async function accessFrom(enc: string): Promise<string | null> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -199,15 +267,23 @@ export async function gmailFor(uid: string): Promise<Gmail> {
     }),
   });
   const token = (await res.json()) as { access_token?: string; error?: string };
-  if (!token.access_token) {
-    if (token.error === "invalid_grant") {
-      // Revoked from the Google account, or expired (tokens of apps in testing mode expire after 7 days).
-      await db.doc(`users/${uid}`).set({ gmail: { needsReconnect: true } }, { merge: true });
-      throw new HttpsError("failed-precondition", "Your Gmail connection expired. Reconnect Gmail on the Profile page.");
-    }
-    throw new HttpsError("unavailable", "Couldn't reach Gmail. Try again.");
+  if (token.access_token) return token.access_token;
+  // Revoked from the Google account, or expired (tokens of apps in testing mode expire after 7 days).
+  if (token.error === "invalid_grant") return null;
+  throw new HttpsError("unavailable", "Couldn't reach Gmail. Try again.");
+}
+
+/** A Gmail client for this user, or an error asking them to connect Gmail. */
+export async function gmailFor(uid: string): Promise<Gmail> {
+  const priv = await db.doc(`private/${uid}`).get();
+  const enc = priv.get("gmail.refreshToken") as string | undefined;
+  if (!enc) throw new HttpsError("failed-precondition", "Connect your Gmail first (Profile page).");
+  const access = await accessFrom(enc);
+  if (!access) {
+    await db.doc(`users/${uid}`).set({ gmail: { needsReconnect: true } }, { merge: true });
+    throw new HttpsError("failed-precondition", "Your Gmail connection expired. Reconnect Gmail on the Profile page.");
   }
-  return { email: priv.get("gmail.email"), call: (path, init) => gmailFetch(token.access_token!, path, init) };
+  return { email: priv.get("gmail.email"), call: (path, init) => gmailFetch(access, path, init) };
 }
 
 type Header = { name: string; value: string };

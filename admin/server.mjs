@@ -18,6 +18,8 @@ const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/
 const DEFAULT_LIMIT = 6.6; // €6 allowance; keep in sync with PLAN_BUDGET_USD in functions/src/shared.ts
 const GMAIL_READ_CAP = 100; // keep in sync with functions/src/access.ts
 const PORT = 4545;
+const SENDER = "baptouai@gmail.com"; // BAPTOU's own mailbox, which sends its emails to users
+const REGION = "europe-west1";
 const TOKEN = randomBytes(16).toString("hex"); // the page gets it; other websites can't
 const month = () => new Date().toISOString().slice(0, 7);
 
@@ -61,7 +63,13 @@ const str = (v) => v?.stringValue;
 // --- Commands
 
 async function overview() {
-  const [users, priv, access, slots] = await Promise.all([list("users"), list("private"), list("access"), fs("config/gmailRead")]);
+  const [users, priv, access, slots, mailer] = await Promise.all([
+    list("users"),
+    list("private"),
+    list("access"),
+    fs("config/gmailRead"),
+    fs("config/mailer"),
+  ]);
   const privById = Object.fromEntries(priv.map((d) => [id(d), d.fields ?? {}]));
   const gifts = Object.fromEntries(access.map((d) => [decodeURIComponent(id(d)), d.fields ?? {}]));
   const m = month();
@@ -117,6 +125,12 @@ async function overview() {
     month: m,
     defaultLimit: DEFAULT_LIMIT,
     gmailRead: { granted: num(slots?.fields?.granted) ?? 0, cap: GMAIL_READ_CAP },
+    sender: {
+      expected: SENDER,
+      email: str(mailer?.fields?.email) ?? null,
+      connectedAt: mailer?.fields?.connectedAt?.timestampValue ?? null,
+      error: str(mailer?.fields?.error) ?? null,
+    },
     users: rows,
     pending,
   };
@@ -183,7 +197,41 @@ async function setLimit({ email, uid, limitUsd }) {
   }
 }
 
-const commands = { overview, gift, removeInvite, setLimit };
+/**
+ * Starts connecting BAPTOU's sender mailbox: saves a one-time state, then returns Google's consent page
+ * (send permission only). Google comes back to the gmailOAuthCallback function, which stores the token.
+ */
+async function connectSender() {
+  const env = readFileSync(join(here, "..", "functions", ".env"), "utf8");
+  const clientId = env.match(/^GOOGLE_OAUTH_CLIENT_ID=(.+)$/m)?.[1].trim();
+  if (!clientId) throw new Error("GOOGLE_OAUTH_CLIENT_ID is missing from functions/.env");
+  const state = randomBytes(24).toString("hex");
+  await fs("config/mailer?updateMask.fieldPaths=pending", {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        pending: {
+          mapValue: {
+            fields: { state: { stringValue: state }, email: { stringValue: SENDER }, createdAt: { integerValue: String(Date.now()) } },
+          },
+        },
+      },
+    }),
+  });
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: `https://${REGION}-${PROJECT}.cloudfunctions.net/gmailOAuthCallback`,
+    response_type: "code",
+    scope: "openid email https://www.googleapis.com/auth/gmail.send",
+    access_type: "offline",
+    prompt: "consent select_account",
+    login_hint: SENDER,
+    state: `sender.${state}`,
+  });
+  return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
+}
+
+const commands = { overview, gift, removeInvite, setLimit, connectSender };
 
 // --- Server
 

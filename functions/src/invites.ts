@@ -1,12 +1,12 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { GMAIL_SECRETS, sendMail } from "./gmail.js";
-import { APP_URL, ownerMailer } from "./notify.js";
-import { REGION } from "./shared.js";
+import { GMAIL_SECRETS, senderGmail, sendMail } from "./gmail.js";
+import { APP_URL } from "./notify.js";
+import { db, REGION } from "./shared.js";
 
 // When BAPTOU Admin gifts a subscription with "Send invitation email" ticked, it sets `notify: true` on
-// access/{email}. This sends the invitation from the owner's Gmail, then clears the flag.
+// access/{email}. This sends the invitation from BAPTOU's own Gmail, then clears the flag.
 
 function invitation(email: string, ownerName: string, until: Date | null) {
   const fr = until ? `jusqu'au ${until.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : "sans date de fin";
@@ -52,9 +52,12 @@ export const sendGiftInvitation = onDocumentWritten(
     if (!after?.exists || after.get("notify") !== true) return;
     const email = decodeURIComponent(event.params.email);
     try {
-      const { gmail, name } = await ownerMailer();
+      // Signed by the owner (config/app.ownerUid), who gives the subscription.
+      const ownerUid = (await db.doc("config/app").get()).get("ownerUid") as string | undefined;
+      const owner = ownerUid ? await db.doc(`users/${ownerUid}`).get() : null;
+      const name = (owner?.get("displayName") as string | undefined) ?? "BAPTOU";
       const until = (after.get("expiresAt") as Timestamp | undefined)?.toDate() ?? null;
-      await sendMail(gmail, { to: email, ...invitation(email, name, until) });
+      await sendMail(await senderGmail(), { to: email, fromName: "BAPTOU", ...invitation(email, name, until) });
       await after.ref.update({ notify: false, notifiedAt: FieldValue.serverTimestamp(), notifyError: FieldValue.delete() });
       logger.info("Gift invitation sent", { email });
     } catch (e) {
