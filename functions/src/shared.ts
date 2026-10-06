@@ -28,7 +28,7 @@ export const kindLabel = (type: unknown) => KIND_LABEL[(type as Kind) in KIND_LA
 export type Model = "claude-opus-5" | "claude-sonnet-5" | "claude-haiku-4-5";
 
 // What a Claude call was for, so spending can be shown per task.
-export type Task = "search" | "letter" | "form" | "contacts" | "ask" | "email" | "profile";
+export type Task = "search" | "letter" | "form" | "contacts" | "ask" | "email" | "profile" | "replies";
 
 // Which model each task uses. Writing quality matters most for letters; the rest is research and extraction.
 // Chosen to give the best quality within a $10/month budget: the daily search (~30 runs/month) is the
@@ -41,6 +41,7 @@ export const MODELS = {
   email: "claude-sonnet-5",
   ask: "claude-sonnet-5",
   contacts: "claude-sonnet-5",
+  replies: "claude-sonnet-5",
 } satisfies Record<string, Model>;
 
 // USD per million tokens (Claude API list prices). Cache writes cost 1.25x input, cache reads 0.1x.

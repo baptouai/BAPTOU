@@ -33,6 +33,12 @@ service cloud.firestore {
         allow read: if isOwner(uid);
       }
 
+      // Replies to applications found in the mailbox (written by the server). The app only marks them seen.
+      match /replies/{replyId} {
+        allow read: if isOwner(uid);
+        allow update: if isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
+      }
+
       // Offers the user turned down (the offer itself is deleted). Written by dismissOffer only.
       match /dismissedOffers/{offerId} {
         allow read: if isOwner(uid);

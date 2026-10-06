@@ -51,6 +51,7 @@ export type Application = {
   source?: "manual"; // added by the user from a link
   postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
   postingClosedReason?: string;
+  lastReply?: { kind: "received" | "interview" | "rejection" | "offer" | "request" | "other"; at: Timestamp; messageId: string };
   dismissReason?: string; // why the user turned it down; future searches learn from it
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
   fitVerdictReason?: string;

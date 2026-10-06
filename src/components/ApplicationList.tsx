@@ -10,6 +10,7 @@ import { DismissForm } from "@/components/DismissForm";
 import { verdictLabel } from "@/components/FitCheck";
 import { RichText } from "@/components/RichText";
 import { looksGeneric } from "@/lib/postingLink";
+import { replyKind } from "@/components/Replies";
 import type { Timestamp } from "firebase/firestore";
 import type { Application } from "@/lib/types";
 
@@ -143,6 +144,11 @@ function OfferCard({ app: a }: { app: Item }) {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            {a.lastReply && a.lastReply.kind !== "other" && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${replyKind[a.lastReply.kind].className}`}>
+                {replyKind[a.lastReply.kind].label}
+              </span>
+            )}
             {a.postingClosedAt && (
               <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
                 Posting closed

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { UsageMeter } from "@/components/UsageMeter";
+import { RepliesPanel } from "@/components/Replies";
 import { usePlan } from "@/lib/plan";
 
 const steps = [
@@ -27,6 +28,7 @@ export default function Dashboard() {
           <span className="font-medium text-accent">See plans →</span>
         </Link>
       )}
+      <RepliesPanel />
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {steps.map((s) => (
           <Link key={s.href} href={s.href} className="rounded-xl border border-card-edge bg-card p-5 hover:border-accent">

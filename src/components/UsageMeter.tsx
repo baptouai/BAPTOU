@@ -12,6 +12,7 @@ const TASKS = [
   { id: "ask", label: "\"Is this for me?\"" },
   { id: "email", label: "Emails" },
   { id: "profile", label: "Profile" },
+  { id: "replies", label: "Reply checks" },
 ] as const;
 
 /** This month's usage as a share of the monthly allowance (users never see amounts of money). */

@@ -20,6 +20,7 @@
   --task-ask: #e87ba4;
   --task-email: #008300;
   --task-profile: #4a3aa7;
+  --task-replies: #e34948;
   --task-earlier: #a8a29e;
 }
 
@@ -53,6 +54,7 @@
     --task-ask: #d55181;
     --task-email: #008300;
     --task-profile: #9085e9;
+    --task-replies: #e66767;
     --task-earlier: #78716c;
   }
 }

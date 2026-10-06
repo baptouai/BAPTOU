@@ -106,7 +106,13 @@ async function overview() {
   const known = new Set(rows.map((r) => r.email));
   const pending = Object.entries(gifts)
     .filter(([email]) => !known.has(email))
-    .map(([email, f]) => ({ email, until: f.expiresAt?.timestampValue ?? null }));
+    .map(([email, f]) => ({
+      email,
+      until: f.expiresAt?.timestampValue ?? null,
+      notifiedAt: f.notifiedAt?.timestampValue ?? null,
+      notifyError: str(f.notifyError) ?? null,
+      sending: f.notify?.booleanValue === true,
+    }));
   return {
     month: m,
     defaultLimit: DEFAULT_LIMIT,
@@ -129,11 +135,13 @@ const cleanLimit = (v) => {
 };
 
 /** Gifts a subscription to an email address for `months` months (0 = no end date). */
-async function gift({ email, months }) {
+async function gift({ email, months, notify }) {
   email = cleanEmail(email);
   const n = Number(months);
   if (![0, 1, 3, 6, 12].includes(n)) throw new Error("Choose a duration.");
   const fields = { gift: { booleanValue: true }, invitedAt: { timestampValue: new Date().toISOString() } };
+  // The sendGiftInvitation function emails them from the owner's Gmail, then clears this flag.
+  if (notify) fields.notify = { booleanValue: true };
   if (n > 0) {
     const end = new Date();
     end.setMonth(end.getMonth() + n);

@@ -50,6 +50,29 @@ export function domainTokens(domain: string): string[] {
     .filter((l) => l.length >= 3 && !GENERIC.has(l));
 }
 
+/** Tokens an email domain could carry for this organization (same as offerTokens in src/lib/orgTokens.ts). */
+export function offerTokens(organization: string, applyUrl?: string): string[] {
+  const words = norm(organization)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !STOP.has(w));
+  const tokens = new Set<string>();
+  for (const w of words) if (w.length >= 3 && !GENERIC.has(w)) tokens.add(w);
+  for (let i = 0; i < words.length; i++) {
+    for (let j = i + 2; j <= words.length; j++) tokens.add(words.slice(i, j).join(""));
+  }
+  if (applyUrl) {
+    try {
+      for (const label of new URL(applyUrl).hostname.split(".")) {
+        const l = norm(label).replace(/[^a-z0-9]/g, "");
+        if (l.length >= 3 && !GENERIC.has(l) && !/^wd\d+$/.test(l)) tokens.add(l);
+      }
+    } catch {
+      // not a URL
+    }
+  }
+  return [...tokens];
+}
+
 // --- Header parsing
 
 const ADDRESS = /(?:"?([^"<>,]*?)"?\s*)?<([^<>\s]+@[^<>\s]+)>|([^\s,<>"]+@[^\s,<>"]+)/g;
