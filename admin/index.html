@@ -95,6 +95,20 @@
       </div>
     </section>
 
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <h2 style="margin:0">Feedback on suggestions <span class="muted" id="feedbackCount"></span></h2>
+        <button id="loadFeedback">Show</button>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Why users turned offers down, newest first. Use it to improve the searches.</p>
+      <div class="scroll" id="feedbackBox" hidden>
+        <table>
+          <thead><tr><th>When</th><th>User · search</th><th>Offer</th><th>Score</th><th>Reason</th></tr></thead>
+          <tbody id="feedback"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="card" id="pendingCard" hidden>
       <h2>Gifted, not signed in yet</h2>
       <table><tbody id="pending"></tbody></table>
@@ -213,6 +227,27 @@
         const { url } = await api("connectSender");
         // Sign in there with BAPTOU's address. The page says when it's done; then click Refresh here.
         window.open(url, "_blank", "width=520,height=720");
+      }),
+    );
+
+    $("loadFeedback").addEventListener("click", () =>
+      run("Loading feedback", async () => {
+        const { rows } = await api("feedback");
+        $("feedbackCount").textContent = `· ${rows.length} from ${new Set(rows.map((r) => r.email)).size} user(s)`;
+        $("feedbackBox").hidden = false;
+        $("feedback").innerHTML =
+          rows
+            .map(
+              (r) => `<tr>
+                <td class="num muted">${esc(date(r.at))}</td>
+                <td><div>${esc(r.email)}</div><div class="muted">${esc([r.kind, r.search].filter(Boolean).join(" · "))}</div></td>
+                <td><div>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a>` : esc(r.title)}</div>
+                    <div class="muted">${esc(r.organization)}${r.jobBoard ? " · job board" : ""}${r.manual ? " · added by user" : ""}</div></td>
+                <td class="num">${r.score == null ? "–" : `${r.score}%`}</td>
+                <td>${esc(r.reason || "–")}</td>
+              </tr>`,
+            )
+            .join("") || `<tr><td colspan="5" class="muted">No feedback yet.</td></tr>`;
       }),
     );
 

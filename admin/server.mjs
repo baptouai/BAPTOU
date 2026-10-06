@@ -231,7 +231,42 @@ async function connectSender() {
   return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
 }
 
-const commands = { overview, gift, removeInvite, setLimit, connectSender };
+/**
+ * Why users turned suggestions down (users/{uid}/dismissedOffers), newest first, to improve the searches.
+ * Read-only.
+ */
+async function feedback() {
+  const res = await fetch(`${BASE}:runQuery`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "dismissedOffers", allDescendants: true }] } }),
+  });
+  if (!res.ok) throw new Error(`Firestore ${res.status}`);
+  const users = Object.fromEntries((await list("users")).map((u) => [id(u), str(u.fields?.email) ?? ""]));
+  const rows = (await res.json())
+    .filter((r) => r.document)
+    .map((r) => {
+      const f = r.document.fields ?? {};
+      const uid = r.document.name.split("/users/")[1].split("/")[0];
+      return {
+        email: users[uid] ?? uid,
+        at: f.dismissedAt?.timestampValue ?? null,
+        kind: str(f.type) ?? "",
+        search: str(f.searchName) ?? "",
+        organization: str(f.organization) ?? "",
+        title: str(f.title) ?? "",
+        score: num(f.matchScore) ?? null,
+        reason: str(f.reason) ?? "",
+        url: str(f.url) ?? "",
+        jobBoard: f.fromJobBoard?.booleanValue === true,
+        manual: str(f.source) === "manual",
+      };
+    })
+    .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
+  return { rows };
+}
+
+const commands = { overview, gift, removeInvite, setLimit, connectSender, feedback };
 
 // --- Server
 

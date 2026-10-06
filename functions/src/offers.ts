@@ -52,6 +52,18 @@ export type DismissedOffer = {
   organization: string;
   reason: string;
   dismissedAt: FirebaseFirestore.FieldValue;
+  // For improving the searches: where the offer came from and what BAPTOU thought of it.
+  type?: string;
+  searchId?: string;
+  searchName?: string;
+  source?: string; // "manual" when the student added it
+  location?: string;
+  country?: string;
+  matchScore?: number;
+  matchReason?: string;
+  fromJobBoard?: boolean;
+  status?: string; // where the student was with it (suggested, interested, editing…)
+  suggestedAt?: FirebaseFirestore.Timestamp;
 };
 
 /** Loads the student's dismissals: ids to block (by link and by organization + title) and recent reasons. */
@@ -82,6 +94,7 @@ export const dismissOffer = onCall({ region: REGION }, async (request) => {
   if (!app) return { ok: true }; // already gone
   if (app.emailSentAt) throw new HttpsError("failed-precondition", "You already emailed about this offer, so it is kept.");
 
+  const search = app.searchId ? (await db.doc(`users/${uid}/searches/${app.searchId}`).get()).data() : undefined;
   const record: DismissedOffer = {
     url: app.applyUrl ?? "",
     offerKey: offerKey(app.organization ?? "", app.title ?? ""),
@@ -89,6 +102,22 @@ export const dismissOffer = onCall({ region: REGION }, async (request) => {
     organization: app.organization ?? "",
     reason: reason.trim(),
     dismissedAt: FieldValue.serverTimestamp(),
+    // Only the fields that exist (Firestore rejects undefined values).
+    ...Object.fromEntries(
+      Object.entries({
+        type: app.type,
+        searchId: app.searchId,
+        searchName: search?.name,
+        source: app.source,
+        location: app.location,
+        country: app.country,
+        matchScore: app.matchScore,
+        matchReason: app.matchReason,
+        fromJobBoard: app.fromJobBoard,
+        status: app.status,
+        suggestedAt: app.createdAt,
+      }).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+    ),
   };
   await db.doc(`users/${uid}/dismissedOffers/${app.applyUrl ? urlId(app.applyUrl) : applicationId}`).set(record);
   await db.recursiveDelete(ref); // letter versions and the "is this for me?" chat go too
