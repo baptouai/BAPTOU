@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Image src="/logo.svg" alt="" width={24} height={24} />
             BAPTOU
           </Link>
-          <nav className="order-last flex w-full justify-between gap-3 scroll-row text-sm sm:order-none sm:w-auto sm:flex-1 sm:justify-start sm:gap-4">
+          <nav className="order-last flex w-full justify-between gap-2.5 scroll-row text-sm sm:order-none sm:w-auto sm:flex-1 sm:justify-start sm:gap-4">
             {nav.map((item) => (
               <Link
                 key={item.href}
