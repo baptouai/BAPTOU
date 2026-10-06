@@ -49,6 +49,7 @@ export type Application = {
   searchId?: string; // the search that found it
   batchAt?: Timestamp; // when the search run that found it happened
   source?: "manual"; // added by the user from a link
+  fromJobBoard?: boolean; // the link is a job board's copy: the organization doesn't publish it itself
   postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
   postingClosedReason?: string;
   lastReply?: { kind: "received" | "interview" | "rejection" | "offer" | "request" | "other"; at: Timestamp; messageId: string };

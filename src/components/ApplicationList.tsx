@@ -165,6 +165,14 @@ function OfferCard({ app: a }: { app: Item }) {
             {a.source === "manual" && (
               <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted">Added by you</span>
             )}
+            {a.fromJobBoard && (
+              <span
+                className="rounded-full border border-border px-2 py-0.5 text-xs text-muted"
+                title="BAPTOU couldn't find this offer on the organization's own website"
+              >
+                Via a job board
+              </span>
+            )}
             {a.fitVerdict && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${verdictLabel[a.fitVerdict].className}`}>
                 {verdictLabel[a.fitVerdict].text}

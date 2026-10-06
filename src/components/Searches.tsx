@@ -135,7 +135,7 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
               .join(" · ")}
           </p>
           <p className="mt-0.5 text-sm text-muted">
-            Up to {s.maxPerRun} new {KINDS[kind].noun} {frequencyLabel(s.frequencyDays)} ·{" "}
+            {s.maxPerRun} new {KINDS[kind].noun} {frequencyLabel(s.frequencyDays)} ·{" "}
             {s.endsAt ? `until ${s.endsAt.toDate().toLocaleDateString()}` : "until you stop it"}
           </p>
         </div>
@@ -441,8 +441,9 @@ const RECOMMENDED_OFFERS = 5;
 const MAX_OFFERS = 50; // the server also caps here; guards against typos like 500
 
 // Rough cost of one run (Sonnet 5, low effort, capped browsing): a fixed part for searching plus a part
-// per offer. An estimate; the real cost of each run is shown on the search after it runs.
-const estimateRunUsd = (offers: number) => 0.1 + 0.03 * offers;
+// per offer, spares and the occasional second pass included. Measured: about $0.45-0.55 for 5 offers.
+// An estimate; the real cost of each run is shown on the search after it runs.
+const estimateRunUsd = (offers: number) => 0.15 + 0.07 * offers;
 
 function OffersCostHint({
   offers,

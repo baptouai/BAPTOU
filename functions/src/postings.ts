@@ -23,6 +23,20 @@ export function looksGeneric(url: string) {
   }
 }
 
+// Job boards and aggregators: good for finding offers, but the organization's own posting is preferred
+// (it is the one that stays up to date and leads to the real application form). Matched on the site's
+// own domain only, so e.g. talent.lvmh.com is not mistaken for talent.com.
+const BOARDS =
+  /(^|\.)(linkedin|indeed|glassdoor|monster|jobteaser|welcometothejungle|hellowork|labonnealternance|francetravail|pole-emploi|apec|cadremploi|meteojob|jobijoba|iquesta|letudiant|studentjob|stepstone|totaljobs|reed|cv-library|prospects|brightnetwork|gradcracker|ratemyplacement|targetjobs|milkround|simplyhired|ziprecruiter|adzuna|talent|jooble|careerjet|joinhandshake|wayup|internships|jobrapido|hosco|mastersportal|findamasters|studyportals|masterstudies|topuniversities)\.[a-z]{2,3}(\.[a-z]{2})?$/;
+
+export function isJobBoard(url: string) {
+  try {
+    return BOARDS.test(new URL(url).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export type PostingCheck = { status: "open" | "closed" | "unknown"; reason?: string };
 
 const CLOSED_TEXT = [
@@ -31,6 +45,8 @@ const CLOSED_TEXT = [
   /(job|posting|page) (not found|does not exist|doesn't exist)/i,
   /applications? (are |is )?(now )?closed/i,
   /n['’]est plus (disponible|en ligne|active|accessible)/i,
+  /(cette |l['’])offre (a expiré|est expirée|est clôturée|est pourvue|a été pourvue)/i,
+  /(position|role|vacancy) (has been|was) filled/i,
   /offre (expirée|pourvue|clôturée|n['’]existe plus)/i,
   /cette annonce (a expiré|n['’]est plus)/i,
 ];
