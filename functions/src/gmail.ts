@@ -4,6 +4,7 @@ import { getFunctions } from "firebase-admin/functions";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import { claimGmailRead, gmailReadAvailable } from "./access.js";
 import { db, REGION } from "./shared.js";
 
 // OAuth client from Google Cloud console (APIs & Services > Credentials). The ID is public and set in
@@ -53,7 +54,8 @@ export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
     client_id: clientId.value(),
     redirect_uri: redirectUri(),
     response_type: "code",
-    scope: SCOPES.join(" "),
+    // Reading is only requested while one of the 100 Gmail-reading places is available (see access.ts).
+    scope: ((await gmailReadAvailable(uid)) ? SCOPES : SCOPES.slice(1)).join(" "),
     access_type: "offline", // refresh token, so the daily jobs work without the user present
     prompt: "consent",
     include_granted_scopes: "true",
@@ -94,6 +96,7 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
       return back("error");
     }
     const granted = tokens.scope?.split(" ") ?? [];
+    if (granted.includes(SCOPES[0])) await claimGmailRead(uid);
     const profile = (await gmailFetch(tokens.access_token, "profile")) as { emailAddress: string };
 
     await db.doc(`private/${uid}`).set(
@@ -163,6 +166,18 @@ async function gmailFetch(accessToken: string, path: string, init?: RequestInit)
   });
   if (!res.ok) throw new Error(`Gmail API ${res.status}`);
   return res.json();
+}
+
+/** Mailbox reading (contacts, index, replies) needs the read permission, which only the first 100 users have. */
+export async function requireGmailRead(uid: string) {
+  const priv = await db.doc(`private/${uid}`).get();
+  const scopes = (priv.get("gmail.scopes") as string[] | undefined) ?? [];
+  if (!scopes.includes(SCOPES[0])) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Reading your mailbox isn't available on your account yet. Sending emails you approve still works.",
+    );
+  }
 }
 
 /** A Gmail client for this user, or an error asking them to connect Gmail. */

@@ -53,7 +53,7 @@ export function AddOffer({ searchId, noun }: { searchId?: string; noun: string }
       className="mt-4 grid gap-2 rounded-xl border border-card-edge-soft bg-card p-4 text-sm"
     >
       <p className="font-medium">Paste the link to the posting</p>
-      <p className="text-muted">BAPTOU reads it and adds it here in the usual format, ready to prepare (about $0.05).</p>
+      <p className="text-muted">BAPTOU reads it and adds it here in the usual format, ready to prepare (about 1% of your monthly allowance).</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           type="url"

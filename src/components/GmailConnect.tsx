@@ -84,8 +84,9 @@ export function GmailConnect() {
         <div className="max-w-xl">
           <h2 className="text-xl font-semibold">Gmail</h2>
           <p className="mt-1 text-sm text-muted">
-            BAPTOU searches your mailbox for people who could help (recruiters, former managers, alumni…) and drafts
-            emails that follow on from your past conversations. It only sends an email when you click “Approve &amp; send”.
+            {connected && !gmail?.canRead
+              ? "Connected for sending the emails you approve, from your own address. Finding people in your mailbox is reserved for BAPTOU's first 100 users for now."
+              : "BAPTOU sends the emails you approve from your own address, and (for its first 100 users) finds people in your mailbox who could help and drafts emails that follow on from your past conversations. It only sends an email when you click “Approve & send”."}
           </p>
           {connected && <p className="mt-2 text-sm">Connected as <span className="font-medium">{gmail.email}</span></p>}
           {gmail?.needsReconnect && (

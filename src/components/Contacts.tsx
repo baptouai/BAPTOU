@@ -96,6 +96,7 @@ export function ContactsPanel({
   }
 
   const connected = !!gmail?.email && !gmail.needsReconnect;
+  const canRead = connected && gmail?.canRead === true; // the AI deep search reads the mailbox
   const visible = contacts.filter((c) => showAll || c.status !== "dismissed");
   const dismissed = contacts.length - contacts.filter((c) => c.status !== "dismissed").length;
 
@@ -118,10 +119,10 @@ export function ContactsPanel({
           <h2 className="font-medium">Drafted emails</h2>
           <p className="mt-1 text-sm text-muted">
             Emails BAPTOU drafted for people in your mailbox. Nothing is sent until you approve it. The deep search reads
-            your conversations with AI to suggest people and uses credits (about $0.05–0.20); the list above is free.
+            your conversations with AI to suggest people and uses about 1–3% of your monthly allowance; the list above is free.
           </p>
         </div>
-        {connected ? (
+        {canRead ? (
           <div className="flex flex-col items-end gap-1">
             <button
               onClick={() => search()}
@@ -140,11 +141,14 @@ export function ContactsPanel({
             )}
           </div>
         ) : (
-          gmail !== undefined && (
+          gmail !== undefined &&
+          (connected ? (
+            <p className="max-w-xs text-right text-xs text-muted">Reserved for BAPTOU&apos;s first 100 users for now.</p>
+          ) : (
             <Link href="/profile" className="rounded-lg border border-accent px-4 py-2 text-sm text-accent">
               Connect Gmail first
             </Link>
-          )
+          ))
         )}
       </div>
       {message && <p className="mt-3 rounded-lg bg-accent/10 p-3 text-sm">{message}</p>}

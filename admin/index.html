@@ -27,6 +27,7 @@
     input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; }
     input[type=email] { flex: 1; min-width: 220px; }
     input.limit { width: 90px; }
+    select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font: inherit; }
     #invite input.limit { width: 120px; }
     button { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; }
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -58,27 +59,34 @@
     <div id="status"></div>
 
     <section class="card">
-      <h2>Invite a tester</h2>
-      <form id="invite">
+      <h2>Gift a subscription</h2>
+      <form id="gift">
         <input type="email" name="email" placeholder="tester@example.com" required>
-        <input class="limit" type="number" name="limit" min="0" max="1000" step="0.5" placeholder="$ per month">
-        <button class="primary">Invite</button>
+        <select name="months">
+          <option value="1">1 month</option>
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="12">1 year</option>
+          <option value="0">No end date</option>
+        </select>
+        <button class="primary">Gift</button>
       </form>
-      <p class="muted" style="margin:8px 0 0">Leave the limit empty for the default (<span id="default"></span>/month). They sign in at baptou-app.web.app with this Google address.</p>
+      <p class="muted" style="margin:8px 0 0">Same access and monthly allowance as a paid plan. They sign in at baptou-app.web.app with this Google address. Gifting again replaces the duration.</p>
+      <p class="muted" style="margin:4px 0 0" id="gmailSlots"></p>
     </section>
 
     <section class="card">
       <h2>Users <span class="muted" id="month"></span></h2>
       <div class="scroll">
         <table>
-          <thead><tr><th>User</th><th>Access</th><th>Spent this month</th><th>Monthly limit</th><th></th></tr></thead>
+          <thead><tr><th>User</th><th>Plan</th><th>This month</th><th>Allowance</th><th></th></tr></thead>
           <tbody id="users"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
 
     <section class="card" id="pendingCard" hidden>
-      <h2>Invited, not signed in yet</h2>
+      <h2>Gifted, not signed in yet</h2>
       <table><tbody id="pending"></tbody></table>
     </section>
   </main>
@@ -115,26 +123,32 @@
       }
     }
 
+    const date = (ts) => (ts ? new Date(ts).toLocaleDateString() : "");
+    const planLabel = (a) =>
+      ({ owner: "owner", monthly: "monthly", annual: "yearly", pass: "1-month pass", gift: "gift", "gift expired": "gift expired", none: "no plan" })[a.kind] ?? a.kind;
+
     async function load() {
       const d = await api("overview");
-      $("default").textContent = money(d.defaultLimit);
       $("month").textContent = "· " + d.month;
+      $("gmailSlots").textContent = `Gmail reading places used: ${d.gmailRead.granted} / ${d.gmailRead.cap} (Google's limit until its audit).`;
       const spent = d.users.reduce((s, u) => s + u.spentUsd, 0);
-      $("totals").textContent = `${d.users.filter((u) => u.invited).length} active · ${money(spent)} spent this month`;
+      const active = d.users.filter((u) => !["none", "gift expired"].includes(u.access.kind)).length;
+      $("totals").textContent = `${active} with access · ${money(spent)} spent this month`;
 
       $("users").innerHTML = d.users
         .sort((a, b) => b.spentUsd - a.spentUsd)
         .map((u) => {
-          const pct = u.limitUsd ? Math.min(100, (u.spentUsd / u.limitUsd) * 100) : 0;
+          const pct = u.limitUsd ? (u.spentUsd / u.limitUsd) * 100 : 0;
           return `<tr data-email="${esc(u.email)}" data-uid="${esc(u.uid)}">
             <td><div>${esc(u.name || u.email)}</div><div class="muted">${esc(u.email)}</div></td>
-            <td>${u.invited ? `<span class="tag">${u.limitSource === "personal" ? "owner" : "invited"}</span>` : `<span class="tag">no access</span>`}
-                ${u.gmail ? ` <span class="tag">Gmail</span>` : ""}</td>
-            <td class="num">${money(u.spentUsd)}${u.limitUsd ? `<div class="bar ${pct >= 100 ? "full" : ""}"><div style="width:${pct}%"></div></div>` : ""}</td>
-            <td class="num">${u.invited ? `<input class="limit" type="number" min="0" max="1000" step="0.5" value="${u.limitUsd}">` : "–"}</td>
+            <td><span class="tag">${esc(planLabel(u.access))}</span>${u.access.until ? ` <span class="muted">until ${esc(date(u.access.until))}</span>` : ""}
+                ${u.gmailRead ? ` <span class="tag">Gmail reading</span>` : u.gmail ? ` <span class="tag">Gmail send</span>` : ""}</td>
+            <td class="num">${u.limitUsd ? `${Math.round(pct)}% · ` : ""}${money(u.spentUsd)}${u.limitUsd ? `<div class="bar ${pct >= 100 ? "full" : ""}"><div style="width:${Math.min(100, pct)}%"></div></div>` : ""}</td>
+            <td class="num">${u.isOwner ? `<input class="limit" type="number" min="0" max="1000" step="0.5" value="${u.limitUsd}">` : u.limitUsd ? money(u.limitUsd) : "–"}</td>
             <td><div class="row-actions">
-              ${u.invited ? `<button data-act="save">Save</button>` : `<button class="primary" data-act="grant">Invite</button>`}
-              ${u.limitSource === "invite" ? `<button class="danger" data-act="remove">Remove</button>` : ""}
+              ${u.isOwner ? `<button data-act="save">Save</button>` : ""}
+              ${!u.isOwner ? `<select data-months><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">1 year</option><option value="0">No end</option></select><button data-act="gift">${u.hasGift ? "Extend gift" : "Gift"}</button>` : ""}
+              ${u.hasGift ? `<button class="danger" data-act="remove">Remove gift</button>` : ""}
             </div></td>
           </tr>`;
         })
@@ -143,16 +157,16 @@
       $("pendingCard").hidden = d.pending.length === 0;
       $("pending").innerHTML = d.pending
         .map((p) => `<tr data-email="${esc(p.email)}">
-            <td>${esc(p.email)}</td><td class="num">${money(p.limitUsd)} / month</td>
-            <td><div class="row-actions"><button class="danger" data-act="remove">Remove</button></div></td></tr>`)
+            <td>${esc(p.email)}</td><td class="muted">${p.until ? `until ${esc(date(p.until))}` : "no end date"}</td>
+            <td><div class="row-actions"><button class="danger" data-act="remove">Remove gift</button></div></td></tr>`)
         .join("");
     }
 
-    $("invite").addEventListener("submit", (e) => {
+    $("gift").addEventListener("submit", (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      run("Inviting " + f.get("email"), async () => {
-        await api("invite", { email: f.get("email"), limitUsd: f.get("limit") });
+      run("Gifting " + f.get("email"), async () => {
+        await api("gift", { email: f.get("email"), months: f.get("months") });
         e.target.reset();
       });
     });
@@ -166,11 +180,12 @@
       if (btn.dataset.act === "save") {
         const limitUsd = row.querySelector("input.limit").value;
         run(`Setting ${email}'s limit to ${money(limitUsd)}`, () => api("setLimit", { email, uid, limitUsd }));
-      } else if (btn.dataset.act === "grant") {
-        run("Inviting " + email, () => api("invite", { email }));
+      } else if (btn.dataset.act === "gift") {
+        const months = row.querySelector("select[data-months]").value;
+        run("Gifting " + email, () => api("gift", { email, months }));
       } else if (btn.dataset.act === "remove") {
-        if (confirm(`Remove ${email}'s access? Their data stays, but BAPTOU's AI features stop working for them.`)) {
-          run("Removing " + email, () => api("removeInvite", { email }));
+        if (confirm(`Remove ${email}'s gifted subscription? Their data stays, but BAPTOU's AI features stop working for them (unless they pay).`)) {
+          run("Removing the gift for " + email, () => api("removeInvite", { email }));
         }
       }
     });

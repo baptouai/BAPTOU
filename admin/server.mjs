@@ -15,7 +15,8 @@ const auth = require(join(here, "..", "node_modules", "firebase-tools", "lib", "
 
 const PROJECT = "baptou-5041c";
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/baptou/documents`;
-const DEFAULT_LIMIT = 5; // keep in sync with DEFAULT_MONTHLY_LIMIT_USD in functions/src/shared.ts
+const DEFAULT_LIMIT = 6.6; // €6 allowance; keep in sync with PLAN_BUDGET_USD in functions/src/shared.ts
+const GMAIL_READ_CAP = 100; // keep in sync with functions/src/access.ts
 const PORT = 4545;
 const TOKEN = randomBytes(16).toString("hex"); // the page gets it; other websites can't
 const month = () => new Date().toISOString().slice(0, 7);
@@ -60,34 +61,59 @@ const str = (v) => v?.stringValue;
 // --- Commands
 
 async function overview() {
-  const [users, priv, access] = await Promise.all([list("users"), list("private"), list("access")]);
+  const [users, priv, access, slots] = await Promise.all([list("users"), list("private"), list("access"), fs("config/gmailRead")]);
   const privById = Object.fromEntries(priv.map((d) => [id(d), d.fields ?? {}]));
-  const invites = Object.fromEntries(access.map((d) => [decodeURIComponent(id(d)), d.fields ?? {}]));
+  const gifts = Object.fromEntries(access.map((d) => [decodeURIComponent(id(d)), d.fields ?? {}]));
   const m = month();
+  const now = Date.now();
+  const live = (ts) => !ts || Date.parse(ts) > now;
 
   const rows = users.map((u) => {
     const f = u.fields ?? {};
     const p = privById[id(u)] ?? {};
     const email = (str(f.email) ?? "").toLowerCase();
     const personal = num(p.monthlyLimitUsd);
-    const invite = invites[email];
+    const plan = p.plan?.mapValue?.fields;
+    const planEnd = plan?.currentPeriodEnd?.timestampValue;
+    const planActive = plan && ["active", "past_due"].includes(str(plan.status)) && live(planEnd);
+    const gift = gifts[email];
+    const giftEnd = gift?.expiresAt?.timestampValue ?? null;
+    // Same order as the server (functions/src/shared.ts entitlementFor): owner, paid plan, gift.
+    const access =
+      personal != null
+        ? { kind: "owner", until: null }
+        : planActive
+          ? { kind: str(plan.type), until: planEnd ?? null }
+          : gift && live(giftEnd)
+            ? { kind: "gift", until: giftEnd }
+            : gift
+              ? { kind: "gift expired", until: giftEnd }
+              : { kind: "none", until: null };
+    const limitUsd = personal ?? (access.kind === "none" || access.kind === "gift expired" ? null : (num(gift?.monthlyLimitUsd) ?? DEFAULT_LIMIT));
     return {
       uid: id(u),
       email,
       name: str(f.displayName) ?? "",
-      invited: personal != null || !!invite,
-      limitUsd: personal ?? (invite ? (num(invite.monthlyLimitUsd) ?? DEFAULT_LIMIT) : null),
-      limitSource: personal != null ? "personal" : invite ? "invite" : null,
+      access,
+      hasGift: !!gift,
+      isOwner: personal != null,
+      limitUsd,
       spentUsd: num(p.spendUsd?.mapValue?.fields?.[m]) ?? 0,
       gmail: !!str(f.gmail?.mapValue?.fields?.email),
-      lastCallAt: p.lastCallAt?.timestampValue ?? null,
+      gmailRead: p.gmailRead?.booleanValue === true,
     };
   });
   const known = new Set(rows.map((r) => r.email));
-  const pending = Object.entries(invites)
+  const pending = Object.entries(gifts)
     .filter(([email]) => !known.has(email))
-    .map(([email, f]) => ({ email, limitUsd: num(f.monthlyLimitUsd) ?? DEFAULT_LIMIT, invitedAt: f.invitedAt?.timestampValue }));
-  return { month: m, defaultLimit: DEFAULT_LIMIT, users: rows, pending };
+    .map(([email, f]) => ({ email, until: f.expiresAt?.timestampValue ?? null }));
+  return {
+    month: m,
+    defaultLimit: DEFAULT_LIMIT,
+    gmailRead: { granted: num(slots?.fields?.granted) ?? 0, cap: GMAIL_READ_CAP },
+    users: rows,
+    pending,
+  };
 }
 
 const cleanEmail = (e) => {
@@ -102,11 +128,18 @@ const cleanLimit = (v) => {
   return Math.round(n * 100) / 100;
 };
 
-async function invite({ email, limitUsd }) {
+/** Gifts a subscription to an email address for `months` months (0 = no end date). */
+async function gift({ email, months }) {
   email = cleanEmail(email);
-  const limit = cleanLimit(limitUsd);
-  const fields = { invitedAt: { timestampValue: new Date().toISOString() } };
-  if (limit != null) fields.monthlyLimitUsd = { doubleValue: limit };
+  const n = Number(months);
+  if (![0, 1, 3, 6, 12].includes(n)) throw new Error("Choose a duration.");
+  const fields = { gift: { booleanValue: true }, invitedAt: { timestampValue: new Date().toISOString() } };
+  if (n > 0) {
+    const end = new Date();
+    end.setMonth(end.getMonth() + n);
+    fields.expiresAt = { timestampValue: end.toISOString() };
+  }
+  // Replace the whole gift (a new duration replaces the old one, an end date can be removed).
   await fs(`access/${encodeURIComponent(email)}`, { method: "PATCH", body: JSON.stringify({ fields }) });
 }
 
@@ -142,7 +175,7 @@ async function setLimit({ email, uid, limitUsd }) {
   }
 }
 
-const commands = { overview, invite, removeInvite, setLimit };
+const commands = { overview, gift, removeInvite, setLimit };
 
 // --- Server
 

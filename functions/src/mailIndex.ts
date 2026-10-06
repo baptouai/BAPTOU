@@ -5,7 +5,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
-import { GMAIL_SECRETS, type Gmail, gmailFor } from "./gmail.js";
+import { GMAIL_SECRETS, type Gmail, gmailFor, requireGmailRead } from "./gmail.js";
 import { db, REGION } from "./shared.js";
 
 // users/{uid}/mailIndex/{id}: one entry per person the user exchanged email with, built from message
@@ -233,6 +233,7 @@ export const refreshMailIndex = onCall({ region: REGION }, async (request) => {
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
   const user = await db.doc(`users/${uid}`).get();
   if (!user.get("gmail.email")) throw new HttpsError("failed-precondition", "Connect your Gmail first (Profile page).");
+  await requireGmailRead(uid);
   if (user.get("mailIndex.status") === "running" || user.get("mailIndex.status") === "queued") return { queued: false };
   await db.doc(`users/${uid}`).set({ mailIndex: { status: "queued" } }, { merge: true });
   await enqueueMailIndex(uid);

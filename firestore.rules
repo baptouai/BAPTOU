@@ -6,7 +6,14 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      // The app may only write these fields. Subscription, usage, Gmail and mail-index state are written
+      // by the server (so nobody can grant themselves a plan from the browser).
+      function appFields() {
+        return ['email', 'displayName', 'lastSeenAt', 'nationalities', 'favouriteContacts'];
+      }
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && request.resource.data.keys().hasOnly(appFields());
+      allow update: if isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(appFields());
 
       match /documents/{docId} {
         allow read, write: if isOwner(uid);

@@ -55,14 +55,17 @@ function useIndexStatus() {
   const { user } = useAuth();
   const [status, setStatus] = useState<IndexStatus | null | undefined>(undefined);
   const [connected, setConnected] = useState(false);
+  const [canRead, setCanRead] = useState(false);
   useEffect(() => {
     if (!user) return;
     return onSnapshot(doc(db, "users", user.uid), (snap) => {
       setStatus((snap.get("mailIndex") as IndexStatus) ?? null);
       setConnected(!!snap.get("gmail.email") && !snap.get("gmail.needsReconnect"));
+      // Reading the mailbox: only users who hold one of the 100 Gmail-reading places.
+      setCanRead(snap.get("gmail.canRead") === true);
     });
   }, [user]);
-  return { status, connected };
+  return { status, connected, canRead };
 }
 
 /**
@@ -71,7 +74,7 @@ function useIndexStatus() {
  */
 export function KnownPeople({ applicationId, organization, applyUrl }: { applicationId: string; organization: string; applyUrl?: string }) {
   const { user } = useAuth();
-  const { status, connected } = useIndexStatus();
+  const { status, connected, canRead } = useIndexStatus();
   const [people, setPeople] = useState<(Person & { id: string })[]>([]);
   const tokens = useMemo(() => offerTokens(organization, applyUrl), [organization, applyUrl]);
   const { favourites, toggle } = useFavourites();
@@ -89,6 +92,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   }, [user, tokens]);
 
   if (!connected && !people.length) return null; // no index to match against
+  if (!canRead && !people.length) return null;
   if (connected && status?.status !== "ready" && !people.length) {
     return (
       <section className="rounded-xl border border-card-edge bg-card p-5 text-sm text-muted">
@@ -110,7 +114,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
               key={p.id}
               person={p}
               applicationId={applicationId}
-              canDraft={connected}
+              canDraft={connected && canRead}
               favourite={favourites.has(p.email)}
               onToggleFavourite={() => toggle(p.email)}
             />
@@ -193,7 +197,7 @@ const HELPFUL = /recrut|recruit|talent|rh\b|hr\b|human resources|ressources huma
 /** Contacts page: everyone in the mail index, searchable, likely helpers first. Free; drafting uses AI. */
 export function MailIndexPanel() {
   const { user } = useAuth();
-  const { status, connected } = useIndexStatus();
+  const { status, connected, canRead } = useIndexStatus();
   const [people, setPeople] = useState<(Person & { id: string })[]>([]);
   const [filter, setFilter] = useState("");
   const [shown, setShown] = useState(20);
@@ -237,6 +241,14 @@ export function MailIndexPanel() {
     }
   }
 
+  if (connected && !canRead && !people.length) {
+    return (
+      <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
+        <h2 className="font-medium">People in your mailbox</h2>
+        <p className="mt-1 text-muted">Finding people in your mailbox is reserved for BAPTOU&apos;s first 100 users for now. It will open to everyone soon.</p>
+      </section>
+    );
+  }
   if (!connected && !people.length) {
     return (
       <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">

@@ -5,6 +5,7 @@ import { addDoc, collection, doc, serverTimestamp, Timestamp, updateDoc } from "
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { formatPct, usePlan } from "@/lib/plan";
 import type { Search, SearchKind, SearchStatus } from "@/lib/types";
 
 const runSearchNow = httpsCallable<{ searchId: string }, { queued: boolean }>(functions, "runSearchNow");
@@ -99,6 +100,7 @@ export const kindNoun = (kind: SearchKind) => KINDS[kind].noun;
 /** The selected search, at the top of its tab: what it looks for, its last run, and its controls. */
 export function SearchCard({ search: s }: { search: SearchItem }) {
   const { user } = useAuth();
+  const { pctOf } = usePlan();
   const [editing, setEditing] = useState(false);
 
   async function setStatus(status: SearchStatus) {
@@ -147,7 +149,7 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
             <span className="font-medium">Last run</span>{" "}
             <span className="text-muted">
               {s.lastRunAt.toDate().toLocaleString()} · {s.lastRunCreated ?? 0} new
-              {s.lastRunCostUsd != null && ` · $${s.lastRunCostUsd.toFixed(2)}`}
+              {s.lastRunCostUsd != null && ` · ${formatPct(pctOf(s.lastRunCostUsd))} of your allowance`}
               {s.status === "active" && s.nextRunAt && ` · next run ${s.nextRunAt.toDate().toLocaleDateString()}`}
             </span>
           </p>
@@ -245,6 +247,7 @@ export function SearchForm({
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: k === "maxPerRun" || k === "frequencyDays" ? Number(e.target.value) : e.target.value }));
   const k = KINDS[form.kind];
+  const { pctOf } = usePlan();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -405,7 +408,7 @@ export function SearchForm({
       </Field>
       <Field label={`New ${k.noun} per run`}>
         <input type="number" min={1} max={MAX_OFFERS} value={form.maxPerRun} onChange={set("maxPerRun")} className={input} />
-        <OffersCostHint offers={form.maxPerRun} frequencyDays={form.frequencyDays} />
+        <OffersCostHint offers={form.maxPerRun} frequencyDays={form.frequencyDays} pctOf={pctOf} />
       </Field>
       <Field label="Search until">
         <input type="date" value={form.endsOn} onChange={set("endsOn")} className={input} />
@@ -441,16 +444,24 @@ const MAX_OFFERS = 50; // the server also caps here; guards against typos like 5
 // per offer. An estimate; the real cost of each run is shown on the search after it runs.
 const estimateRunUsd = (offers: number) => 0.1 + 0.03 * offers;
 
-function OffersCostHint({ offers, frequencyDays }: { offers: number; frequencyDays: number }) {
+function OffersCostHint({
+  offers,
+  frequencyDays,
+  pctOf,
+}: {
+  offers: number;
+  frequencyDays: number;
+  pctOf: (usd: number) => number;
+}) {
   if (!offers || offers < 1) return <span className="text-xs text-muted">At least 1.</span>;
   if (offers > MAX_OFFERS) return <span className="text-xs text-red-600">At most {MAX_OFFERS} per run.</span>;
-  const run = estimateRunUsd(offers);
+  const run = pctOf(estimateRunUsd(offers));
   const monthly = (run * 30) / (frequencyDays || 1);
   return (
-    <span className={`text-xs ${monthly > 8 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
+    <span className={`text-xs ${monthly > 70 ? "text-amber-700 dark:text-amber-400" : "text-muted"}`}>
       {offers === RECOMMENDED_OFFERS ? "Recommended. " : `Recommended: ${RECOMMENDED_OFFERS}. `}
-      About ${run.toFixed(2)} a run, at most ${monthly.toFixed(0)}/month
-      {monthly > 8 ? ", which leaves little of a $10 budget for letters." : "."}
+      About {formatPct(run)} of your monthly allowance per run, at most {formatPct(Math.min(monthly, 100))} a month
+      {monthly > 70 ? ", which leaves little for letters." : "."}
     </span>
   );
 }

@@ -51,8 +51,11 @@ const PRICES: Record<Model, { input: number; output: number }> = {
 };
 const WEB_SEARCH_USD = 0.01; // $10 per 1,000 searches
 
-// Default monthly Claude budget per user, in USD. Override per user with `monthlyLimitUsd` on private/{uid}.
-export const DEFAULT_MONTHLY_LIMIT_USD = 5;
+// AI allowance included in every subscription (and gift): €6 a month. Costs are computed in USD, so the
+// allowance is stored in USD (rate kept deliberately round; revisit if EUR/USD moves a lot).
+const EUR_TO_USD = 1.1;
+export const PLAN_BUDGET_EUR = 6;
+export const PLAN_BUDGET_USD = Math.round(PLAN_BUDGET_EUR * EUR_TO_USD * 100) / 100;
 
 // Stored in Google Secret Manager: `npx firebase functions:secrets:set ANTHROPIC_API_KEY`
 export const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
@@ -85,35 +88,74 @@ export function estimateCostUsd(model: Model, usage: Usage) {
 
 const month = () => new Date().toISOString().slice(0, 7); // "2026-10"
 
-/**
- * Monthly budget for a user, or null if they have no access. BAPTOU is invite-only: a user needs either
- * an entry in access/{email} (added by the owner) or a personal `monthlyLimitUsd` on private/{uid}.
- */
-async function limitFor(uid: string, priv: FirebaseFirestore.DocumentSnapshot): Promise<number | null> {
-  const personal = priv.get("monthlyLimitUsd") as number | undefined;
-  if (personal != null) return personal;
+// What gives a user access to BAPTOU's AI features, most specific first:
+// - owner: a personal `monthlyLimitUsd` on private/{uid} (set from BAPTOU Admin);
+// - subscription / pass: `plan` on private/{uid}, kept up to date by the Stripe webhook;
+// - gift: access/{email} (added from BAPTOU Admin), optionally with an end date.
+export type Plan = {
+  type: "monthly" | "annual" | "pass";
+  status: "active" | "past_due" | "canceled" | "expired";
+  currentPeriodEnd?: FirebaseFirestore.Timestamp;
+  cancelAtPeriodEnd?: boolean;
+  commitmentEnd?: FirebaseFirestore.Timestamp; // annual plan: paid monthly, committed for 12 months
+};
+
+export type Entitlement = {
+  kind: "owner" | "monthly" | "annual" | "pass" | "gift";
+  budgetUsd: number;
+  until: number | null; // ms; null = no end date
+  cancelAtPeriodEnd?: boolean;
+};
+
+const isLive = (end?: { toMillis(): number } | null) => !end || end.toMillis() > Date.now();
+
+export async function entitlementFor(uid: string, priv?: FirebaseFirestore.DocumentSnapshot): Promise<Entitlement | null> {
+  const doc = priv ?? (await db.doc(`private/${uid}`).get());
+  const personal = doc.get("monthlyLimitUsd") as number | undefined;
+  if (personal != null) return { kind: "owner", budgetUsd: personal, until: null };
+
+  const plan = doc.get("plan") as Plan | undefined;
+  if (plan && (plan.status === "active" || plan.status === "past_due") && isLive(plan.currentPeriodEnd)) {
+    return {
+      kind: plan.type,
+      budgetUsd: PLAN_BUDGET_USD,
+      until: plan.currentPeriodEnd?.toMillis() ?? null,
+      cancelAtPeriodEnd: plan.cancelAtPeriodEnd,
+    };
+  }
+
   const email = (await getAuth().getUser(uid)).email?.toLowerCase();
   if (!email) return null;
-  const invite = await db.doc(`access/${email}`).get();
-  if (!invite.exists) return null;
-  return (invite.get("monthlyLimitUsd") as number | undefined) ?? DEFAULT_MONTHLY_LIMIT_USD;
+  const gift = await db.doc(`access/${email}`).get();
+  if (gift.exists && isLive(gift.get("expiresAt"))) {
+    return {
+      kind: "gift",
+      budgetUsd: (gift.get("monthlyLimitUsd") as number | undefined) ?? PLAN_BUDGET_USD,
+      until: (gift.get("expiresAt") as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? null,
+    };
+  }
+  return null;
 }
 
-/** Refuses the call when the user isn't invited or has used up this month's budget. Call before every Claude request. */
+async function limitFor(uid: string, priv: FirebaseFirestore.DocumentSnapshot): Promise<number | null> {
+  return (await entitlementFor(uid, priv))?.budgetUsd ?? null;
+}
+
+/** Refuses the call without an active subscription (or gift), or once this month's allowance is used. Call before every Claude request. */
 export async function assertBudget(uid: string) {
   const snap = await db.doc(`private/${uid}`).get();
   const limit = await limitFor(uid, snap);
   if (limit == null) {
     throw new HttpsError(
       "permission-denied",
-      "BAPTOU is invite-only for now. Ask the person who shared it with you to add your email address.",
+      "You need an active BAPTOU subscription for this. See the Plans page.",
     );
   }
   const spent = (snap.get(`spendUsd.${month()}`) as number | undefined) ?? 0;
   if (spent >= limit) {
     throw new HttpsError(
       "resource-exhausted",
-      `You've reached this month's BAPTOU limit ($${limit}). It resets on the 1st of next month.`,
+      "You've used 100% of this month's allowance. It renews on the 1st of next month.",
     );
   }
 }

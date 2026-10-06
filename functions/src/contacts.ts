@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { type ClientTool, loadProfile, runAgent, today } from "./agent.js";
-import { GMAIL_SECRETS, type Gmail, gmailFor, readThread, searchMail, sendMail } from "./gmail.js";
+import { GMAIL_SECRETS, type Gmail, gmailFor, readThread, requireGmailRead, searchMail, sendMail } from "./gmail.js";
 import { anthropicKey, db, MODELS, REGION } from "./shared.js";
 
 export const ContactsSchema = z.object({
@@ -72,6 +72,7 @@ export const findContacts = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireGmailRead(uid);
     const { applicationId, full } = z
       .object({ applicationId: z.string().optional(), full: z.boolean().default(false) })
       .parse(request.data ?? {});
@@ -183,6 +184,7 @@ export const draftContactEmail = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireGmailRead(uid);
     const { contactId: id, instructions } = z
       .object({ contactId: z.string().min(1), instructions: z.string().max(2000).default("") })
       .parse(request.data);
@@ -306,6 +308,7 @@ export const draftFromIndex = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireGmailRead(uid);
     const { indexId, applicationId } = z
       .object({ indexId: z.string().min(1), applicationId: z.string().optional() })
       .parse(request.data);
