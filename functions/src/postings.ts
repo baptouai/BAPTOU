@@ -1,4 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
+import { offerTokens } from "./mailIndex.js";
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { db, REGION } from "./shared.js";
@@ -29,9 +30,22 @@ export function looksGeneric(url: string) {
 const BOARDS =
   /(^|\.)(linkedin|indeed|glassdoor|monster|jobteaser|welcometothejungle|hellowork|labonnealternance|francetravail|pole-emploi|apec|cadremploi|meteojob|jobijoba|iquesta|letudiant|studentjob|stepstone|totaljobs|reed|cv-library|prospects|brightnetwork|gradcracker|ratemyplacement|targetjobs|milkround|simplyhired|ziprecruiter|adzuna|talent|jooble|careerjet|joinhandshake|wayup|internships|jobrapido|hosco|mastersportal|findamasters|studyportals|masterstudies|topuniversities)\.[a-z]{2,3}(\.[a-z]{2})?$/;
 
-export function isJobBoard(url: string) {
+// Application systems that organizations run themselves: a posting there is the official one.
+const ATS =
+  /(^|\.)(myworkdayjobs|myworkdaysite|greenhouse|lever|smartrecruiters|successfactors|sapsf|taleo|icims|jobvite|ashbyhq|recruitee|teamtailor|workable|personio|bamboohr|oraclecloud|avature|eightfold|phenompeople|fluidjobs|breezy|applytojob|jazzhr|pinpointhq|rippling-ats|dayforcehcm|ultipro|paylocity|csod|brassring|softgarden|welcomekit|talentsoft|talent-soft|digitalrecruiters|flatchr|beetween|join)\.[a-z]{2,3}(\.[a-z]{2})?$/;
+
+/**
+ * Whether the link is the organization's own posting: on its own website (its name is in the domain) or
+ * on an application system it runs. Anything else (job boards, aggregators, sites that copy postings)
+ * is a third-party copy, even when it isn't in the BOARDS list.
+ */
+export function isOfficial(url: string, organization: string) {
   try {
-    return BOARDS.test(new URL(url).hostname.toLowerCase());
+    const host = new URL(url).hostname.toLowerCase();
+    if (BOARDS.test(host)) return false;
+    if (ATS.test(host)) return true;
+    const labels = host.split(".").map((l) => l.replace(/[^a-z0-9]/g, ""));
+    return offerTokens(organization).some((t) => labels.some((l) => l === t || (t.length >= 5 && l.includes(t))));
   } catch {
     return false;
   }

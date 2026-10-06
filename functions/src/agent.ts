@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
 import { z } from "zod";
 import { assertBudget, claude, db, fallbackFor, type Model, recordUsage, type Task } from "./shared.js";
 
@@ -10,6 +11,8 @@ const DEFAULT_MAX_RUN_USD = 0.75;
 const MAX_PAGE_TOKENS = 6000;
 
 export type WebBudget = { searches: number; fetches: number };
+// `limited`: the run stopped because it reached its spending or browsing limits, not because it was done.
+export type AgentStats = { costUsd: number; searches?: number; fetches?: number; limited?: boolean };
 
 export const webTools = (
   { searches, fetches }: WebBudget,
@@ -67,7 +70,7 @@ export async function runAgent<T>(opts: {
   maxToolCalls?: number; // ceiling on client tool calls, default 10
   maxRunUsd?: number; // spending ceiling for this run, default $0.75
   maxPageTokens?: number; // size cap for each fetched web page
-  stats?: { costUsd: number }; // filled with this run's cost
+  stats?: AgentStats; // filled with this run's cost and web use
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
   await assertBudget(opts.uid);
@@ -82,6 +85,14 @@ export async function runAgent<T>(opts: {
   let toolCalls = 0;
   let nudged = false;
   let runCost = 0;
+  let searches = 0;
+  let fetches = 0;
+  let limited = false;
+  const visited: string[] = []; // search queries and opened pages, for the log
+  const done = (turns: number) => {
+    if (opts.stats) Object.assign(opts.stats, { costUsd: runCost, searches, fetches, limited });
+    logger.info("Agent run", { task: opts.task, turns, costUsd: Math.round(runCost * 1000) / 1000, searches, fetches, limited, visited: visited.slice(0, 40) });
+  };
 
   for (let i = 0; i < MAX_CONTINUATIONS + maxToolCalls; i++) {
     const response = await claude()
@@ -99,7 +110,16 @@ export async function runAgent<T>(opts: {
       })
       .finalMessage();
     runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
+    searches += response.usage.server_tool_use?.web_search_requests ?? 0;
+    fetches += response.usage.server_tool_use?.web_fetch_requests ?? 0;
+    for (const b of response.content) {
+      if (b.type === "server_tool_use") {
+        const input = b.input as { query?: string; url?: string };
+        visited.push(`${b.name === "web_fetch" ? "open" : "search"}: ${(input.query ?? input.url ?? "").slice(0, 120)}`);
+      }
+    }
     if (opts.stats) opts.stats.costUsd = runCost;
+    if (opts.web && (searches >= opts.web.searches || fetches >= opts.web.fetches)) limited = true;
 
     if (response.stop_reason === "refusal") {
       throw new HttpsError("internal", "BAPTOU couldn't complete this request.");
@@ -109,12 +129,14 @@ export async function runAgent<T>(opts: {
     const call = uses.find((b) => b.name === opts.submit.name);
     if (call) {
       const parsed = opts.submit.schema.safeParse(call.input);
+      done(i + 1);
       if (parsed.success) return parsed.data;
       throw new HttpsError("internal", "BAPTOU returned an incomplete answer. Try again.");
     }
 
     messages.push({ role: "assistant", content: response.content });
     const overBudget = runCost >= (opts.maxRunUsd ?? DEFAULT_MAX_RUN_USD) || toolCalls >= maxToolCalls;
+    if (overBudget) limited = true;
 
     if (response.stop_reason === "tool_use" && uses.length) {
       // All results go back in one user message, as the API expects.
@@ -145,6 +167,7 @@ export async function runAgent<T>(opts: {
     nudged = true;
     messages.push({ role: "user", content: `Now call ${opts.submit.name} with your final answer.` });
   }
+  done(MAX_CONTINUATIONS + maxToolCalls);
   throw new HttpsError("deadline-exceeded", "BAPTOU took too long. Try again.");
 }
 

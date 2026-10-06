@@ -20,6 +20,29 @@ export const offerKey = (organization: string, title: string) =>
       .trim(),
   );
 
+// Words that don't tell organizations apart ("Alpine F1 Team" and "Alpine Racing (F1)" are the same).
+const NOT_BRAND = new Set([
+  "the", "and", "of", "team", "f1", "formula", "racing", "motorsport", "motorsports", "group", "groupe", "ltd", "limited",
+  "plc", "inc", "llc", "gmbh", "sa", "sas", "sarl", "ag", "co", "company", "corporation", "corp", "holding", "holdings",
+  "international", "uk", "us", "usa", "north", "america", "europe", "france",
+]);
+
+/**
+ * A looser key than offerKey: the organization's first distinctive word plus the title, so the same
+ * offer found on two sites with differently written company names counts once.
+ */
+export function looseOfferKey(organization: string, title: string) {
+  const words = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+  const brand = words(organization).find((w) => w.length >= 3 && !NOT_BRAND.has(w)) ?? words(organization).join("");
+  return hash(`${brand}|${words(title).join(" ")}`);
+}
+
 // users/{uid}/dismissedOffers/{urlId}: what remains of an offer the student turned down. The offer
 // itself is deleted; this record keeps it from ever being suggested again and teaches future searches.
 export type DismissedOffer = {
@@ -37,6 +60,7 @@ export async function loadDismissed(uid: string) {
   return {
     urlIds: new Set(snap.docs.map((d) => d.id)),
     offerKeys: new Set(snap.docs.map((d) => d.get("offerKey") as string)),
+    looseKeys: new Set(snap.docs.map((d) => looseOfferKey(d.get("organization") ?? "", d.get("title") ?? ""))),
     urls: snap.docs.map((d) => d.get("url") as string),
     reasons: snap.docs
       .filter((d) => d.get("reason"))
