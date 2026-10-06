@@ -57,8 +57,13 @@ function loadPlan(uid: string) {
   return cache.promise;
 }
 
+/** Forgets the cached plan (e.g. after a payment), so the next usePlan() asks the server again. */
+export function refreshPlan() {
+  cache = null;
+}
+
 /** The user's plan (from the server) and this month's usage as a share of the allowance. */
-export function usePlan() {
+export function usePlan(reloadKey = 0) {
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   const [spentUsd, setSpentUsd] = useState(0);
@@ -73,7 +78,7 @@ export function usePlan() {
       setSpentUsd(u?.month === thisMonth ? u.spentUsd : 0);
       setByTask(u?.month === thisMonth ? (u.byTask ?? {}) : {});
     });
-  }, [user]);
+  }, [user, reloadKey]);
 
   const budget = plan?.entitlement?.budgetUsd ?? plan?.budgetUsd ?? 6.6;
   return {

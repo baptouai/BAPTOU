@@ -1,6 +1,13 @@
 "use client";
 
-import { formatPct, PLANS, usePlan } from "@/lib/plan";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+import { formatPct, PLANS, refreshPlan, usePlan } from "@/lib/plan";
+
+const createCheckout = httpsCallable<{ plan: string; returnTo: string }, { url: string }>(functions, "createCheckout");
+const billingPortal = httpsCallable<{ returnTo: string }, { url: string }>(functions, "billingPortal");
 
 const KIND_LABEL = {
   owner: "Owner",
@@ -11,8 +18,56 @@ const KIND_LABEL = {
 } as const;
 
 export default function PlansPage() {
-  const { plan, loading, spentUsd, pctOf } = usePlan();
+  return (
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+      <Plans />
+    </Suspense>
+  );
+}
+
+function Plans() {
+  const checkout = useSearchParams().get("checkout");
+  const [reload, setReload] = useState(0);
+  const { plan, loading, spentUsd, pctOf } = usePlan(reload);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const e = plan?.entitlement;
+  const paid = e && (e.kind === "monthly" || e.kind === "annual" || e.kind === "pass");
+
+  // Back from Stripe: the plan is activated by Stripe's confirmation, a few seconds later. Ask again until it shows.
+  const waiting = checkout === "success" && !loading && !paid && reload < 10;
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => {
+      refreshPlan();
+      setReload((n) => n + 1);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [waiting, reload]);
+
+  async function choose(id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      const { data } = await createCheckout({ plan: id, returnTo: window.location.origin });
+      window.location.assign(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setBusy(null);
+    }
+  }
+
+  async function manage() {
+    setBusy("portal");
+    setError(null);
+    try {
+      const { data } = await billingPortal({ returnTo: window.location.origin });
+      window.location.assign(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setBusy(null);
+    }
+  }
 
   return (
     <div>
@@ -22,54 +77,83 @@ export default function PlansPage() {
         forms, answers). It renews on the 1st of each month.
       </p>
 
+      {checkout === "success" && (
+        <p className="mt-4 rounded-lg border border-green-600/40 bg-green-600/10 p-3 text-sm">
+          {paid ? "Payment received. Your plan is active. Welcome to BAPTOU!" : "Payment received. Activating your plan…"}
+        </p>
+      )}
+      {checkout === "cancelled" && (
+        <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted">Payment cancelled. Nothing was charged.</p>
+      )}
+
       <section className="mt-6 rounded-xl border border-card-edge bg-card p-5 text-sm">
-        <h2 className="font-medium">Your plan</h2>
-        {loading ? (
-          <p className="mt-1 text-muted">Loading…</p>
-        ) : e ? (
-          <div className="mt-1 grid gap-1">
-            <p>
-              <span className="font-medium">{KIND_LABEL[e.kind]}</span>
-              <span className="text-muted">
-                {e.until
-                  ? ` · ${e.cancelAtPeriodEnd || e.kind === "pass" || e.kind === "gift" ? "until" : "renews on"} ${new Date(e.until).toLocaleDateString()}`
-                  : e.kind === "gift"
-                    ? " · no end date"
-                    : ""}
-              </span>
-            </p>
-            <p className="text-muted">{formatPct(pctOf(spentUsd))} of this month&apos;s allowance used.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Your plan</h2>
+            {loading ? (
+              <p className="mt-1 text-muted">Loading…</p>
+            ) : e ? (
+              <div className="mt-1 grid gap-1">
+                <p>
+                  <span className="font-medium">{KIND_LABEL[e.kind]}</span>
+                  <span className="text-muted">
+                    {e.until
+                      ? ` · ${e.cancelAtPeriodEnd || e.kind === "pass" || e.kind === "gift" ? "until" : "renews on"} ${new Date(e.until).toLocaleDateString()}`
+                      : e.kind === "gift"
+                        ? " · no end date"
+                        : ""}
+                  </span>
+                </p>
+                <p className="text-muted">{formatPct(pctOf(spentUsd))} of this month&apos;s allowance used.</p>
+              </div>
+            ) : (
+              <p className="mt-1 text-muted">You don&apos;t have a plan yet. Choose one below to use BAPTOU&apos;s AI features.</p>
+            )}
           </div>
-        ) : (
-          <p className="mt-1 text-muted">You don&apos;t have a plan yet. Choose one below to use BAPTOU&apos;s AI features.</p>
+          {paid && e?.kind !== "pass" && (
+            <button onClick={manage} disabled={!!busy} className="rounded-lg border border-border px-4 py-2 disabled:opacity-50">
+              {busy === "portal" ? "Opening…" : "Manage subscription"}
+            </button>
+          )}
+        </div>
+        {e?.kind === "annual" && (
+          <p className="mt-2 text-xs text-muted">The yearly plan is committed for 12 months; you can cancel it after that.</p>
         )}
       </section>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {PLANS.map((p) => (
-          <section
-            key={p.id}
-            className={`flex flex-col rounded-xl border bg-card p-5 ${p.id === "annual" ? "border-accent" : "border-card-edge"}`}
-          >
-            {p.id === "annual" && (
-              <span className="mb-2 w-fit rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Best price</span>
-            )}
-            <h2 className="font-medium">{p.name}</h2>
-            <p className="mt-2">
-              <span className="text-3xl font-semibold">{p.price}</span> <span className="text-sm text-muted">{p.per}</span>
-            </p>
-            <p className="mt-2 flex-1 text-sm text-muted">{p.detail}</p>
-            <button
-              disabled
-              title="Payments open soon"
-              className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              Payments open soon
-            </button>
-          </section>
-        ))}
-      </div>
-      <p className="mt-3 text-xs text-muted">Prices include VAT.</p>
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+      {!paid && (
+        <>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {PLANS.map((p) => (
+              <section
+                key={p.id}
+                className={`flex flex-col rounded-xl border bg-card p-5 ${p.id === "annual" ? "border-accent" : "border-card-edge"}`}
+              >
+                {p.id === "annual" && (
+                  <span className="mb-2 w-fit rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Best price</span>
+                )}
+                <h2 className="font-medium">{p.name}</h2>
+                <p className="mt-2">
+                  <span className="text-3xl font-semibold">{p.price}</span> <span className="text-sm text-muted">{p.per}</span>
+                </p>
+                <p className="mt-2 flex-1 text-sm text-muted">{p.detail}</p>
+                <button
+                  onClick={() => choose(p.id)}
+                  disabled={!!busy}
+                  className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {busy === p.id ? "Opening payment…" : `Choose ${p.name.toLowerCase()}`}
+                </button>
+              </section>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Prices include VAT. Payments are handled by Stripe; BAPTOU never sees your card details.
+          </p>
+        </>
+      )}
     </div>
   );
 }

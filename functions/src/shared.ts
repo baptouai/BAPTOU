@@ -98,6 +98,7 @@ export type Plan = {
   currentPeriodEnd?: FirebaseFirestore.Timestamp;
   cancelAtPeriodEnd?: boolean;
   commitmentEnd?: FirebaseFirestore.Timestamp; // annual plan: paid monthly, committed for 12 months
+  subscriptionId?: string;
 };
 
 export type Entitlement = {
