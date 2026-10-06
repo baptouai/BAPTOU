@@ -16,3 +16,4 @@ export { sendGiftInvitation } from "./invites.js";
 export { deleteMyAccount, exportMyData } from "./account.js";
 export { commitmentReminders } from "./reminders.js";
 export { claudeAuthCheck } from "./health.js";
+export { browserCheck, unlockForm } from "./unlock.js";

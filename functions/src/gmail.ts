@@ -313,6 +313,30 @@ function stripQuoted(text: string) {
   return (cut >= 0 ? lines.slice(0, cut) : lines).filter((l) => !l.startsWith(">")).join("\n").trim();
 }
 
+function htmlOf(part: Part | undefined): string {
+  if (!part) return "";
+  if (part.mimeType === "text/html" && part.body?.data) return Buffer.from(part.body.data, "base64url").toString("utf8");
+  return (part.parts ?? []).map(htmlOf).join("\n");
+}
+
+/** Emails received since `sinceMs` (newest first), with their text and the links they contain. */
+export async function recentMessages(gmail: Gmail, sinceMs: number, max = 5) {
+  const list = (await gmail.call(
+    `messages?q=${encodeURIComponent(`in:anywhere after:${Math.floor(sinceMs / 1000) - 60}`)}&maxResults=${max}`,
+  )) as { messages?: { id: string }[] };
+  const messages = await Promise.all(
+    (list.messages ?? []).map((m) => gmail.call(`messages/${m.id}?format=full`) as Promise<Message>),
+  );
+  return messages
+    .filter((m) => Number(m.internalDate ?? 0) >= sinceMs - 60_000)
+    .map((m) => {
+      const text = plainText(m.payload).replace(/\s+\n/g, "\n").slice(0, 3000);
+      const html = htmlOf(m.payload);
+      const links = [...new Set([...`${html} ${text}`.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((x) => x[0].replace(/&amp;/g, "&")))];
+      return { id: m.id, from: header(m, "From"), subject: header(m, "Subject"), receivedAt: Number(m.internalDate ?? 0), text, links };
+    });
+}
+
 /** Searches the whole mailbox with Gmail's own query syntax; returns one line per message. */
 export async function searchMail(gmail: Gmail, query: string, max = 15) {
   const list = (await gmail.call(`messages?q=${encodeURIComponent(query)}&maxResults=${max}`)) as {

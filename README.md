@@ -78,6 +78,22 @@ the browser console run `testSignIn("<uid>")` (emulator mode only; never in prod
 Europe/Paris time: 06:00 posting checks, 06:30 mailbox index, 07:00 searches (then new-offer emails),
 07:30 reply checks, 09:00 yearly-commitment reminders (sent once, about 2 months before the end).
 
+## Unlocking forms behind an email check
+
+`unlockForm` (functions/src/unlock.ts): when a careers site shows its form only after the student
+confirms their email, the student can click "Unlock the form". BAPTOU opens the site in a headless
+Chrome on the server (`@sparticuz/chromium` + `puppeteer-core`, functions/src/browser.ts), the AI
+types the student's Gmail address, reads the code or link from their Gmail (needs mailbox reading),
+then the form page's text is read like a pasted form. Hard limits in code: no submit-like clicks, no
+password fields, only codes/links that came by email, no internal addresses; stops at CAPTCHAs.
+`browserCheck` (monthly, or run from Cloud Scheduler) checks that Chrome still starts.
+
+## Languages
+
+The app is in English and French: texts are written in English in the code and translated through
+`src/lib/fr.ts` (`t("…")`, see `src/lib/i18n.tsx`). The language is saved on the account
+(`users/{uid}.lang`) and also used for BAPTOU's emails and the AI's explanations.
+
 ## Legal pages
 
 `site/terms.html` (CGV/CGU, French with English translation) and `site/legal.html` (mentions

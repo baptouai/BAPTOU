@@ -671,6 +671,23 @@ export const fr: Record<string, string> = {
     "Vous avez utilisé 100 % du crédit de ce mois. Il se renouvelle le 1er du mois prochain.",
   "BAPTOU couldn't read this application form.": "BAPTOU n'a pas pu lire ce formulaire de candidature.",
   "The search failed. It will try again tomorrow.": "La recherche a échoué. Elle réessaiera demain.",
+
+  // --- Unlock the form (email confirmation)
+  "BAPTOU can confirm your email for you when it can read your Gmail (Profile page; first 100 users for now).":
+    "BAPTOU peut confirmer votre email à votre place s'il peut lire votre Gmail (page Profil ; 100 premiers utilisateurs pour l'instant).",
+  "BAPTOU will open {site} in its own browser, type {email}, read the code the site sends to your Gmail, then read the form. It won't fill in or send your application. Continue?":
+    "BAPTOU va ouvrir {site} dans son propre navigateur, saisir {email}, lire le code que le site envoie sur votre Gmail, puis lire le formulaire. Il ne remplira ni n'enverra votre candidature. Continuer ?",
+  "Let BAPTOU confirm your email": "Laisser BAPTOU confirmer votre email",
+  "It types {email} on {site}, reads the code from your Gmail and opens the real form. Nothing is filled in or sent. About 1–3% of your monthly allowance.":
+    "Il saisit {email} sur {site}, lit le code dans votre Gmail et ouvre le vrai formulaire. Rien n'est rempli ni envoyé. Environ 1 à 3 % de votre crédit mensuel.",
+  "Unlocking… (up to 3 min)": "Déverrouillage… (jusqu'à 3 min)",
+  "Unlock the form": "Déverrouiller le formulaire",
+  "This site asks for a robot check (CAPTCHA), which BAPTOU doesn't get around. Open the form yourself, then paste it here.":
+    "Ce site demande une vérification anti-robot (CAPTCHA), que BAPTOU ne contourne pas. Ouvrez le formulaire vous-même, puis collez-le ici.",
+  "This site wants an account with a password, which BAPTOU doesn't create for you. Sign up there yourself, then paste the form here.":
+    "Ce site demande un compte avec mot de passe, que BAPTOU ne crée pas à votre place. Inscrivez-vous vous-même, puis collez le formulaire ici.",
+  "BAPTOU couldn't get to the form. Open it yourself, then paste it here.":
+    "BAPTOU n'a pas pu accéder au formulaire. Ouvrez-le vous-même, puis collez-le ici.",
 };
 
 // Server messages with a variable part: [English pattern, French with $1, $2…].

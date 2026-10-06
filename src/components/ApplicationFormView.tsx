@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref } from "firebase/storage";
 import { db, functions, storage } from "@/lib/firebase";
@@ -15,6 +15,10 @@ const fitApplicationLimits = httpsCallable<{ applicationId: string }, { letter: 
   "fitApplicationLimits",
   { timeout: 300_000 },
 );
+const unlockForm = httpsCallable<
+  { applicationId: string },
+  { status: "unlocked" | "busy" | "captcha" | "password_required" | "failed"; message?: string; note?: string }
+>(functions, "unlockForm", { timeout: 540_000 });
 const prepareApplication = httpsCallable<{ applicationId: string; formText?: string }, ApplicationForm | null>(functions, "prepareApplication", {
   timeout: 540_000,
 });
@@ -199,7 +203,9 @@ export function ApplicationFormView({
                 )}{" "}
                 {t("The fields below are what this platform usually asks, not the exact form.")}
               </p>
+              {local.loginRequired && <UnlockForm applicationId={applicationId} url={local.formUrl} />}
               <PasteForm
+                collapsed={local.loginRequired}
                 intro={t("To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.")}
                 formUrl={local.formUrl}
                 onSubmit={prepare}
@@ -286,6 +292,73 @@ export function ApplicationFormView({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * "Unlock the form": with the student's go-ahead, BAPTOU confirms their email on the careers site in its own
+ * browser (reading the code from their Gmail), then reads the real form. It never fills in or submits it.
+ */
+function UnlockForm({ applicationId, url }: { applicationId: string; url: string }) {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const [gmail, setGmail] = useState<{ email?: string; canRead?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  let site = url;
+  try {
+    site = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    // keep the raw link
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "users", user.uid), (snap) => setGmail((snap.get("gmail") as typeof gmail) ?? null));
+  }, [user]);
+
+  if (!gmail?.email || !gmail.canRead) {
+    return (
+      <p className="mt-2 text-xs">
+        {t("BAPTOU can confirm your email for you when it can read your Gmail (Profile page; first 100 users for now).")}
+      </p>
+    );
+  }
+
+  async function unlock() {
+    const question = t(
+      "BAPTOU will open {site} in its own browser, type {email}, read the code the site sends to your Gmail, then read the form. It won't fill in or send your application. Continue?",
+      { site, email: gmail!.email! },
+    );
+    if (!confirm(question)) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { data } = await unlockForm({ applicationId });
+      if (data.status !== "unlocked" && data.status !== "busy") {
+        setMessage([data.message && t(data.message), data.note].filter(Boolean).join(" "));
+      }
+    } catch (e) {
+      setMessage(errorText(e, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-accent/40 bg-accent/5 p-3 text-foreground">
+      <p className="font-medium">{t("Let BAPTOU confirm your email")}</p>
+      <p className="mt-0.5 text-muted">
+        {t("It types {email} on {site}, reads the code from your Gmail and opens the real form. Nothing is filled in or sent. About 1–3% of your monthly allowance.", {
+          email: gmail.email,
+          site,
+        })}
+      </p>
+      <button onClick={unlock} disabled={busy} className="mt-2 rounded-lg bg-accent px-3 py-1.5 font-medium text-white disabled:opacity-50">
+        {t(busy ? "Unlocking… (up to 3 min)" : "Unlock the form")}
+      </button>
+      {message && <p className="mt-2 text-amber-800 dark:text-amber-300">{message}</p>}
+    </div>
   );
 }
 
