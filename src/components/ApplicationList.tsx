@@ -142,6 +142,14 @@ function OfferCard({ app: a }: { app: Item }) {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            {a.postingClosedAt && (
+              <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                Posting closed
+              </span>
+            )}
+            {a.source === "manual" && (
+              <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted">Added by you</span>
+            )}
             {a.fitVerdict && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${verdictLabel[a.fitVerdict].className}`}>
                 {verdictLabel[a.fitVerdict].text}

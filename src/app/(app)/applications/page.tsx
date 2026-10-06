@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ApplicationList, type ApplicationItem } from "@/components/ApplicationList";
 import { kindNoun, kindOf, kindTag, SearchCard, SearchForm, type SearchItem } from "@/components/Searches";
 import { SearchTab } from "@/components/SearchTab";
+import { AddOffer } from "@/components/AddOffer";
 import type { Application, Search } from "@/lib/types";
 
 // The selected tab lives in the URL (?search=<id>, or ?search=new), so "Back" from an offer returns to it.
@@ -153,6 +154,7 @@ function Applications() {
         ) : current ? (
           <>
             <SearchCard key={current.id} search={current} />
+            <AddOffer key={`add-${current.id}`} searchId={current.id} noun={kindNoun(kindOf(current))} />
             <ApplicationList
               key={`list-${current.id}`}
               apps={offersOf(current.id)}

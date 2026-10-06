@@ -7,6 +7,7 @@ import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { loadDismissed, offerKey, urlId } from "./offers.js";
+import { checkPostings } from "./postings.js";
 import { anthropicKey, db, type Kind, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
@@ -60,7 +61,7 @@ export const OffersSchema = z.object({
 });
 
 // Jobs and alternances add contract details to the same offer fields.
-const offerItem = OffersSchema.shape.offers.element;
+export const offerItem = OffersSchema.shape.offers.element;
 export const JobsSchema = OffersSchema.extend({
   offers: z.array(
     offerItem.extend({
@@ -282,8 +283,12 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
 
     let created = 0;
     const batchAt = Timestamp.now(); // groups this run's offers into the "Latest batch" list
+    // Dead links (removed or expired postings) never reach the student. Plain HTTP check, no AI.
+    const links = await checkPostings(result.offers.map((o) => o.url));
+    const dropped = result.offers.filter((o) => links.get(o.url)?.status === "closed").length;
     for (const o of result.offers) {
       if (created >= maxPerRun) break;
+      if (links.get(o.url)?.status === "closed") continue;
       const id = urlId(o.url);
       const key = offerKey(o.organization, o.title);
       // Hard guarantee, whatever the model returned: turned-down and already-listed offers never come back.
@@ -326,6 +331,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       lastRunAt: FieldValue.serverTimestamp(),
       lastBatchAt: batchAt,
       lastRunCreated: created,
+      lastRunDropped: dropped, // offers whose posting turned out to be closed
       lastRunCostUsd: Math.round(stats.costUsd * 100) / 100,
       ...nextRunAfter(search, created),
       nextLeads: result.leadsToCheckNext.slice(0, 8),

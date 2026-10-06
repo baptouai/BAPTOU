@@ -202,6 +202,16 @@ function ApplicationView() {
         </div>
       </div>
 
+      {app.postingClosedAt && (
+        <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-800 dark:text-red-300">
+          <p className="font-medium">This posting seems to be closed.</p>
+          <p className="mt-0.5">
+            Checked {app.postingClosedAt.toDate().toLocaleDateString()}: {app.postingClosedReason || "the page is no longer available"}. You
+            may want to dismiss it, or check the company&apos;s careers page for a newer version.
+          </p>
+        </section>
+      )}
+
       {(app.matchReason || app.research) && (
         <div className="grid gap-4 md:grid-cols-2">
           {app.matchReason && (
@@ -241,6 +251,7 @@ function ApplicationView() {
           letter={letter}
           title={`${app.title} - ${app.organization}`}
           onChange={(applicationForm) => scheduleSave({ applicationForm })}
+        onLetterFitted={setLetter}
         />
 
         {/* The letter box only when the form asks for one (or the user wants one); the email box only on request. */}
@@ -266,6 +277,7 @@ function ApplicationView() {
             />
             <textarea
               value={letter}
+              maxLength={coverLetterField(app.applicationForm)?.charLimit || undefined}
               onChange={(e) => {
                 setLetter(e.target.value);
                 scheduleSave({ letter: e.target.value });

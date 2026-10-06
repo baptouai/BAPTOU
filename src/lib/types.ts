@@ -48,6 +48,9 @@ export type Application = {
   school?: string; // alternances: partner school named in the posting
   searchId?: string; // the search that found it
   batchAt?: Timestamp; // when the search run that found it happened
+  source?: "manual"; // added by the user from a link
+  postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
+  postingClosedReason?: string;
   dismissReason?: string; // why the user turned it down; future searches learn from it
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
   fitVerdictReason?: string;

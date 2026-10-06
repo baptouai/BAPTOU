@@ -9,6 +9,11 @@ import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
 
+const fitApplicationLimits = httpsCallable<{ applicationId: string }, { letter: string }>(
+  functions,
+  "fitApplicationLimits",
+  { timeout: 300_000 },
+);
 const prepareApplication = httpsCallable<{ applicationId: string; formText?: string }, ApplicationForm | null>(functions, "prepareApplication", {
   timeout: 540_000,
 });
@@ -37,7 +42,7 @@ export function coverLetterField(form: ApplicationForm | undefined): FormField |
  * Edits are passed to `onChange`, which autosaves them.
  */
 export function ApplicationFormView({
-  applicationId, form, status, statusError, autoPrepare, letter, title, onChange,
+  applicationId, form, status, statusError, autoPrepare, letter, title, onChange, onLetterFitted,
 }: {
   applicationId: string;
   form: ApplicationForm | undefined;
@@ -47,6 +52,7 @@ export function ApplicationFormView({
   letter: string;
   title: string;
   onChange: (form: ApplicationForm) => void;
+  onLetterFitted?: (letter: string) => void;
 }) {
   const { user } = useAuth();
   const [local, setLocal] = useState(form);
@@ -115,6 +121,23 @@ export function ApplicationFormView({
   const needsWork = (f: FormField) =>
     f === coverField || (f.worthPreparing ?? (f.kind === "file" || f.kind === "entries" || f.kind === "long_text"));
   const routine = fields.filter((f) => !needsWork(f));
+  // Answers over the form's character limit (forms prepared before limits were enforced).
+  const overLimit =
+    fields.filter((f) => f.charLimit > 0 && f !== coverField && f.value.length > f.charLimit).length +
+    (coverField && coverField.charLimit > 0 && letter.length > coverField.charLimit ? 1 : 0);
+  const [fitting, setFitting] = useState(false);
+  async function fitLimits() {
+    setFitting(true);
+    setError(null);
+    try {
+      const { data } = await fitApplicationLimits({ applicationId });
+      onLetterFitted?.(data.letter);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setFitting(false);
+    }
+  }
 
   return (
     <section className="rounded-xl border border-card-edge bg-card p-5">
@@ -180,6 +203,20 @@ export function ApplicationFormView({
             </div>
           ) : (
             <PasteForm collapsed intro="The real form looks different? Paste it here and BAPTOU will follow it exactly." onSubmit={prepare} />
+          )}
+          {overLimit > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm">
+              <p className="text-red-700 dark:text-red-300">
+                {overLimit} answer{overLimit > 1 ? "s are" : " is"} longer than the form allows.
+              </p>
+              <button
+                onClick={fitLimits}
+                disabled={fitting}
+                className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white disabled:opacity-50"
+              >
+                {fitting ? "Shortening…" : "Fit to the limits"}
+              </button>
+            </div>
           )}
           <Checklist fields={fields} docs={docs} letter={letter} />
 
@@ -494,6 +531,7 @@ function FieldView({
           <textarea
             value={field.value}
             onChange={(e) => onChange({ value: e.target.value })}
+            maxLength={field.charLimit > 0 ? field.charLimit : undefined}
             rows={6}
             placeholder={field.needsUser ? "Only you can answer this" : ""}
             className="flex-1 rounded-lg border border-border bg-background p-3 text-sm leading-relaxed"
@@ -502,6 +540,7 @@ function FieldView({
           <input
             value={field.value}
             onChange={(e) => onChange({ value: e.target.value })}
+            maxLength={field.charLimit > 0 ? field.charLimit : undefined}
             placeholder={field.needsUser ? "Only you can answer this" : ""}
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />

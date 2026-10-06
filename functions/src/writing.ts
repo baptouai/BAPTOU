@@ -4,6 +4,8 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { toContentBlock } from "./profile.js";
+import { letterLimit } from "./form.js";
+import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
 
 const Input = z.object({
@@ -72,6 +74,8 @@ export const draftLetter = onCall(
     const { applicationId, instructions } = Input.parse(request.data);
     const { appRef, app, profile, pastLetters } = await loadContext(uid, applicationId);
     const current: string = app.letter ?? "";
+    // If the application form caps the letter, the letter must fit.
+    const limit = letterLimit(app.applicationForm);
 
     const result = await runAgent({
       uid,
@@ -91,7 +95,9 @@ ${describeApplication(app)}
 
 ${current ? `Current letter (may include the student's own edits):\n"""\n${current}\n"""` : "There is no letter yet."}
 
-${instructions ? `Student's instructions: ${instructions}` : current ? "Improve this letter." : "Write the motivation letter."}`,
+${instructions ? `Student's instructions: ${instructions}` : current ? "Improve this letter." : "Write the motivation letter."}${
+            limit ? `\nThe application form limits the letter to ${limit} characters (spaces included): stay well under it.` : ""
+          }`,
         },
       ],
     });
@@ -100,6 +106,7 @@ ${instructions ? `Student's instructions: ${instructions}` : current ? "Improve 
     if (current) {
       await appRef.collection("letterVersions").add({ text: current, author: "user", createdAt: FieldValue.serverTimestamp() });
     }
+    if (limit) result.letter = (await fitToLimits(uid, [{ label: "Motivation letter", limit, text: result.letter }]))[0];
     await appRef.collection("letterVersions").add({ text: result.letter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
     await appRef.update({
       letter: result.letter,

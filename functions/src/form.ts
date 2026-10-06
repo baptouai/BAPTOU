@@ -2,7 +2,33 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
+import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+
+type Form = z.infer<typeof FormSchema>;
+
+const COVER_LETTER_LABEL = /cover(ing)? letter|motivation letter|lettre de motivation|anschreiben/i;
+
+/** The character limit the form puts on the cover letter, or 0. */
+export function letterLimit(form: Partial<Form> | undefined) {
+  const fields = form?.sections?.flatMap((s) => s.fields) ?? [];
+  const f = fields.find((x) => x.isCoverLetter) ?? fields.find((x) => x.kind === "long_text" && COVER_LETTER_LABEL.test(x.label));
+  return f?.charLimit ?? 0;
+}
+
+/** Brings every limited text answer of the form within its character limit. */
+export async function fitFormLimits(uid: string, form: Form): Promise<Form> {
+  const slots = form.sections.flatMap((s, si) =>
+    s.fields
+      .map((f, fi) => ({ f, si, fi }))
+      .filter(({ f }) => f.charLimit > 0 && f.value && (f.kind === "short_text" || f.kind === "long_text" || f.isCoverLetter)),
+  );
+  if (!slots.some(({ f }) => f.value.length > f.charLimit)) return form;
+  const fitted = await fitToLimits(uid, slots.map(({ f }) => ({ label: f.label, limit: f.charLimit, text: f.value })));
+  const next = structuredClone(form);
+  slots.forEach(({ si, fi }, n) => (next.sections[si].fields[fi].value = fitted[n]));
+  return next;
+}
 
 const Entry = z.object({
   title: z.string().describe("Job title, or degree"),
@@ -142,7 +168,7 @@ export const prepareApplication = onCall(
     if (!claimed) return null;
 
     try {
-      const form = await readForm(uid, app, profile, formText?.trim() || undefined);
+      const form = await fitFormLimits(uid, await readForm(uid, app, profile, formText?.trim() || undefined));
       // The letter lives in one place: the application's letter (editable, with version history).
       // If the form needed one and none existed yet, BAPTOU's draft becomes that letter.
       const coverLetter = form.sections.flatMap((s) => s.fields).find((f) => f.isCoverLetter && f.value)?.value;
@@ -164,5 +190,33 @@ export const prepareApplication = onCall(
       });
       throw e;
     }
+  },
+);
+
+/**
+ * "Fit to the limits": shortens the stored form answers and the letter that exceed the form's
+ * character limits (for forms prepared before limits were enforced, or edited since).
+ */
+export const fitApplicationLimits = onCall(
+  { region: REGION, secrets: [anthropicKey], timeoutSeconds: 300, memory: "512MiB" },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const applicationId = z.string().min(1).parse(request.data?.applicationId);
+    const appRef = db.doc(`users/${uid}/applications/${applicationId}`);
+    const app = (await appRef.get()).data();
+    if (!app?.applicationForm) throw new HttpsError("failed-precondition", "Prepare the application form first.");
+
+    const form = await fitFormLimits(uid, app.applicationForm as Form);
+    const limit = letterLimit(form);
+    const letter = limit && app.letter?.length > limit
+      ? (await fitToLimits(uid, [{ label: "Motivation letter", limit, text: app.letter }]))[0]
+      : app.letter;
+    if (letter !== app.letter) {
+      await appRef.collection("letterVersions").add({ text: app.letter, author: "user", createdAt: FieldValue.serverTimestamp() });
+    }
+    // A new preparedAt makes the open page take the fitted answers.
+    await appRef.update({ applicationForm: { ...form, preparedAt: FieldValue.serverTimestamp() }, letter, updatedAt: FieldValue.serverTimestamp() });
+    return { letter };
   },
 );
