@@ -156,26 +156,28 @@ export function PersonRow({
   }
 
   return (
+    // On a phone the button wraps under the person (the details need the width); on a wide screen it sits on the right.
     <li className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-card-edge-soft p-3 text-sm">
-      {onToggleFavourite && (
-        <button
-          onClick={onToggleFavourite}
-          aria-label={favourite ? `Remove ${p.name || p.email} from favourites` : `Add ${p.name || p.email} to favourites`}
-          aria-pressed={favourite}
-          title={favourite ? "Remove from favourites" : "Add to favourites"}
-          className={`-m-1 shrink-0 p-1 text-lg leading-none ${favourite ? "text-amber-500" : "text-muted hover:text-amber-500"}`}
-        >
-          {favourite ? "★" : "☆"}
-        </button>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="font-medium [overflow-wrap:anywhere]">
-          {p.name || p.email} {p.name && <span className="font-normal text-muted">&lt;{p.email}&gt;</span>}
-        </p>
-        <p className="truncate text-muted">
-          {p.sent} sent · {p.received} received · last {new Date(p.lastAt).toLocaleDateString()}
-          {p.lastSubject && ` · “${p.lastSubject}”`}
-        </p>
+      <div className="flex min-w-0 flex-1 basis-64 items-start gap-3">
+        {onToggleFavourite && (
+          <button
+            onClick={onToggleFavourite}
+            aria-label={favourite ? `Remove ${p.name || p.email} from favourites` : `Add ${p.name || p.email} to favourites`}
+            aria-pressed={favourite}
+            title={favourite ? "Remove from favourites" : "Add to favourites"}
+            className={`-m-1 shrink-0 p-1 text-lg leading-none ${favourite ? "text-amber-500" : "text-muted hover:text-amber-500"}`}
+          >
+            {favourite ? "★" : "☆"}
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="font-medium [overflow-wrap:anywhere]">{p.name || p.email}</p>
+          {p.name && <p className="text-muted [overflow-wrap:anywhere]">{p.email}</p>}
+          <p className="line-clamp-2 text-muted">
+            {p.sent} sent · {p.received} received · last {new Date(p.lastAt).toLocaleDateString()}
+            {p.lastSubject && ` · “${p.lastSubject}”`}
+          </p>
+        </div>
       </div>
       {canDraft ? (
         <button onClick={draft} disabled={busy} className="rounded-lg border border-accent px-3 py-1.5 text-accent disabled:opacity-50">

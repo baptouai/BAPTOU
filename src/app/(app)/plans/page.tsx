@@ -214,7 +214,7 @@ function Plans() {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted">
-            Prices include VAT. Payments are handled by Stripe; BAPTOU never sees your card details.
+            Prices include all taxes. Payments are handled by Stripe; BAPTOU never sees your card details.
           </p>
         </>
       )}

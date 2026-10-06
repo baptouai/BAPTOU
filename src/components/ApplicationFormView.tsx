@@ -526,7 +526,8 @@ function FieldView({
       {(field.kind === "choice" || field.kind === "yes_no") && field.options.length > 0 && (
         <p className="mt-1 text-xs text-muted">Options: {field.options.join(" · ")}</p>
       )}
-      <div className="mt-2 flex gap-2">
+      {/* Long answers get the full width on a phone, with Copy underneath. */}
+      <div className={`mt-2 flex gap-2 ${long ? "flex-col sm:flex-row" : ""}`}>
         {long ? (
           <textarea
             value={field.value}
@@ -545,7 +546,7 @@ function FieldView({
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
         )}
-        <CopyButton text={field.value} />
+        <CopyButton text={field.value} className={long ? "self-end sm:self-start" : ""} />
       </div>
       {field.charLimit > 0 && (
         <p className={`mt-1 text-xs ${over ? "text-red-600" : "text-muted"}`}>
@@ -570,20 +571,31 @@ function EntryCard({ entry }: { entry: FormEntry }) {
     <li className="rounded-lg border border-border p-3 text-sm">
       {rows
         .filter(([, v]) => v)
-        .map(([k, v]) => (
-          <div key={k} className="flex items-start justify-between gap-3 py-0.5">
-            <p>
-              <span className="text-muted">{k}: </span>
-              <span className="whitespace-pre-wrap">{v}</span>
-            </p>
-            <CopyButton text={v} />
-          </div>
-        ))}
+        .map(([k, v]) =>
+          // Long values go under their label, so the text keeps the full width of the card.
+          k === "Description" || v.length > 80 ? (
+            <div key={k} className="py-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted">{k}</span>
+                <CopyButton text={v} />
+              </div>
+              <p className="mt-1 whitespace-pre-wrap">{v}</p>
+            </div>
+          ) : (
+            <div key={k} className="flex items-start justify-between gap-3 py-0.5">
+              <p className="min-w-0 [overflow-wrap:anywhere]">
+                <span className="text-muted">{k}: </span>
+                <span className="whitespace-pre-wrap">{v}</span>
+              </p>
+              <CopyButton text={v} />
+            </div>
+          ),
+        )}
     </li>
   );
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, className = "" }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -593,7 +605,7 @@ function CopyButton({ text }: { text: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       disabled={!text}
-      className="h-fit shrink-0 rounded-lg border border-border px-2 py-1 text-xs disabled:opacity-40"
+      className={`h-fit shrink-0 rounded-lg border border-border px-2 py-1 text-xs disabled:opacity-40 ${className}`}
     >
       {copied ? "Copied" : "Copy"}
     </button>

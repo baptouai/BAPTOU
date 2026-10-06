@@ -3,34 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BAPTOU</title>
-  <meta name="description" content="BAPTOU is an AI assistant that helps students find internships and prepare master's applications.">
+  <title>BAPTOU – your AI agent for applications</title>
+  <meta name="description" content="BAPTOU finds internships, jobs, alternances and master's programmes that fit you, prepares each application in the format of its form and writes your letters. Nothing is sent without your approval.">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <header><img src="logo.svg" alt="">BAPTOU</header>
+  <main class="wide">
+    <header>
+      <img src="logo.svg" alt="">BAPTOU
+      <a class="header-link" href="https://baptou-app.web.app">Sign in</a>
+    </header>
 
-    <h1>Your AI assistant for internships and master's applications</h1>
-    <p>
-      BAPTOU helps students find internships and prepare applications. It reads the documents you give it
-      (CV, transcripts, past motivation letters), searches for offers matching what you ask for, researches each
-      organization, and drafts motivation letters, application answers and emails in your own style.
-    </p>
+    <section class="hero">
+      <h1>Your AI agent for internships, jobs and master's applications</h1>
+      <p class="lead">
+        BAPTOU reads your CV, finds the offers that fit you, prepares each application in the format of the
+        organization's own form and writes your letters. Nothing is sent without your approval.
+      </p>
+      <p><a class="button" href="https://baptou-app.web.app">Get started</a></p>
+      <p class="small">Sign in with Google. Works for internships, jobs, alternances and master's programmes.</p>
+    </section>
+
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><strong>Add your CV</strong><span>And, if you like, your transcripts and an old motivation letter. BAPTOU builds your profile from them.</span></li>
+      <li><strong>Start a search</strong><span>Say what you're looking for: role, places, dates. BAPTOU searches every morning until you stop it.</span></li>
+      <li><strong>Pick what interests you</strong><span>For each offer you like, BAPTOU prepares the application and drafts the letter. You check, edit and apply.</span></li>
+    </ol>
 
     <h2>What BAPTOU does</h2>
-    <ul>
-      <li>Searches for internship offers only when you start a search, and stops when you tell it to.</li>
-      <li>Prepares each application in the format of the organization's own application form.</li>
-      <li>Writes and rewrites motivation letters and emails on request.</li>
-      <li>If you connect Gmail, finds people in your mailbox who could help (recruiters, former managers, alumni) and drafts an email that follows on from your past conversations.</li>
+    <ul class="features">
+      <li><strong>Finds offers that fit you</strong>, with the reasons why, and removes postings that are closed or no longer online.</li>
+      <li><strong>Prepares each application in the format of its form</strong>: the questions it asks, the files it needs, its character limits.</li>
+      <li><strong>Writes and rewrites your letters and emails</strong> on request, researched for each organization and in your own style.</li>
+      <li><strong>Emails you when it finds new offers</strong>, with a separate email when one is almost ideal.</li>
+      <li><strong>Works with your Gmail, if you want</strong>: it recognises people you already know at each organization, drafts emails that follow on from your past conversations, and spots replies to your applications every morning. Some mailbox features are open to a limited number of users for now.</li>
     </ul>
 
     <h2>You stay in control</h2>
     <p>
-      BAPTOU only suggests. It never sends an email or submits an application on its own: an email is sent from
-      your Gmail only after you click “Approve &amp; send” in the app. You can disconnect Gmail at any time.
+      BAPTOU only suggests. It never submits an application, and an email is sent from your Gmail only after you
+      click “Approve &amp; send”. You can disconnect Gmail, export your data or delete your account at any time.
+    </p>
+
+    <h2 id="pricing">Pricing</h2>
+    <p>Every plan includes all of BAPTOU and the same monthly allowance for its AI work.</p>
+    <div class="plans">
+      <div class="plan">
+        <h3>Monthly</h3>
+        <p class="price">€13.99 <span>/ month</span></p>
+        <p>Cancel anytime.</p>
+      </div>
+      <div class="plan best">
+        <span class="badge">Best price</span>
+        <h3>Yearly</h3>
+        <p class="price">€11.49 <span>/ month</span></p>
+        <p>Paid monthly, 12-month commitment.</p>
+      </div>
+      <div class="plan">
+        <h3>One-month pass</h3>
+        <p class="price">€13.99 <span>once</span></p>
+        <p>One month, no renewal.</p>
+      </div>
+    </div>
+    <p class="small">Prices in euros, all taxes included. Payments by card through Stripe.</p>
+    <p class="note">
+      BAPTOU is in beta: access is by invitation for now. Want to try it?
+      Write to <a href="mailto:baptouai@gmail.com">baptouai@gmail.com</a>.
     </p>
 
     <footer>

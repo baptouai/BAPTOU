@@ -31,12 +31,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+        {/* On a phone the menu gets its own row under the logo, so every item stays visible. */}
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
             <Image src="/logo.svg" alt="" width={24} height={24} />
             BAPTOU
           </Link>
-          <nav className="flex flex-1 gap-4 scroll-row text-sm">
+          <nav className="order-last flex w-full justify-between gap-3 scroll-row text-sm sm:order-none sm:w-auto sm:flex-1 sm:justify-start sm:gap-4">
             {nav.map((item) => (
               <Link
                 key={item.href}
@@ -49,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
-          <button onClick={logOut} className="text-sm text-muted">
+          <button onClick={logOut} className="ml-auto text-sm text-muted sm:ml-0">
             Sign out
           </button>
         </div>

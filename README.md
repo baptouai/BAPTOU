@@ -52,6 +52,17 @@ from BAPTOU Admin (Sender email > Connect): it asks Google for send permission o
 encrypted token in `config/mailer`. Until it's connected, these emails aren't sent. New offers: one summary per search run, or a dedicated email for each
 offer scoring 90% or more. Users turn them off on their Profile page.
 
+## Checking pages locally
+
+`npm run emulators` starts local Auth and Firestore emulators; `npm run dev:emulators` runs the app on
+port 3001 against them. Create an account in the Auth emulator, put test data under its uid, then in
+the browser console run `testSignIn("<uid>")` (emulator mode only; never in production builds).
+
+## Scheduled jobs
+
+Europe/Paris time: 06:00 posting checks, 06:30 mailbox index, 07:00 searches (then new-offer emails),
+07:30 reply checks, 09:00 yearly-commitment reminders (sent once, about 2 months before the end).
+
 ## Legal pages
 
 `site/terms.html` (CGV/CGU, French with English translation) and `site/legal.html` (mentions

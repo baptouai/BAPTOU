@@ -14,3 +14,4 @@ export { billingPortal, cancelSubscription, createCheckout, stripeWebhook } from
 export { dailyReplies, scanRepliesNow, scanRepliesTask } from "./replies.js";
 export { sendGiftInvitation } from "./invites.js";
 export { deleteMyAccount, exportMyData } from "./account.js";
+export { commitmentReminders } from "./reminders.js";

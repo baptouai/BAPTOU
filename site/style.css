@@ -27,3 +27,33 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border
 hr { border: 0; border-top: 1px solid var(--border); margin: 56px 0 0; }
 /* Details still to fill in before these pages go live. */
 mark.todo { background: #fde68a; color: #78350f; padding: 0 4px; border-radius: 3px; }
+
+/* Home page */
+main.wide { max-width: 880px; }
+header .header-link { margin-left: auto; font-weight: 500; font-size: 15px; }
+.hero { padding: 24px 0 8px; }
+.hero h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); max-width: 720px; }
+.lead { font-size: 1.1rem; max-width: 680px; }
+.small { font-size: 14px; }
+.button { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; text-decoration: none; padding: 12px 22px; border-radius: 10px; }
+.button:hover { opacity: .9; }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); counter-reset: step; }
+.steps li { border: 1px solid var(--border); border-radius: 12px; padding: 16px; counter-increment: step; }
+.steps li::before { content: counter(step); display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.steps strong { display: block; color: var(--fg); }
+.steps span { display: block; font-size: 15px; }
+.features li { margin-bottom: 6px; }
+.features strong, p strong { color: var(--fg); }
+.plans { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 12px; }
+.plan { border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.plan.best { border-color: var(--accent); }
+.plan h3 { margin: 0; font-size: 1rem; }
+.plan .price { margin: 6px 0 2px; font-size: 1.8rem; font-weight: 700; color: var(--fg); }
+.plan .price span { font-size: 14px; font-weight: 400; color: var(--muted); }
+.plan p { margin: 0; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 8px; margin-bottom: 6px; }
+.note { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; }
+/* The dark theme's lighter accent needs dark text to stay readable. */
+@media (prefers-color-scheme: dark) {
+  .button, .steps li::before { color: #1e1b4b; }
+}

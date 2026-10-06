@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:emulators": "set NEXT_PUBLIC_USE_EMULATORS=1&& next dev -p 3001",
+    "emulators": "firebase emulators:start --only auth,firestore --project baptou-5041c"
   },
   "dependencies": {
     "firebase": "^12.19.0",

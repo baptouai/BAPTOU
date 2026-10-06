@@ -19,9 +19,9 @@ export default function Home() {
         <Image src="/logo.svg" alt="" width={72} height={72} className="mx-auto mb-6" priority />
         <h1 className="text-5xl font-bold tracking-tight">BAPTOU</h1>
         <p className="mt-4 text-lg text-muted">
-          Your AI agent for internships and master&apos;s applications. It finds
-          opportunities, researches each organization and drafts your letters.
-          Nothing is sent without your approval.
+          Your AI agent for internships, jobs, alternances and master&apos;s
+          applications. It finds offers that fit you, prepares each application and
+          writes your letters. Nothing is sent without your approval.
         </p>
         <button
           onClick={signIn}
@@ -30,6 +30,11 @@ export default function Home() {
         >
           Continue with Google
         </button>
+        <p className="mt-4 text-sm text-muted">
+          <a href="https://baptou-5041c.web.app" className="hover:underline">About BAPTOU and pricing</a>
+          {" · "}
+          <a href="https://baptou-5041c.web.app/privacy" className="hover:underline">Privacy policy</a>
+        </p>
       </div>
     </main>
   );
