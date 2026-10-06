@@ -10,6 +10,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { offerTokens } from "@/lib/orgTokens";
 import { ContactsPanel } from "@/components/Contacts";
+import { errorText, useI18n } from "@/lib/i18n";
 
 // users/{uid}/mailIndex/{id}, built from email headers by the server (no AI). See functions/src/mailIndex.ts.
 type Person = {
@@ -78,6 +79,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   const [people, setPeople] = useState<(Person & { id: string })[]>([]);
   const tokens = useMemo(() => offerTokens(organization, applyUrl), [organization, applyUrl]);
   const { favourites, toggle } = useFavourites();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!user || !tokens.length) return;
@@ -96,7 +98,7 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
   if (connected && status?.status !== "ready" && !people.length) {
     return (
       <section className="rounded-xl border border-card-edge bg-card p-5 text-sm text-muted">
-        BAPTOU is indexing your mailbox (no credit used). People you know at {organization} will show up here.
+        {t("BAPTOU is indexing your mailbox (no credit used). People you know at {name} will show up here.", { name: organization })}
       </section>
     );
   }
@@ -104,8 +106,8 @@ export function KnownPeople({ applicationId, organization, applyUrl }: { applica
 
   return (
     <section className="rounded-xl border border-card-edge bg-card p-5">
-      <h2 className="font-medium">People you know at {organization}</h2>
-      <p className="mt-1 text-sm text-muted">Found in your mailbox automatically, without using credits.</p>
+      <h2 className="font-medium">{t("People you know at {name}", { name: organization })}</h2>
+      <p className="mt-1 text-sm text-muted">{t("Found in your mailbox automatically, without using credits.")}</p>
       <ul className="mt-3 grid grid-cols-1 gap-2">
         {[...people]
           .sort((a, b) => Number(favourites.has(b.email)) - Number(favourites.has(a.email)))
@@ -142,6 +144,8 @@ export function PersonRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t, date } = useI18n();
+  const who = p.name || p.email;
 
   async function draft() {
     setBusy(true);
@@ -149,7 +153,7 @@ export function PersonRow({
     try {
       await draftFromIndex({ indexId: p.id, ...(applicationId ? { applicationId } : {}) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -162,9 +166,9 @@ export function PersonRow({
         {onToggleFavourite && (
           <button
             onClick={onToggleFavourite}
-            aria-label={favourite ? `Remove ${p.name || p.email} from favourites` : `Add ${p.name || p.email} to favourites`}
+            aria-label={t(favourite ? "Remove {name} from favourites" : "Add {name} to favourites", { name: who })}
             aria-pressed={favourite}
-            title={favourite ? "Remove from favourites" : "Add to favourites"}
+            title={t(favourite ? "Remove from favourites" : "Add to favourites")}
             className={`-m-1 shrink-0 p-1 text-lg leading-none ${favourite ? "text-amber-500" : "text-muted hover:text-amber-500"}`}
           >
             {favourite ? "★" : "☆"}
@@ -174,18 +178,18 @@ export function PersonRow({
           <p className="font-medium [overflow-wrap:anywhere]">{p.name || p.email}</p>
           {p.name && <p className="text-muted [overflow-wrap:anywhere]">{p.email}</p>}
           <p className="line-clamp-2 text-muted">
-            {p.sent} sent · {p.received} received · last {new Date(p.lastAt).toLocaleDateString()}
+            {t("{sent} sent · {received} received · last {date}", { sent: p.sent, received: p.received, date: date(p.lastAt, "short") })}
             {p.lastSubject && ` · “${p.lastSubject}”`}
           </p>
         </div>
       </div>
       {canDraft ? (
         <button onClick={draft} disabled={busy} className="rounded-lg border border-accent px-3 py-1.5 text-accent disabled:opacity-50">
-          {busy ? "Writing…" : "Draft an email"}
+          {t(busy ? "Writing…" : "Draft an email")}
         </button>
       ) : (
         <Link href="/profile" className="text-xs text-muted underline">
-          Reconnect Gmail to draft
+          {t("Reconnect Gmail to draft")}
         </Link>
       )}
       {error && <p className="w-full text-red-600">{error}</p>}
@@ -207,6 +211,7 @@ export function MailIndexPanel() {
   const [now] = useState(() => Date.now()); // for recency scoring; stable during the session
   const { favourites, toggle } = useFavourites();
   const [onlyFavourites, setOnlyFavourites] = useState(false);
+  const { t, dateTime } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -239,22 +244,27 @@ export function MailIndexPanel() {
     try {
       await refreshMailIndex();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     }
   }
 
   if (connected && !canRead && !people.length) {
     return (
       <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
-        <h2 className="font-medium">People in your mailbox</h2>
-        <p className="mt-1 text-muted">Finding people in your mailbox is reserved for BAPTOU&apos;s first 100 users for now. It will open to everyone soon.</p>
+        <h2 className="font-medium">{t("People in your mailbox")}</h2>
+        <p className="mt-1 text-muted">
+          {t("Finding people in your mailbox is reserved for BAPTOU's first 100 users for now. It will open to everyone soon.")}
+        </p>
       </section>
     );
   }
   if (!connected && !people.length) {
     return (
       <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
-        <Link href="/profile" className="text-accent">Connect Gmail</Link> to see the people in your mailbox.
+        <Link href="/profile" className="text-accent">
+          {t("Connect Gmail")}
+        </Link>{" "}
+        {t("to see the people in your mailbox.")}
       </section>
     );
   }
@@ -264,24 +274,26 @@ export function MailIndexPanel() {
     <section className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-medium">People in your mailbox</h2>
+          <h2 className="font-medium">{t("People in your mailbox")}</h2>
           <p className="mt-1 text-sm text-muted">
             {working
-              ? "Indexing your mailbox… (no credit used)"
+              ? t("Indexing your mailbox… (no credit used)")
               : status?.status === "error"
-                ? "The last update failed. Try again."
-                : `${status?.people ?? people.length} people${status?.updatedAt ? ` · updated ${status.updatedAt.toDate().toLocaleString()}` : ""}${
-                    status?.backfillDone === false ? " · older emails are still being added" : ""
-                  }. Built from email headers only, without credits.`}
+                ? t("The last update failed. Try again.")
+                : `${t("{n} people", { n: status?.people ?? people.length })}${
+                    status?.updatedAt ? ` · ${t("updated {date}", { date: dateTime(status.updatedAt.toDate()) })}` : ""
+                  }${status?.backfillDone === false ? ` · ${t("older emails are still being added")}` : ""}. ${t(
+                    "Built from email headers only, without credits.",
+                  )}`}
           </p>
         </div>
         {connected ? (
           <button onClick={refresh} disabled={working} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
-            {working ? "Updating…" : "Update now"}
+            {t(working ? "Updating…" : "Update now")}
           </button>
         ) : (
           <Link href="/profile" className="text-sm text-accent">
-            Reconnect Gmail to update
+            {t("Reconnect Gmail to update")}
           </Link>
         )}
       </div>
@@ -293,19 +305,19 @@ export function MailIndexPanel() {
           setFilter(e.target.value);
           setShown(20);
         }}
-        placeholder="Search by name, email, company or subject"
+        placeholder={t("Search by name, email, company or subject")}
         className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
       />
       {favourites.size > 0 && (
         <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={onlyFavourites} onChange={(e) => setOnlyFavourites(e.target.checked)} />
-          Favourites only
+          {t("Favourites only")}
         </label>
       )}
 
       {favouriteRows.length > 0 && (
         <>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">★ Favourites</p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">★ {t("Favourites")}</p>
           <ul className="mt-2 grid grid-cols-1 gap-2">
             {favouriteRows.map((p) => (
               <PersonRow key={p.id} person={p} canDraft={connected} favourite onToggleFavourite={() => toggle(p.email)} />
@@ -317,7 +329,7 @@ export function MailIndexPanel() {
       {otherRows.length > 0 && (
         <>
           {favouriteRows.length > 0 && (
-            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Everyone else</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">{t("Everyone else")}</p>
           )}
           <ul className="mt-2 grid grid-cols-1 gap-2">
             {otherRows.slice(0, shown).map((p) => (
@@ -329,12 +341,12 @@ export function MailIndexPanel() {
       <div className="mt-3 flex gap-4 text-sm text-muted">
         {otherRows.length > shown && (
           <button onClick={() => setShown((n) => n + 20)} className="hover:text-foreground">
-            Show more ({otherRows.length - shown} left)
+            {t("Show more ({n} left)", { n: otherRows.length - shown })}
           </button>
         )}
         {shown > 20 && (
           <button onClick={() => setShown(20)} className="hover:text-foreground">
-            Show less
+            {t("Show less")}
           </button>
         )}
       </div>

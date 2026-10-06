@@ -10,11 +10,12 @@ import { kindNoun, kindOf, kindTag, SearchCard, SearchForm, type SearchItem } fr
 import { SearchTab } from "@/components/SearchTab";
 import { AddOffer } from "@/components/AddOffer";
 import type { Application, Search } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 // The selected tab lives in the URL (?search=<id>, or ?search=new), so "Back" from an offer returns to it.
 export default function ApplicationsPage() {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+    <Suspense fallback={null}>
       <Applications />
     </Suspense>
   );
@@ -40,6 +41,7 @@ function saveLastTab(id: string) {
 
 function Applications() {
   const { user } = useAuth();
+  const { t } = useI18n();
   // Switching tabs is plain state: changing ?search= in the URL makes Next rebuild the page (reloading
   // the data and losing a tab being renamed). ?search= is only read on arrival (e.g. "Back" from an
   // offer); the last tab is remembered in this browser for the next visit.
@@ -72,7 +74,7 @@ function Applications() {
     };
   }, [user]);
 
-  if (!searches || !apps) return <p className="text-muted">Loading…</p>;
+  if (!searches || !apps) return <p className="text-muted">{t("Loading…")}</p>;
 
   const offersOf = (id: string) =>
     id === OTHER ? apps.filter((a) => !searches.some((s) => s.id === a.searchId)) : apps.filter((a) => a.searchId === id);
@@ -90,10 +92,11 @@ function Applications() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Applications</h1>
+      <h1 className="text-2xl font-semibold">{t("Applications")}</h1>
       <p className="mt-1 text-muted">
-        One tab per search, so each one keeps its own suggestions. Double-click a tab to rename it. BAPTOU searches once
-        a day while a search is active.
+        {t(
+          "One tab per search, so each one keeps its own suggestions. Double-click a tab to rename it. BAPTOU searches once a day while a search is active.",
+        )}
       </p>
 
       <div role="tablist" className="mt-5 flex gap-1 scroll-row border-b border-border">
@@ -103,7 +106,7 @@ function Applications() {
             name={s.name}
             active={current?.id === s.id}
             dimmed={s.status === "stopped" || s.status === "ended"}
-            tag={kindTag(kindOf(s))}
+            tag={kindTag(kindOf(s)) && t(kindTag(kindOf(s))!)}
             badge={offersOf(s.id).filter((a) => a.status === "suggested").length}
             onSelect={() => select(s.id)}
             onRename={(name) => rename(s.id, name)}
@@ -118,7 +121,7 @@ function Applications() {
               showingOther ? "border-accent font-medium text-accent" : "border-transparent text-muted"
             }`}
           >
-            Other
+            {t("Other")}
           </button>
         )}
         <button
@@ -129,7 +132,7 @@ function Applications() {
             creating ? "border-accent font-medium text-accent" : "border-transparent text-muted hover:text-foreground"
           }`}
         >
-          + New search
+          + {t("New search")}
         </button>
       </div>
 
@@ -138,9 +141,9 @@ function Applications() {
           <>
             {tabs.length === 0 && (
               <p className="mb-4 text-muted">
-                Tell BAPTOU what you&apos;re looking for: an internship, a job, an alternance or a master&apos;s
-                programme. Each search gets its own tab, for example one internship starting in November and another
-                starting in April.
+                {t(
+                  "Tell BAPTOU what you're looking for: an internship, a job, an alternance or a master's programme. Each search gets its own tab, for example one internship starting in November and another starting in April.",
+                )}
               </p>
             )}
             <SearchForm
@@ -154,16 +157,20 @@ function Applications() {
         ) : current ? (
           <>
             <SearchCard key={current.id} search={current} />
-            <AddOffer key={`add-${current.id}`} searchId={current.id} noun={kindNoun(kindOf(current))} />
+            <AddOffer key={`add-${current.id}`} searchId={current.id} noun={t(kindNoun(kindOf(current)))} />
             <ApplicationList
               key={`list-${current.id}`}
               apps={offersOf(current.id)}
               lastRun={{ at: current.lastRunAt, batchAt: current.lastBatchAt, summary: current.lastRunSummary }}
-              empty={`No ${kindNoun(kindOf(current))} yet. BAPTOU lists what this search finds here (the first run takes a few minutes).`}
+              empty={t(
+                kindOf(current) === "masters"
+                  ? "No programmes yet. BAPTOU lists what this search finds here (the first run takes a few minutes)."
+                  : "No offers yet. BAPTOU lists what this search finds here (the first run takes a few minutes).",
+              )}
             />
           </>
         ) : (
-          <ApplicationList key="list-other" apps={orphans} empty="Nothing here." />
+          <ApplicationList key="list-other" apps={orphans} empty={t("Nothing here.")} />
         )}
       </div>
     </div>

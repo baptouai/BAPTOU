@@ -6,11 +6,13 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { Profile } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const buildProfile = httpsCallable(functions, "buildProfile", { timeout: 300_000 });
 
 export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
   const { user } = useAuth();
+  const { t, dateTime } = useI18n();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Timestamp | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +32,7 @@ export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
     try {
       await buildProfile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -40,9 +42,11 @@ export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
     <section className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Your profile</h2>
+          <h2 className="text-xl font-semibold">{t("Your profile")}</h2>
           <p className="text-sm text-muted">
-            {updatedAt ? `Built ${updatedAt.toDate().toLocaleString()}` : "BAPTOU reads your documents and summarizes your background."}
+            {updatedAt
+              ? t("Built {date}", { date: dateTime(updatedAt.toDate()) })
+              : t("BAPTOU reads your documents and summarizes your background.")}
           </p>
         </div>
         <button
@@ -50,7 +54,7 @@ export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
           disabled={busy || !hasDocuments}
           className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
         >
-          {busy ? "Reading your documents…" : profile ? "Rebuild profile" : "Build my profile"}
+          {t(busy ? "Reading your documents…" : profile ? "Rebuild profile" : "Build my profile")}
         </button>
       </div>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -61,33 +65,33 @@ export function ProfileSummary({ hasDocuments }: { hasDocuments: boolean }) {
             <p className="text-lg font-medium">{profile.fullName}</p>
             <p className="text-muted">{profile.headline}</p>
           </div>
-          <Block title="Education">
+          <Block title={t("Education")}>
             {profile.education.map((e, i) => (
               <li key={i}>
-                <span className="font-medium">{e.degree} in {e.field}</span>, {e.institution} ({e.country}), {e.startYear}–{e.endYear}
+                <span className="font-medium">{t("{degree} in {field}", { degree: e.degree, field: e.field })}</span>, {e.institution} ({e.country}), {e.startYear}–{e.endYear}
                 {e.grade && <span className="text-muted"> · {e.grade}</span>}
               </li>
             ))}
           </Block>
-          <Block title="Experience">
+          <Block title={t("Experience")}>
             {profile.experience.map((x, i) => (
               <li key={i}>
                 <span className="font-medium">{x.role}</span>, {x.organization} <span className="text-muted">({x.period})</span>
               </li>
             ))}
           </Block>
-          <Tags title="Skills" items={profile.skills} />
-          <Tags title="Languages" items={profile.languages.map((l) => `${l.language} (${l.level})`)} />
-          <Block title="Strengths">{profile.strengths.map((s, i) => <li key={i}>{s}</li>)}</Block>
-          <Block title="Points to address">{profile.gaps.map((s, i) => <li key={i}>{s}</li>)}</Block>
+          <Tags title={t("Skills")} items={profile.skills} />
+          <Tags title={t("Languages")} items={profile.languages.map((l) => `${l.language} (${l.level})`)} />
+          <Block title={t("Strengths")}>{profile.strengths.map((s, i) => <li key={i}>{s}</li>)}</Block>
+          <Block title={t("Points to address")}>{profile.gaps.map((s, i) => <li key={i}>{s}</li>)}</Block>
           {profile.writingStyle && (
             <div>
-              <p className="font-medium">Your writing style</p>
+              <p className="font-medium">{t("Your writing style")}</p>
               <p className="mt-1 text-muted">{profile.writingStyle}</p>
             </div>
           )}
-          <Tags title="Suggested internship roles" items={profile.suggestedTargets.internshipRoles} />
-          <Tags title="Suggested master's fields" items={profile.suggestedTargets.mastersFields} />
+          <Tags title={t("Suggested internship roles")} items={profile.suggestedTargets.internshipRoles} />
+          <Tags title={t("Suggested master's fields")} items={profile.suggestedTargets.mastersFields} />
         </div>
       )}
     </section>

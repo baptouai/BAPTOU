@@ -5,12 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { formatPct, PLANS, refreshPlan, usePlan } from "@/lib/plan";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const createCheckout = httpsCallable<{ plan: string; returnTo: string }, { url: string }>(functions, "createCheckout");
 const billingPortal = httpsCallable<{ returnTo: string }, { url: string }>(functions, "billingPortal");
 const cancelSubscription = httpsCallable<{ undo?: boolean }, { endsAt: number | null }>(functions, "cancelSubscription");
-
-const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
 const KIND_LABEL = {
   owner: "Owner",
@@ -22,7 +21,7 @@ const KIND_LABEL = {
 
 export default function PlansPage() {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+    <Suspense fallback={null}>
       <Plans />
     </Suspense>
   );
@@ -30,6 +29,7 @@ export default function PlansPage() {
 
 function Plans() {
   const checkout = useSearchParams().get("checkout");
+  const { t, date } = useI18n();
   const [reload, setReload] = useState(0);
   const { plan, loading, spentUsd, pctOf } = usePlan(reload);
   const [busy, setBusy] = useState<string | null>(null);
@@ -47,11 +47,11 @@ function Plans() {
   const waiting = checkout === "success" && !loading && !paid && reload < 10;
   useEffect(() => {
     if (!waiting) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       refreshPlan();
       setReload((n) => n + 1);
     }, 2500);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [waiting, reload]);
 
   async function choose(id: string) {
@@ -61,7 +61,7 @@ function Plans() {
       const { data } = await createCheckout({ plan: id, returnTo: window.location.origin });
       window.location.assign(data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
       setBusy(null);
     }
   }
@@ -75,7 +75,7 @@ function Plans() {
       setReload((n) => n + 1);
       setConfirming(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
     } finally {
       setBusy(null);
     }
@@ -88,62 +88,79 @@ function Plans() {
       const { data } = await billingPortal({ returnTo: window.location.origin });
       window.location.assign(data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
       setBusy(null);
     }
   }
 
+  // What the plan line says after the plan's name.
+  const planEnd = !e
+    ? ""
+    : e.endsAt
+      ? t("ends on {date}", { date: date(e.endsAt) })
+      : e.until
+        ? t(e.kind === "pass" || e.kind === "gift" ? "until {date}" : "renews on {date}", { date: date(e.until) })
+        : e.kind === "gift"
+          ? t("no end date")
+          : "";
+
+  const cancelText = !cancelDate
+    ? t("It will end at the end of the current period, and there will be no further payment. You'll get a confirmation by email.")
+    : committedUntil
+      ? t(
+          "It will end on {date}. You keep full access until then. Your yearly plan is committed for 12 months: the monthly payments until that date are still due, and there is none after it. You'll get a confirmation by email.",
+          { date: date(cancelDate) },
+        )
+      : t("It will end on {date}. You keep full access until then, and there will be no further payment. You'll get a confirmation by email.", {
+          date: date(cancelDate),
+        });
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Plans</h1>
+      <h1 className="text-2xl font-semibold">{t("Plans")}</h1>
       <p className="mt-1 text-muted">
-        Every plan includes everything in BAPTOU and the same monthly allowance for its AI work (searches, letters,
-        forms, answers). It renews on the 1st of each month.
+        {t(
+          "Every plan includes everything in BAPTOU and the same monthly allowance for its AI work (searches, letters, forms, answers). It renews on the 1st of each month.",
+        )}
       </p>
 
       {checkout === "success" && (
         <p className="mt-4 rounded-lg border border-green-600/40 bg-green-600/10 p-3 text-sm">
-          {paid ? "Payment received. Your plan is active. Welcome to BAPTOU!" : "Payment received. Activating your plan…"}
+          {t(paid ? "Payment received. Your plan is active. Welcome to BAPTOU!" : "Payment received. Activating your plan…")}
         </p>
       )}
       {checkout === "cancelled" && (
-        <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted">Payment cancelled. Nothing was charged.</p>
+        <p className="mt-4 rounded-lg border border-border p-3 text-sm text-muted">{t("Payment cancelled. Nothing was charged.")}</p>
       )}
 
       <section className="mt-6 rounded-xl border border-card-edge bg-card p-5 text-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-medium">Your plan</h2>
+            <h2 className="font-medium">{t("Your plan")}</h2>
             {loading ? (
-              <p className="mt-1 text-muted">Loading…</p>
+              <p className="mt-1 text-muted">{t("Loading…")}</p>
             ) : e ? (
               <div className="mt-1 grid gap-1">
                 <p>
-                  <span className="font-medium">{KIND_LABEL[e.kind]}</span>
-                  <span className="text-muted">
-                    {e.endsAt
-                      ? ` · ends on ${day(e.endsAt)}`
-                      : e.until
-                        ? ` · ${e.kind === "pass" || e.kind === "gift" ? "until" : "renews on"} ${day(e.until)}`
-                        : e.kind === "gift"
-                          ? " · no end date"
-                          : ""}
-                  </span>
+                  <span className="font-medium">{t(KIND_LABEL[e.kind])}</span>
+                  {planEnd && <span className="text-muted"> · {planEnd}</span>}
                 </p>
-                <p className="text-muted">{formatPct(pctOf(spentUsd))} of this month&apos;s allowance used.</p>
+                <p className="text-muted">{t("{pct} of this month's allowance used.", { pct: formatPct(pctOf(spentUsd)) })}</p>
               </div>
             ) : (
-              <p className="mt-1 text-muted">You don&apos;t have a plan yet. Choose one below to use BAPTOU&apos;s AI features.</p>
+              <p className="mt-1 text-muted">{t("You don't have a plan yet. Choose one below to use BAPTOU's AI features.")}</p>
             )}
           </div>
           {paid && e?.kind !== "pass" && (
             <button onClick={manage} disabled={!!busy} className="rounded-lg border border-border px-4 py-2 disabled:opacity-50">
-              {busy === "portal" ? "Opening…" : "Payment method & invoices"}
+              {t(busy === "portal" ? "Opening…" : "Payment method & invoices")}
             </button>
           )}
         </div>
         {committedUntil && !e?.endsAt && (
-          <p className="mt-2 text-xs text-muted">The yearly plan is committed for 12 months, until {day(committedUntil)}.</p>
+          <p className="mt-2 text-xs text-muted">
+            {t("The yearly plan is committed for 12 months, until {date}.", { date: date(committedUntil) })}
+          </p>
         )}
 
         {subscribed && (
@@ -151,34 +168,30 @@ function Plans() {
             {e?.endsAt ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-muted">
-                  You cancelled your subscription. You keep full access until {day(e.endsAt)}, with no payment after that.
+                  {t("You cancelled your subscription. You keep full access until {date}, with no payment after that.", {
+                    date: date(e.endsAt),
+                  })}
                 </p>
                 <button onClick={() => cancel(true)} disabled={!!busy} className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50">
-                  {busy === "undo" ? "Saving…" : "Keep my subscription"}
+                  {t(busy === "undo" ? "Saving…" : "Keep my subscription")}
                 </button>
               </div>
             ) : confirming ? (
               <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
-                <p className="font-medium">Cancel your subscription?</p>
-                <p className="mt-1 text-muted">
-                  {cancelDate ? `It will end on ${day(cancelDate)}. You keep full access until then` : "It will end at the end of the current period"}
-                  {committedUntil
-                    ? ". Your yearly plan is committed for 12 months: the monthly payments until that date are still due, and there is none after it."
-                    : ", and there will be no further payment."}{" "}
-                  You&apos;ll get a confirmation by email.
-                </p>
+                <p className="font-medium">{t("Cancel your subscription?")}</p>
+                <p className="mt-1 text-muted">{cancelText}</p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <button onClick={() => cancel(false)} disabled={!!busy} className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white disabled:opacity-50">
-                    {busy === "cancel" ? "Cancelling…" : "Confirm cancellation"}
+                    {t(busy === "cancel" ? "Cancelling…" : "Confirm cancellation")}
                   </button>
                   <button onClick={() => setConfirming(false)} disabled={!!busy} className="rounded-lg border border-border px-4 py-2 disabled:opacity-50">
-                    Keep my subscription
+                    {t("Keep my subscription")}
                   </button>
                 </div>
               </div>
             ) : (
               <button onClick={() => setConfirming(true)} className="text-muted underline-offset-2 hover:text-foreground hover:underline">
-                Cancel subscription
+                {t("Cancel subscription")}
               </button>
             )}
           </div>
@@ -196,25 +209,25 @@ function Plans() {
                 className={`flex flex-col rounded-xl border bg-card p-5 ${p.id === "annual" ? "border-accent" : "border-card-edge"}`}
               >
                 {p.id === "annual" && (
-                  <span className="mb-2 w-fit rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Best price</span>
+                  <span className="mb-2 w-fit rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{t("Best price")}</span>
                 )}
-                <h2 className="font-medium">{p.name}</h2>
+                <h2 className="font-medium">{t(p.name)}</h2>
                 <p className="mt-2">
-                  <span className="text-3xl font-semibold">{p.price}</span> <span className="text-sm text-muted">{p.per}</span>
+                  <span className="text-3xl font-semibold">{p.price}</span> <span className="text-sm text-muted">{t(p.per)}</span>
                 </p>
-                <p className="mt-2 flex-1 text-sm text-muted">{p.detail}</p>
+                <p className="mt-2 flex-1 text-sm text-muted">{t(p.detail)}</p>
                 <button
                   onClick={() => choose(p.id)}
                   disabled={!!busy}
                   className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {busy === p.id ? "Opening payment…" : `Choose ${p.name.toLowerCase()}`}
+                  {t(busy === p.id ? "Opening payment…" : "Choose this plan")}
                 </button>
               </section>
             ))}
           </div>
           <p className="mt-3 text-xs text-muted">
-            Prices include all taxes. Payments are handled by Stripe; BAPTOU never sees your card details.
+            {t("Prices include all taxes. Payments are handled by Stripe; BAPTOU never sees your card details.")}
           </p>
         </>
       )}

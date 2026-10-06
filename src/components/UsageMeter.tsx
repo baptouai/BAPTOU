@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatPct, usePlan } from "@/lib/plan";
+import { useI18n } from "@/lib/i18n";
 
 // Fixed order and color per task (colors follow the task, never its rank). Colors live in globals.css.
 const TASKS = [
@@ -27,6 +28,7 @@ export function UsageMeter() {
  */
 export function UsageBar({ spent, limit, byTask }: { spent: number; limit: number; byTask?: Record<string, number> }) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const { t } = useI18n();
   const pct = (usd: number) => (limit > 0 ? (usd / limit) * 100 : 0);
 
   const tracked = TASKS.map((t) => ({ ...t, usd: byTask?.[t.id] ?? 0 }));
@@ -43,14 +45,14 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
   return (
     <div className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="font-medium">Your allowance this month</p>
+        <p className="font-medium">{t("Your allowance this month")}</p>
         <p className="text-muted">
           {used >= 100 ? (
-            <span className="font-medium text-red-600 dark:text-red-400">100% used</span>
+            <span className="font-medium text-red-600 dark:text-red-400">{t("100% used")}</span>
           ) : (
             <>
-              <span className="font-medium text-foreground">{formatPct(used)}</span> used ·{" "}
-              {formatPct(Math.max(0, 100 - used))} left
+              <span className="font-medium text-foreground">{formatPct(used)}</span> {t("used")} ·{" "}
+              {formatPct(Math.max(0, 100 - used))} {t("left")}
             </>
           )}
         </p>
@@ -59,12 +61,12 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
       <div
         className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-full bg-border"
         role="img"
-        aria-label={`${formatPct(used)} of this month's allowance used`}
+        aria-label={t("{pct} of this month's allowance used", { pct: formatPct(used) })}
       >
         {segments.map((s) => (
           <div
             key={s.id}
-            title={`${s.label}: ${formatPct(pct(s.usd))} of your allowance`}
+            title={t("{task}: {pct} of your allowance", { task: t(s.label), pct: formatPct(pct(s.usd)) })}
             onMouseEnter={() => setHovered(s.id)}
             onMouseLeave={() => setHovered(null)}
             className={`h-full first:rounded-l-full transition-opacity ${hovered && hovered !== s.id ? "opacity-40" : ""}`}
@@ -84,17 +86,17 @@ export function UsageBar({ spent, limit, byTask }: { spent: number; limit: numbe
               className="flex items-center gap-2"
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: `var(--task-${s.id})` }} />
-              <span className="flex-1 truncate">{s.label}</span>
+              <span className="flex-1 truncate">{t(s.label)}</span>
               <span className="w-12 text-right tabular-nums">{formatPct(pct(s.usd))}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-muted">Nothing used yet this month.</p>
+        <p className="mt-3 text-sm text-muted">{t("Nothing used yet this month.")}</p>
       )}
 
       <p className="mt-3 text-xs text-muted">
-        Percentages are shares of your monthly allowance. It renews on the 1st of each month.
+        {t("Percentages are shares of your monthly allowance. It renews on the 1st of each month.")}
       </p>
     </div>
   );

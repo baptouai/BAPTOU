@@ -24,20 +24,37 @@ export const commitmentReminders = onSchedule(
       if (left <= 0 || left > NOTICE_DAYS * DAY) continue;
       if (doc.get("commitmentReminder.for") === end) continue; // already told for this commitment
 
-      const ok = await emailUser(doc.id, {
-        subject: `Your BAPTOU yearly commitment ends on ${longDate(end)}`,
-        body: `Hi,
+      const ok = await emailUser(doc.id, (lang) =>
+        lang === "fr"
+          ? {
+              subject: `Votre engagement annuel BAPTOU se termine le ${longDate(end, lang)}`,
+              body: `Bonjour,
 
-Your 12-month commitment for the yearly BAPTOU plan ends on ${longDate(end)}.
+L'engagement de 12 mois de votre formule annuelle BAPTOU se termine le ${longDate(end, lang)}.
+
+Et ensuite :
+- Si vous ne faites rien, votre formule continue mois par mois au même prix mensuel, et vous pouvez la résilier à tout moment.
+- Si vous ne souhaitez pas la poursuivre, résiliez-la depuis la page Formules avant le ${longDate(end, lang)} : elle prendra fin à cette date, sans paiement ensuite.
+
+Page Formules : ${APP_URL}/plans
+
+BAPTOU`,
+            }
+          : {
+              subject: `Your BAPTOU yearly commitment ends on ${longDate(end, lang)}`,
+              body: `Hi,
+
+Your 12-month commitment for the yearly BAPTOU plan ends on ${longDate(end, lang)}.
 
 What happens next:
 - If you do nothing, your plan continues month by month at the same monthly price, and you can cancel it at any time.
-- If you don't want it to continue, cancel it from the Plans page before ${longDate(end)}: it will end on that date, with no payment after it.
+- If you don't want it to continue, cancel it from the Plans page before ${longDate(end, lang)}: it will end on that date, with no payment after it.
 
 Plans page: ${APP_URL}/plans
 
 BAPTOU`,
-      });
+            },
+      );
       if (ok) {
         await doc.ref.set({ commitmentReminder: { for: end, sentAt: FieldValue.serverTimestamp() } }, { merge: true });
         sent++;

@@ -12,6 +12,7 @@ import { ProfileSummary } from "@/components/ProfileSummary";
 import { GmailConnect } from "@/components/GmailConnect";
 import { Nationalities } from "@/components/Nationalities";
 import { AccountSettings } from "@/components/AccountSettings";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const kinds: { value: DocumentKind; label: string }[] = [
   { value: "cv", label: "CV" },
@@ -29,6 +30,7 @@ export default function ProfilePage() {
   const [kind, setKind] = useState<DocumentKind>("cv");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -44,7 +46,7 @@ export default function ProfilePage() {
     setBusy(true);
     try {
       for (const file of Array.from(files)) {
-        if (file.size > MAX_BYTES) throw new Error(`${file.name} is larger than 10 MB`);
+        if (file.size > MAX_BYTES) throw new Error(t("{file} is larger than 10 MB", { file: file.name }));
         const storagePath = `users/${user.uid}/documents/${crypto.randomUUID()}-${file.name}`;
         await uploadBytes(ref(storage, storagePath), file, { contentType: file.type });
         await addDoc(collection(db, "users", user.uid, "documents"), {
@@ -57,7 +59,7 @@ export default function ProfilePage() {
         });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      setError(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -71,10 +73,8 @@ export default function ProfilePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Your documents</h1>
-      <p className="mt-1 text-muted">
-        BAPTOU uses these to understand your background and to write letters in your style.
-      </p>
+      <h1 className="text-2xl font-semibold">{t("Your documents")}</h1>
+      <p className="mt-1 text-muted">{t("BAPTOU uses these to understand your background and to write letters in your style.")}</p>
 
       <div className="mt-6 flex flex-col gap-3 rounded-xl border border-card-edge bg-card p-5 sm:flex-row sm:items-center">
         <select
@@ -83,11 +83,11 @@ export default function ProfilePage() {
           className="rounded-lg border border-border bg-background px-3 py-2"
         >
           {kinds.map((k) => (
-            <option key={k.value} value={k.value}>{k.label}</option>
+            <option key={k.value} value={k.value}>{t(k.label)}</option>
           ))}
         </select>
         <label className="cursor-pointer rounded-lg bg-accent px-4 py-2 text-center font-medium text-white">
-          {busy ? "Uploading…" : "Upload PDF / Word"}
+          {busy ? t("Uploading…") : t("Upload PDF / Word")}
           <input
             type="file"
             multiple
@@ -101,14 +101,14 @@ export default function ProfilePage() {
       </div>
 
       <ul className="mt-6 divide-y divide-border rounded-xl border border-card-edge bg-card">
-        {docs.length === 0 && <li className="p-5 text-muted">No documents yet.</li>}
+        {docs.length === 0 && <li className="p-5 text-muted">{t("No documents yet.")}</li>}
         {docs.map((d) => (
           <li key={d.id} className="flex items-center justify-between gap-4 p-4">
             <div className="min-w-0">
               <p className="truncate font-medium">{d.fileName}</p>
-              <p className="text-sm text-muted">{kinds.find((k) => k.value === d.kind)?.label}</p>
+              <p className="text-sm text-muted">{t(kinds.find((k) => k.value === d.kind)?.label ?? "Other")}</p>
             </div>
-            <button onClick={() => remove(d)} className="text-sm text-red-600">Delete</button>
+            <button onClick={() => remove(d)} className="text-sm text-red-600">{t("Delete")}</button>
           </li>
         ))}
       </ul>

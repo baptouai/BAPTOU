@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const REASONS = [
   "Wrong location",
@@ -18,21 +19,24 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="rounded-lg px-4 py-2 text-muted">
-        Not for me
+        {t("Not for me")}
       </button>
     );
   }
 
-  const reason = [...picked, details.trim()].filter(Boolean).join(". ");
+  const reason = [...picked.map((r) => t(r)), details.trim()].filter(Boolean).join(". ");
   const toggle = (r: string) => setPicked((p) => (p.includes(r) ? p.filter((x) => x !== r) : [...p, r]));
 
   return (
     <div className="grid w-full gap-3 rounded-lg border border-border p-4">
-      <p className="text-sm font-medium">Why isn&apos;t it for you? The offer will be deleted and never suggested again, and BAPTOU will avoid similar ones.</p>
+      <p className="text-sm font-medium">
+        {t("Why isn't it for you? The offer will be deleted and never suggested again, and BAPTOU will avoid similar ones.")}
+      </p>
       <div className="flex flex-wrap gap-2">
         {REASONS.map((r) => (
           <button
@@ -41,7 +45,7 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
             onClick={() => toggle(r)}
             className={`rounded-full border px-3 py-1 text-sm ${picked.includes(r) ? "border-accent bg-accent/10 text-accent" : "border-border"}`}
           >
-            {r}
+            {t(r)}
           </button>
         ))}
       </div>
@@ -49,7 +53,7 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
         value={details}
         onChange={(e) => setDetails(e.target.value)}
         rows={2}
-        placeholder="Details (optional), e.g. I want to stay in finance, not audit"
+        placeholder={t("Details (optional), e.g. I want to stay in finance, not audit")}
         className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
       />
       <div className="flex gap-2">
@@ -61,17 +65,17 @@ export function DismissForm({ onDismiss }: { onDismiss: (reason: string) => Prom
             try {
               await onDismiss(reason);
             } catch (e) {
-              setError(e instanceof Error ? e.message : "Something went wrong");
+              setError(errorText(e, t));
             } finally {
               setBusy(false);
             }
           }}
           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {busy ? "Deleting…" : "Dismiss this offer"}
+          {t(busy ? "Deleting…" : "Dismiss this offer")}
         </button>
         <button onClick={() => setOpen(false)} className="rounded-lg px-4 py-2 text-sm text-muted">
-          Cancel
+          {t("Cancel")}
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -8,6 +8,7 @@ import { db, functions, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const fitApplicationLimits = httpsCallable<{ applicationId: string }, { letter: string }>(
   functions,
@@ -59,6 +60,7 @@ export function ApplicationFormView({
   const [docs, setDocs] = useState<(UploadedDocument & { id: string })[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   // Take the server's version when BAPTOU (re)prepares the form.
   const preparedAt = form?.preparedAt?.toMillis();
@@ -82,7 +84,7 @@ export function ApplicationFormView({
       const { data } = await prepareApplication({ applicationId, ...(formText ? { formText } : {}) });
       if (data) setLocal(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -94,13 +96,11 @@ export function ApplicationFormView({
   useEffect(() => {
     if (!autoPrepare || form || status || autoStarted.current) return;
     autoStarted.current = true;
-    prepareApplication({ applicationId }).catch((e) =>
-      setError(e instanceof Error ? e.message : "Something went wrong"),
-    );
-  }, [autoPrepare, form, status, applicationId]);
+    prepareApplication({ applicationId }).catch((e) => setError(errorText(e, t)));
+  }, [autoPrepare, form, status, applicationId, t]);
 
   const preparing = busy || status === "preparing";
-  const shownError = error ?? (status === "error" ? statusError : undefined);
+  const shownError = error ?? (status === "error" && statusError ? t(statusError) : undefined);
 
   function updateField(si: number, fi: number, patch: Partial<FormField>) {
     if (!local) return;
@@ -133,7 +133,7 @@ export function ApplicationFormView({
       const { data } = await fitApplicationLimits({ applicationId });
       onLetterFitted?.(data.letter);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     } finally {
       setFitting(false);
     }
@@ -143,17 +143,17 @@ export function ApplicationFormView({
     <section className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-medium">Application form</h2>
+          <h2 className="font-medium">{t("Application form")}</h2>
           <p className="mt-1 text-sm text-muted">
             {local
-              ? `${local.platform} · ${
+              ? `${local.platform} · ${t(
                   local.source === "pasted"
                     ? "fields from the form you pasted"
                     : local.seenOnForm
                       ? "fields read from the real form"
-                      : "estimated: BAPTOU couldn't see the real form"
-                }`
-              : "BAPTOU opens the application page and prepares every field in the organization's format."}
+                      : "estimated: BAPTOU couldn't see the real form",
+                )}`
+              : t("BAPTOU opens the application page and prepares every field in the organization's format.")}
           </p>
         </div>
         <button
@@ -161,25 +161,27 @@ export function ApplicationFormView({
           disabled={preparing}
           className={local ? "rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50" : "rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"}
         >
-          {preparing
-            ? "Reading the form… (1–3 min)"
-            : local
-              ? "Prepare again"
-              : status === "error"
-                ? "Try again"
-                : "Prepare this application"}
+          {t(
+            preparing
+              ? "Reading the form… (1–3 min)"
+              : local
+                ? "Prepare again"
+                : status === "error"
+                  ? "Try again"
+                  : "Prepare this application",
+          )}
         </button>
       </div>
       {shownError && <p className="mt-2 text-sm text-red-600">{shownError}</p>}
       {preparing && !local && (
         <p className="mt-4 animate-pulse rounded-lg bg-accent/10 p-3 text-sm">
-          BAPTOU is opening the application page and reading the form. You can keep reading the offer meanwhile.
+          {t("BAPTOU is opening the application page and reading the form. You can keep reading the offer meanwhile.")}
         </p>
       )}
       {!local && !preparing && (
         <PasteForm
           collapsed
-          intro="Some careers sites only show the form after you sign in or confirm your email. If that's the case, sign in there, then paste the form here."
+          intro={t("Some careers sites only show the form after you sign in or confirm your email. If that's the case, sign in there, then paste the form here.")}
           onSubmit={prepare}
         />
       )}
@@ -190,31 +192,33 @@ export function ApplicationFormView({
           {local.source !== "pasted" && (!local.seenOnForm || local.loginRequired) ? (
             <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-800 dark:text-amber-300">
-                {local.loginRequired
-                  ? "This careers site asks you to sign in or confirm your email before it shows the form."
-                  : "BAPTOU couldn't see the real form."}{" "}
-                The fields below are what this platform usually asks, not the exact form.
+                {t(
+                  local.loginRequired
+                    ? "This careers site asks you to sign in or confirm your email before it shows the form."
+                    : "BAPTOU couldn't see the real form.",
+                )}{" "}
+                {t("The fields below are what this platform usually asks, not the exact form.")}
               </p>
               <PasteForm
-                intro="To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here."
+                intro={t("To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.")}
                 formUrl={local.formUrl}
                 onSubmit={prepare}
               />
             </div>
           ) : (
-            <PasteForm collapsed intro="The real form looks different? Paste it here and BAPTOU will follow it exactly." onSubmit={prepare} />
+            <PasteForm collapsed intro={t("The real form looks different? Paste it here and BAPTOU will follow it exactly.")} onSubmit={prepare} />
           )}
           {overLimit > 0 && (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm">
               <p className="text-red-700 dark:text-red-300">
-                {overLimit} answer{overLimit > 1 ? "s are" : " is"} longer than the form allows.
+                {t(overLimit > 1 ? "{n} answers are longer than the form allows." : "{n} answer is longer than the form allows.", { n: overLimit })}
               </p>
               <button
                 onClick={fitLimits}
                 disabled={fitting}
                 className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white disabled:opacity-50"
               >
-                {fitting ? "Shortening…" : "Fit to the limits"}
+                {t(fitting ? "Shortening…" : "Fit to the limits")}
               </button>
             </div>
           )}
@@ -252,7 +256,7 @@ export function ApplicationFormView({
           {routine.length > 0 && (
             <details className="mt-6 rounded-lg border border-border p-3 text-sm">
               <summary className="cursor-pointer text-muted">
-                Also on the form, quick to fill in yourself ({routine.length}):{" "}
+                {t("Also on the form, quick to fill in yourself ({n}):", { n: routine.length })}{" "}
                 {routine
                   .slice(0, 4)
                   .map((f) => f.label.replace(/\s*\(.*\)$/, ""))
@@ -277,7 +281,7 @@ export function ApplicationFormView({
             rel="noopener noreferrer"
             className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 font-medium text-white"
           >
-            Open the application form ↗
+            {t("Open the application form")} ↗
           </a>
         </>
       )}
@@ -303,11 +307,12 @@ function PasteForm({
   const [open, setOpen] = useState(!collapsed);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const { t } = useI18n();
 
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="mt-3 text-sm text-muted underline">
-        Paste the real application form
+        {t("Paste the real application form")}
       </button>
     );
   }
@@ -317,7 +322,7 @@ function PasteForm({
         {intro}{" "}
         {formUrl && (
           <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-accent">
-            Open the form ↗
+            {t("Open the form")} ↗
           </a>
         )}
       </p>
@@ -326,7 +331,7 @@ function PasteForm({
         onChange={(e) => setText(e.target.value)}
         rows={5}
         disabled={busy}
-        placeholder="Paste the whole form page here"
+        placeholder={t("Paste the whole form page here")}
         className="rounded-lg border border-border bg-background p-3 text-sm"
       />
       <div className="flex gap-2">
@@ -340,11 +345,11 @@ function PasteForm({
           disabled={busy || text.trim().length < 40}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {busy ? "Reading your form… (about 1 min)" : "Use this form"}
+          {t(busy ? "Reading your form… (about 1 min)" : "Use this form")}
         </button>
         {collapsed && (
           <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted">
-            Cancel
+            {t("Cancel")}
           </button>
         )}
       </div>
@@ -368,23 +373,24 @@ function Checklist({
   docs: (UploadedDocument & { id: string })[];
   letter: string;
 }) {
+  const { t } = useI18n();
   const files = fields
     .filter((f) => f.kind === "file" && f.suggestedDocument !== "none")
     .map((f) => {
       const ready =
         (f.suggestedDocument === "motivation_letter" && !!letter) || docs.some((d) => d.kind === f.suggestedDocument);
       const hint = ready
-        ? docLabel[f.suggestedDocument]
+        ? t(docLabel[f.suggestedDocument])
         : f.suggestedDocument === "motivation_letter"
-          ? "Write the letter below"
-          : `Upload your ${docLabel[f.suggestedDocument].toLowerCase()} on the Profile page`;
+          ? t("Write the letter below")
+          : t("Upload it on the Profile page ({doc})", { doc: t(docLabel[f.suggestedDocument]) });
       return { label: f.label, required: f.required, ready, hint };
     });
   if (!files.length) return null;
 
   return (
     <div className="mt-4 rounded-lg border border-border p-4">
-      <ChecklistColumn title="Files to attach" items={files} empty="No files requested." />
+      <ChecklistColumn title={t("Files to attach")} items={files} empty={t("No files requested.")} />
     </div>
   );
 }
@@ -426,6 +432,7 @@ function FieldView({
   title: string;
   onChange: (patch: Partial<FormField>) => void;
 }) {
+  const { t } = useI18n();
   const header = (
     <div className="flex flex-wrap items-center gap-2">
       <p className="text-sm font-medium">
@@ -433,7 +440,7 @@ function FieldView({
         {field.required && <span className="text-red-600"> *</span>}
       </p>
       {field.needsUser && (
-        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">Your answer</span>
+        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">{t("Your answer")}</span>
       )}
     </div>
   );
@@ -448,23 +455,23 @@ function FieldView({
           {letter ? (
             <p className="line-clamp-4 whitespace-pre-wrap text-muted">{letter}</p>
           ) : (
-            <p className="text-muted">No letter yet. Write it in the Motivation letter section below.</p>
+            <p className="text-muted">{t("No letter yet. Write it in the Motivation letter section below.")}</p>
           )}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           <a href="#letter" className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
-            Edit the letter ↓
+            {t("Edit the letter")} ↓
           </a>
           {letter && field.kind === "file" && (
             <button onClick={() => printLetter(letter, title)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-              Save as PDF to attach
+              {t("Save as PDF to attach")}
             </button>
           )}
           {letter && field.kind !== "file" && <CopyButton text={letter} />}
         </div>
         {field.charLimit > 0 && letter && (
           <p className={`mt-1 text-xs ${letter.length > field.charLimit ? "text-red-600" : "text-muted"}`}>
-            {letter.length} / {field.charLimit} characters
+            {t("{n} / {max} characters", { n: letter.length, max: field.charLimit })}
           </p>
         )}
         {note}
@@ -481,7 +488,7 @@ function FieldView({
         <div className="mt-2 flex flex-wrap gap-2">
           {isLetter && letter && (
             <button onClick={() => printLetter(letter, title)} className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
-              Save this application&apos;s letter as PDF
+              {t("Save this application's letter as PDF")}
             </button>
           )}
           {matches.map((d) => (
@@ -495,7 +502,9 @@ function FieldView({
           ))}
           {!matches.length && !(isLetter && letter) && (
             <p className="text-sm text-muted">
-              {field.suggestedDocument === "none" ? "Nothing to attach." : `Upload your ${field.suggestedDocument.replace("_", " ")} on the Profile page.`}
+              {field.suggestedDocument === "none"
+                ? t("Nothing to attach.")
+                : t("Upload it on the Profile page ({doc}).", { doc: t(docLabel[field.suggestedDocument] ?? "Other document") })}
             </p>
           )}
         </div>
@@ -524,7 +533,9 @@ function FieldView({
     <div>
       {header}
       {(field.kind === "choice" || field.kind === "yes_no") && field.options.length > 0 && (
-        <p className="mt-1 text-xs text-muted">Options: {field.options.join(" · ")}</p>
+        <p className="mt-1 text-xs text-muted">
+          {t("Options:")} {field.options.join(" · ")}
+        </p>
       )}
       {/* Long answers get the full width on a phone, with Copy underneath. */}
       <div className={`mt-2 flex gap-2 ${long ? "flex-col sm:flex-row" : ""}`}>
@@ -534,7 +545,7 @@ function FieldView({
             onChange={(e) => onChange({ value: e.target.value })}
             maxLength={field.charLimit > 0 ? field.charLimit : undefined}
             rows={6}
-            placeholder={field.needsUser ? "Only you can answer this" : ""}
+            placeholder={field.needsUser ? t("Only you can answer this") : ""}
             className="flex-1 rounded-lg border border-border bg-background p-3 text-sm leading-relaxed"
           />
         ) : (
@@ -542,7 +553,7 @@ function FieldView({
             value={field.value}
             onChange={(e) => onChange({ value: e.target.value })}
             maxLength={field.charLimit > 0 ? field.charLimit : undefined}
-            placeholder={field.needsUser ? "Only you can answer this" : ""}
+            placeholder={field.needsUser ? t("Only you can answer this") : ""}
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
         )}
@@ -550,7 +561,7 @@ function FieldView({
       </div>
       {field.charLimit > 0 && (
         <p className={`mt-1 text-xs ${over ? "text-red-600" : "text-muted"}`}>
-          {field.value.length} / {field.charLimit} characters
+          {t("{n} / {max} characters", { n: field.value.length, max: field.charLimit })}
         </p>
       )}
       {note}
@@ -559,12 +570,13 @@ function FieldView({
 }
 
 function EntryCard({ entry }: { entry: FormEntry }) {
+  const { t } = useI18n();
   const rows: [string, string][] = [
     ["Title", entry.title],
     ["Organization", entry.organization],
     ["Location", entry.location],
     ["From", entry.startDate],
-    ["To", entry.endDate],
+    ["Until", entry.endDate],
     ["Description", entry.description],
   ];
   return (
@@ -576,7 +588,7 @@ function EntryCard({ entry }: { entry: FormEntry }) {
           k === "Description" || v.length > 80 ? (
             <div key={k} className="py-1">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-muted">{k}</span>
+                <span className="text-muted">{t(k)}</span>
                 <CopyButton text={v} />
               </div>
               <p className="mt-1 whitespace-pre-wrap">{v}</p>
@@ -584,7 +596,7 @@ function EntryCard({ entry }: { entry: FormEntry }) {
           ) : (
             <div key={k} className="flex items-start justify-between gap-3 py-0.5">
               <p className="min-w-0 [overflow-wrap:anywhere]">
-                <span className="text-muted">{k}: </span>
+                <span className="text-muted">{t(k)}: </span>
                 <span className="whitespace-pre-wrap">{v}</span>
               </p>
               <CopyButton text={v} />
@@ -597,6 +609,7 @@ function EntryCard({ entry }: { entry: FormEntry }) {
 
 function CopyButton({ text, className = "" }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
+  const { t } = useI18n();
   return (
     <button
       onClick={async () => {
@@ -607,7 +620,7 @@ function CopyButton({ text, className = "" }: { text: string; className?: string
       disabled={!text}
       className={`h-fit shrink-0 rounded-lg border border-border px-2 py-1 text-xs disabled:opacity-40 ${className}`}
     >
-      {copied ? "Copied" : "Copy"}
+      {t(copied ? "Copied" : "Copy")}
     </button>
   );
 }

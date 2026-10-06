@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * One search tab. Click selects it; double-click turns the name into a field (Enter or leaving it saves,
@@ -23,6 +24,7 @@ export function SearchTab({
   onSelect: () => void;
   onRename: (name: string) => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
 
   function finish(save: boolean) {
@@ -44,7 +46,7 @@ export function SearchTab({
           if (e.key === "Enter") finish(true);
           if (e.key === "Escape") finish(false);
         }}
-        aria-label="Tab name"
+        aria-label={t("Tab name")}
         className="-mb-px w-52 border-b-2 border-accent bg-transparent px-4 py-2.5 text-sm font-medium outline-none"
       />
     );
@@ -57,7 +59,7 @@ export function SearchTab({
       aria-selected={active}
       onClick={onSelect}
       onDoubleClick={() => setDraft(name)}
-      title="Double-click to rename"
+      title={t("Double-click to rename")}
       className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm ${
         active ? "border-accent font-medium text-accent" : "border-transparent text-muted hover:text-foreground"
       } ${dimmed ? "opacity-60" : ""}`}
@@ -65,7 +67,7 @@ export function SearchTab({
       {name}
       {tag && <span className="rounded border border-border px-1 text-[10px] uppercase">{tag}</span>}
       {badge > 0 && (
-        <span className="rounded-full bg-accent px-1.5 text-xs font-medium text-white" title={`${badge} to review`}>
+        <span className="rounded-full bg-accent px-1.5 text-xs font-medium text-white" title={t("{n} to review", { n: badge })}>
           {badge}
         </span>
       )}

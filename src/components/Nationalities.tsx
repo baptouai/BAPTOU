@@ -4,8 +4,19 @@ import { useEffect, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 
 // Suggestions only: any text can be added (e.g. a nationality missing from this list).
+const SUGGESTIONS_FR = [
+  "Algérienne", "Allemande", "Américaine", "Argentine", "Australienne", "Autrichienne", "Belge", "Brésilienne",
+  "Britannique", "Bulgare", "Camerounaise", "Canadienne", "Chilienne", "Chinoise", "Chypriote", "Colombienne",
+  "Coréenne", "Croate", "Danoise", "Égyptienne", "Espagnole", "Estonienne", "Finlandaise", "Française", "Grecque",
+  "Hongroise", "Indienne", "Indonésienne", "Irlandaise", "Islandaise", "Israélienne", "Italienne", "Ivoirienne",
+  "Japonaise", "Lettone", "Libanaise", "Lituanienne", "Luxembourgeoise", "Malaisienne", "Maltaise", "Marocaine",
+  "Mexicaine", "Néerlandaise", "Néo-zélandaise", "Nigériane", "Norvégienne", "Pakistanaise", "Péruvienne",
+  "Polonaise", "Portugaise", "Roumaine", "Russe", "Saoudienne", "Sénégalaise", "Singapourienne", "Slovaque",
+  "Slovène", "Sud-africaine", "Suédoise", "Suisse", "Tchèque", "Tunisienne", "Turque", "Ukrainienne", "Vietnamienne",
+];
 const SUGGESTIONS = [
   "Algerian", "American", "Argentinian", "Australian", "Austrian", "Belgian", "Brazilian", "British", "Bulgarian",
   "Cameroonian", "Canadian", "Chilean", "Chinese", "Colombian", "Croatian", "Cypriot", "Czech", "Danish", "Dutch",
@@ -21,6 +32,8 @@ export function Nationalities() {
   const { user } = useAuth();
   const [list, setList] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const { t, lang } = useI18n();
+  const suggestions = lang === "fr" ? SUGGESTIONS_FR : SUGGESTIONS;
 
   useEffect(() => {
     if (!user) return;
@@ -32,7 +45,7 @@ export function Nationalities() {
     if (!user || !value) return;
     setDraft("");
     // Same spelling as the suggestion when it matches one, ignoring case ("british" -> "British").
-    const name = SUGGESTIONS.find((s) => s.toLowerCase() === value.toLowerCase()) ?? value;
+    const name = suggestions.find((s) => s.toLowerCase() === value.toLowerCase()) ?? value;
     if (list.some((n) => n.toLowerCase() === name.toLowerCase())) return;
     await setDoc(doc(db, "users", user.uid), { nationalities: arrayUnion(name) }, { merge: true });
   }
@@ -44,9 +57,9 @@ export function Nationalities() {
 
   return (
     <section className="mt-8 rounded-xl border border-card-edge bg-card p-5">
-      <h2 className="text-xl font-semibold">Nationalities</h2>
+      <h2 className="text-xl font-semibold">{t("Nationalities")}</h2>
       <p className="mt-1 text-sm text-muted">
-        BAPTOU uses them for work permits, visa questions on application forms, and tuition fees for master&apos;s programmes.
+        {t("BAPTOU uses them for work permits, visa questions on application forms, and tuition fees for master's programmes.")}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -55,7 +68,7 @@ export function Nationalities() {
             {n}
             <button
               onClick={() => remove(n)}
-              aria-label={`Remove ${n}`}
+              aria-label={t("Remove {name}", { name: n })}
               className="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-accent/20 hover:text-foreground"
             >
               ×
@@ -73,16 +86,16 @@ export function Nationalities() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             list="nationality-suggestions"
-            placeholder={list.length ? "Add another" : "e.g. French"}
-            aria-label="Add a nationality"
+            placeholder={list.length ? t("Add another") : t("e.g. French")}
+            aria-label={t("Add a nationality")}
             className="w-40 rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
           />
           <button disabled={!draft.trim()} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
-            Add
+            {t("Add")}
           </button>
         </form>
         <datalist id="nationality-suggestions">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <option key={s} value={s} />
           ))}
         </datalist>

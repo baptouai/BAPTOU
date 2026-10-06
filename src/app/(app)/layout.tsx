@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { LanguageSwitch, useI18n } from "@/lib/i18n";
 import { GmailReconnectBanner } from "@/components/GmailConnect";
 
 const nav = [
@@ -19,13 +20,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");
   }, [loading, user, router]);
 
   if (loading || !user) {
-    return <div className="flex flex-1 items-center justify-center text-muted">Loading…</div>;
+    return <div className="flex flex-1 items-center justify-center text-muted">{t("Loading…")}</div>;
   }
 
   return (
@@ -46,12 +48,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   pathname.startsWith(item.href) ? "font-medium text-accent" : "text-muted"
                 }
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             ))}
           </nav>
-          <button onClick={logOut} className="ml-auto text-sm text-muted sm:ml-0">
-            Sign out
+          <LanguageSwitch className="ml-auto sm:ml-0" />
+          <button onClick={logOut} className="text-sm text-muted">
+            {t("Sign out")}
           </button>
         </div>
       </header>

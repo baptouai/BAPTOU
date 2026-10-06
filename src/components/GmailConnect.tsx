@@ -7,6 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import type { GmailConnection } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const gmailAuthUrl = httpsCallable<{ returnTo: string }, { url: string }>(functions, "gmailAuthUrl");
 const gmailDisconnect = httpsCallable<{ clearIndex: boolean }, { ok: boolean }>(functions, "gmailDisconnect");
@@ -21,6 +22,7 @@ const callbackMessage: Record<string, string> = {
 /** Shown on every page when Google has expired BAPTOU's Gmail access (weekly while the Google app is in Testing). */
 export function GmailReconnectBanner() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [expired, setExpired] = useState(false);
 
   useEffect(() => {
@@ -32,8 +34,9 @@ export function GmailReconnectBanner() {
   return (
     <div className="border-b border-amber-500/30 bg-amber-500/10">
       <p className="mx-auto max-w-5xl px-4 py-2 text-sm text-amber-800 dark:text-amber-300">
-        Your Gmail connection expired. <a href="/profile" className="font-medium underline">Reconnect Gmail</a> to keep
-        finding contacts and sending emails.
+        {t("Your Gmail connection expired.")}{" "}
+        <a href="/profile" className="font-medium underline">{t("Reconnect Gmail")}</a>{" "}
+        {t("to keep finding contacts and sending emails.")}
       </p>
     </div>
   );
@@ -47,6 +50,7 @@ export function GmailConnect() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const result = params.get("gmail");
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -61,7 +65,7 @@ export function GmailConnect() {
       const { data } = await gmailAuthUrl({ returnTo: window.location.origin });
       window.location.href = data.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
       setBusy(false);
     }
   }
@@ -70,7 +74,7 @@ export function GmailConnect() {
     const question = clearIndex
       ? "Disconnect Gmail and delete the index of people in your mailbox? Offers will no longer show people you know until you reconnect and the index is rebuilt."
       : "Disconnect Gmail? BAPTOU loses access to your mailbox immediately. The index of people you know is kept, so offers still show them.";
-    if (!confirm(question)) return;
+    if (!confirm(t(question))) return;
     setBusy(true);
     await gmailDisconnect({ clearIndex }).catch(() => {});
     setBusy(false);
@@ -84,31 +88,37 @@ export function GmailConnect() {
         <div className="max-w-xl">
           <h2 className="text-xl font-semibold">Gmail</h2>
           <p className="mt-1 text-sm text-muted">
-            {connected && !gmail?.canRead
-              ? "Connected for sending the emails you approve, from your own address. Finding people in your mailbox is reserved for BAPTOU's first 100 users for now."
-              : "BAPTOU sends the emails you approve from your own address, and (for its first 100 users) finds people in your mailbox who could help and drafts emails that follow on from your past conversations. It only sends an email when you click “Approve & send”."}
+            {t(
+              connected && !gmail?.canRead
+                ? "Connected for sending the emails you approve, from your own address. Finding people in your mailbox is reserved for BAPTOU's first 100 users for now."
+                : "BAPTOU sends the emails you approve from your own address, and (for its first 100 users) finds people in your mailbox who could help and drafts emails that follow on from your past conversations. It only sends an email when you click “Approve & send”.",
+            )}
           </p>
-          {connected && <p className="mt-2 text-sm">Connected as <span className="font-medium">{gmail.email}</span></p>}
+          {connected && (
+            <p className="mt-2 text-sm">
+              {t("Connected as")} <span className="font-medium">{gmail.email}</span>
+            </p>
+          )}
           {gmail?.needsReconnect && (
-            <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">The connection expired. Reconnect to keep using it.</p>
+            <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">{t("The connection expired. Reconnect to keep using it.")}</p>
           )}
         </div>
         {connected ? (
           <div className="flex flex-col items-start gap-1 sm:items-end">
             <button onClick={() => disconnect(false)} disabled={busy} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50">
-              Disconnect
+              {t("Disconnect")}
             </button>
             <button onClick={() => disconnect(true)} disabled={busy} className="text-xs text-red-600 underline disabled:opacity-50">
-              Disconnect and clear index
+              {t("Disconnect and clear index")}
             </button>
           </div>
         ) : (
           <button onClick={connect} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            {busy ? "Opening Google…" : gmail?.needsReconnect ? "Reconnect Gmail" : "Connect Gmail"}
+            {t(busy ? "Opening Google…" : gmail?.needsReconnect ? "Reconnect Gmail" : "Connect Gmail")}
           </button>
         )}
       </div>
-      {result && callbackMessage[result] && <p className="mt-3 text-sm">{callbackMessage[result]}</p>}
+      {result && callbackMessage[result] && <p className="mt-3 text-sm">{t(callbackMessage[result])}</p>}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
   );

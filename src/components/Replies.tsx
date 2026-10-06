@@ -7,6 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
+import { errorText, useI18n } from "@/lib/i18n";
 
 // users/{uid}/replies/{messageId}, written by the daily reply check (functions/src/replies.ts).
 type Reply = {
@@ -42,6 +43,7 @@ export function RepliesPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showRead, setShowRead] = useState(false);
+  const { t, dateTime } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -64,9 +66,11 @@ export function RepliesPanel() {
     setMessage(null);
     try {
       const { data } = await scanRepliesNow();
-      setMessage(data.found ? `${data.found} new repl${data.found > 1 ? "ies" : "y"}.` : "No new replies.");
+      setMessage(
+        data.found ? t(data.found > 1 ? "{n} new replies." : "{n} new reply.", { n: data.found }) : t("No new replies."),
+      );
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Something went wrong");
+      setMessage(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -82,23 +86,27 @@ export function RepliesPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-medium">
-            Replies to your applications{unread.length > 0 && <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs text-white">{unread.length} new</span>}
+            {t("Replies to your applications")}
+            {unread.length > 0 && (
+              <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs text-white">{t("{n} new", { n: unread.length })}</span>
+            )}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            BAPTOU checks your mailbox every morning
-            {lastCheck ? ` (last check ${new Date(lastCheck * 1000).toLocaleString()})` : ""}.
+            {lastCheck
+              ? t("BAPTOU checks your mailbox every morning (last check {date}).", { date: dateTime(lastCheck * 1000) })
+              : t("BAPTOU checks your mailbox every morning.")}
           </p>
         </div>
         {canRead && (
           <button onClick={check} disabled={busy} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
-            {busy ? "Checking…" : "Check now"}
+            {t(busy ? "Checking…" : "Check now")}
           </button>
         )}
       </div>
       {message && <p className="mt-2 text-sm text-muted">{message}</p>}
 
       {shown.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">{replies.length ? "No new replies." : "No replies yet."}</p>
+        <p className="mt-3 text-sm text-muted">{t(replies.length ? "No new replies." : "No replies yet.")}</p>
       ) : (
         <ul className="mt-4 grid grid-cols-1 gap-3">
           {shown.map((r) => (
@@ -108,7 +116,7 @@ export function RepliesPanel() {
       )}
       {replies.length > unread.length && (
         <button onClick={() => setShowRead((v) => !v)} className="mt-3 text-sm text-muted">
-          {showRead ? "Hide read replies" : `Show read replies (${replies.length - unread.length})`}
+          {showRead ? t("Hide read replies") : t("Show read replies ({n})", { n: replies.length - unread.length })}
         </button>
       )}
     </section>
@@ -117,6 +125,7 @@ export function RepliesPanel() {
 
 function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
   const { user } = useAuth();
+  const { t, date } = useI18n();
   const k = replyKind[r.kind];
   const markSeen = () => user && updateDoc(doc(db, "users", user.uid, "replies", r.id), { seen: true });
 
@@ -124,21 +133,22 @@ function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
     <li className={`min-w-0 rounded-lg border p-4 text-sm ${r.seen ? "border-card-edge-soft opacity-70" : "border-card-edge-soft"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-medium [overflow-wrap:anywhere]">{r.subject || "(no subject)"}</p>
+          <p className="font-medium [overflow-wrap:anywhere]">{r.subject || t("(no subject)")}</p>
           <p className="text-muted [overflow-wrap:anywhere]">
-            {r.from} · {r.receivedAt?.toDate().toLocaleDateString()}
+            {r.from} · {r.receivedAt ? date(r.receivedAt.toDate(), "short") : ""}
           </p>
         </div>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${k.className}`}>{k.label}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${k.className}`}>{t(k.label)}</span>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">What it says</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("What it says")}</p>
           <RichText text={r.summary} className="mt-1" />
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Next step{r.dueDate && <span className="normal-case"> · by {new Date(r.dueDate).toLocaleDateString()}</span>}
+            {t("Next step")}
+            {r.dueDate && <span className="normal-case"> · {t("by {date}", { date: date(r.dueDate, "short") })}</span>}
           </p>
           <RichText text={r.nextStep} className="mt-1" />
         </div>
@@ -146,7 +156,7 @@ function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
       <div className="mt-3 flex flex-wrap gap-3">
         {r.applicationId && (
           <Link href={`/applications/view?id=${r.applicationId}`} className="text-accent hover:underline" onClick={markSeen}>
-            Open the application
+            {t("Open the application")}
           </Link>
         )}
         <a
@@ -156,11 +166,11 @@ function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
           className="text-accent hover:underline"
           onClick={markSeen}
         >
-          Open in Gmail ↗
+          {t("Open in Gmail")} ↗
         </a>
         {!r.seen && (
           <button onClick={markSeen} className="text-muted hover:text-foreground">
-            Mark as read
+            {t("Mark as read")}
           </button>
         )}
       </div>

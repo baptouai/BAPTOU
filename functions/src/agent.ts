@@ -75,13 +75,16 @@ export async function runAgent<T>(opts: {
   effort?: "low" | "medium" | "high";
 }): Promise<T> {
   await assertBudget(opts.uid);
+  const lang = (await db.doc(`users/${opts.uid}`).get()).get("lang");
   const clientTools = opts.clientTools ?? [];
   const tools = [
     ...(opts.web ? webTools(opts.web, opts.maxPageTokens) : []),
     ...clientTools.map((t) => submitTool(t.name, t.description, t.schema)),
     submitTool(opts.submit.name, opts.submit.description, opts.submit.schema),
   ];
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: opts.prompt }];
+  // Last in the prompt, so the cached beginning (system prompt, profile) is the same in both languages.
+  const prompt = lang === "fr" ? [...opts.prompt, { type: "text" as const, text: FRENCH }] : opts.prompt;
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
   const maxToolCalls = opts.maxToolCalls ?? 10;
   let toolCalls = 0;
   let nudged = false;
@@ -174,6 +177,9 @@ export async function runAgent<T>(opts: {
   done(MAX_CONTINUATIONS + maxToolCalls);
   throw new HttpsError("deadline-exceeded", "BAPTOU took too long. Try again.");
 }
+
+// The student uses BAPTOU in French (users/{uid}.lang, set in the app).
+const FRENCH = `Language: the student uses BAPTOU in French. Write everything addressed to the student (reasons, summaries, briefs, notes, verdicts, advice, questions) in French. Letters, emails and application answers keep the language they must be written in (the posting's, the form's or the recipient's) unless the student asks otherwise.`;
 
 const endUser = (uid: string) => createHash("sha256").update(`baptou:${uid}`).digest("hex").slice(0, 32);
 

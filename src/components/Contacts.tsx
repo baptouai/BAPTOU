@@ -8,6 +8,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
 import type { Contact, GmailConnection } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const findContacts = httpsCallable<
   { applicationId?: string; full?: boolean },
@@ -54,6 +55,7 @@ export function ContactsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [lastScan, setLastScan] = useState<number | null>(null); // epoch seconds
+  const { t, dateTime } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -82,14 +84,14 @@ export function ContactsPanel({
   }, [user, applicationId]);
 
   async function search(full = false) {
-    if (full && !confirm("Scan your whole mailbox again? It costs more than scanning only new emails.")) return;
+    if (full && !confirm(t("Scan your whole mailbox again? It costs more than scanning only new emails."))) return;
     setBusy(true);
     setMessage(null);
     try {
       const { data } = await findContacts({ ...(applicationId ? { applicationId } : {}), full });
-      setMessage(data.found ? data.summary : `No new contacts found. ${data.summary}`);
+      setMessage(data.found ? data.summary : `${t("No new contacts found.")} ${data.summary}`);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Something went wrong");
+      setMessage(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -116,10 +118,11 @@ export function ContactsPanel({
     <section className="rounded-xl border border-card-edge bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-xl">
-          <h2 className="font-medium">Drafted emails</h2>
+          <h2 className="font-medium">{t("Drafted emails")}</h2>
           <p className="mt-1 text-sm text-muted">
-            Emails BAPTOU drafted for people in your mailbox. Nothing is sent until you approve it. The deep search reads
-            your conversations with AI to suggest people and uses about 1–3% of your monthly allowance; the list above is free.
+            {t(
+              "Emails BAPTOU drafted for people in your mailbox. Nothing is sent until you approve it. The deep search reads your conversations with AI to suggest people and uses about 1–3% of your monthly allowance; the list above is free.",
+            )}
           </p>
         </div>
         {canRead ? (
@@ -129,13 +132,13 @@ export function ContactsPanel({
               disabled={busy}
               className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
             >
-              {busy ? "Searching with AI… (1–3 min)" : lastScan ? "Deep search new emails (AI)" : "Deep search with AI"}
+              {t(busy ? "Searching with AI… (1–3 min)" : lastScan ? "Deep search new emails (AI)" : "Deep search with AI")}
             </button>
             {lastScan && !busy && (
               <p className="text-right text-xs text-muted">
-                Last scan {new Date(lastScan * 1000).toLocaleString()}. Only newer emails are searched.{" "}
+                {t("Last scan {date}. Only newer emails are searched.", { date: dateTime(lastScan * 1000) })}{" "}
                 <button onClick={() => search(true)} className="underline">
-                  Scan everything again
+                  {t("Scan everything again")}
                 </button>
               </p>
             )}
@@ -143,10 +146,10 @@ export function ContactsPanel({
         ) : (
           gmail !== undefined &&
           (connected ? (
-            <p className="max-w-xs text-right text-xs text-muted">Reserved for BAPTOU&apos;s first 100 users for now.</p>
+            <p className="max-w-xs text-right text-xs text-muted">{t("Reserved for BAPTOU's first 100 users for now.")}</p>
           ) : (
             <Link href="/profile" className="rounded-lg border border-accent px-4 py-2 text-sm text-accent">
-              Connect Gmail first
+              {t("Connect Gmail first")}
             </Link>
           ))
         )}
@@ -162,7 +165,7 @@ export function ContactsPanel({
       </ul>
       {dismissed > 0 && (
         <button onClick={() => setShowAll((v) => !v)} className="mt-3 text-sm text-muted">
-          {showAll ? "Hide dismissed" : `Show dismissed (${dismissed})`}
+          {showAll ? t("Hide dismissed") : t("Show dismissed ({n})", { n: dismissed })}
         </button>
       )}
     </section>
@@ -178,6 +181,7 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = user ? doc(db, "users", user.uid, "contacts", contact.id) : null;
   const sent = contact.status === "sent";
+  const { t, dateTime } = useI18n();
 
   function edit(patch: Partial<Contact["draft"]>) {
     const next = { ...draft, ...patch };
@@ -207,21 +211,21 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
       setDraft(data);
       setInstructions("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
     } finally {
       setBusy(null);
     }
   }
 
   async function send() {
-    if (!confirm(`Send this email to ${draft.to} from your Gmail now?`)) return;
+    if (!confirm(t("Send this email to {to} from your Gmail now?", { to: draft.to }))) return;
     setBusy("send");
     setError(null);
     try {
       await flush();
       await sendApprovedEmail({ kind: "contact", id: contact.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
     } finally {
       setBusy(null);
     }
@@ -236,28 +240,28 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
           </p>
           <p className="text-sm text-muted">
             {[contact.role, contact.organization].filter(Boolean).join(" · ")}
-            {contact.lastContactDate && ` · last contact ${contact.lastContactDate}`}
+            {contact.lastContactDate && ` · ${t("last contact {date}", { date: contact.lastContactDate })}`}
           </p>
         </div>
         <span className="rounded-full border border-border px-2 py-0.5 text-xs">
-          {sent ? "Sent" : relationshipLabel[contact.relationship]}
+          {t(sent ? "Sent" : relationshipLabel[contact.relationship])}
         </span>
       </div>
 
       <div className="mt-3 grid gap-2 text-sm">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your history</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("Your history")}</p>
           <RichText text={contact.history} className="mt-1" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Why contact them</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("Why contact them")}</p>
           <RichText text={contact.whyContact} className="mt-1" />
         </div>
       </div>
 
       <div className="mt-4 grid gap-2">
         <p className="text-xs text-muted">
-          {contact.replyInThread ? "Sent as a reply in your previous conversation." : "Sent as a new email."}
+          {t(contact.replyInThread ? "Sent as a reply in your previous conversation." : "Sent as a new email.")}
         </p>
         <input
           value={draft.to}
@@ -287,36 +291,40 @@ function ContactCard({ contact }: { contact: Contact & { id: string } }) {
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               disabled={!!busy}
-              placeholder="e.g. More formal, mention the VCARB offer, in French"
+              placeholder={t("e.g. More formal, mention the VCARB offer, in French")}
               className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />
             <button disabled={!!busy} className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50">
-              {busy === "rewrite" ? "Rewriting…" : "Rewrite"}
+              {t(busy === "rewrite" ? "Rewriting…" : "Rewrite")}
             </button>
           </form>
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={send} disabled={!!busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-              {busy === "send" ? "Sending…" : "Approve & send"}
+              {t(busy === "send" ? "Sending…" : "Approve & send")}
             </button>
             {contact.status !== "dismissed" ? (
               <button
                 onClick={() => ref && updateDoc(ref, { status: "dismissed", updatedAt: serverTimestamp() })}
                 className="rounded-lg px-4 py-2 text-sm text-muted"
               >
-                Not this person
+                {t("Not this person")}
               </button>
             ) : (
               <button
                 onClick={() => ref && updateDoc(ref, { status: "suggested", updatedAt: serverTimestamp() })}
                 className="rounded-lg px-4 py-2 text-sm text-muted"
               >
-                Restore
+                {t("Restore")}
               </button>
             )}
           </div>
         </>
       )}
-      {sent && <p className="mt-3 text-sm text-green-700 dark:text-green-400">Sent {contact.sentAt?.toDate().toLocaleString()}.</p>}
+      {sent && (
+        <p className="mt-3 text-sm text-green-700 dark:text-green-400">
+          {contact.sentAt ? t("Sent {date}.", { date: dateTime(contact.sentAt.toDate()) }) : t("Sent")}
+        </p>
+      )}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );

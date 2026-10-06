@@ -18,6 +18,7 @@ import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import { RichText } from "@/components/RichText";
 import { looksGeneric } from "@/lib/postingLink";
 import type { Application, LetterVersion } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const AUTOSAVE_MS = 800;
 
@@ -30,7 +31,7 @@ const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>
 // The app is exported as static files, so the offer id travels in the query (?id=...) rather than the path.
 export default function ApplicationPage() {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+    <Suspense fallback={null}>
       <ApplicationView />
     </Suspense>
   );
@@ -53,6 +54,7 @@ function ApplicationView() {
   const [wantLetter, setWantLetter] = useState(false);
   const [wantEmail, setWantEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const { t, date, dateTime } = useI18n();
 
   const appRef = user ? doc(db, "users", user.uid, "applications", id) : null;
 
@@ -154,7 +156,7 @@ function ApplicationView() {
   // what is stored (not what the browser sends), from the user's Gmail.
   async function approveEmail() {
     if (!appRef || !email) return;
-    if (!confirm(`Send this email to ${email.to || "(no recipient)"} from your Gmail now?`)) return;
+    if (!confirm(t("Send this email to {to} from your Gmail now?", { to: email.to || t("(no recipient)") }))) return;
     setEmailError(null);
     setSending(true);
     try {
@@ -162,7 +164,7 @@ function ApplicationView() {
       await setStatus("approved", { emailDraft: email, emailApprovedAt: serverTimestamp() as never });
       await sendApprovedEmail({ kind: "application", id });
     } catch (e) {
-      setEmailError(e instanceof Error ? e.message : "Couldn't send the email");
+      setEmailError(errorText(e, t));
     } finally {
       setSending(false);
     }
@@ -171,11 +173,14 @@ function ApplicationView() {
   if (missing) {
     return (
       <p className="text-muted">
-        This offer was removed. <Link href="/applications" className="text-accent">Back to internships</Link>
+        {t("This offer was removed.")}{" "}
+        <Link href="/applications" className="text-accent">
+          {t("Back to applications")}
+        </Link>
       </p>
     );
   }
-  if (!app) return <p className="text-muted">Loading…</p>;
+  if (!app) return <p className="text-muted">{t("Loading…")}</p>;
 
   const showLetter = !!letter || wantLetter || formAsksForLetter(app.applicationForm);
   const showEmail = !!email || wantEmail;
@@ -184,7 +189,7 @@ function ApplicationView() {
     <div className="grid gap-6">
       <div>
         <Link href={app.searchId ? `/applications?search=${app.searchId}` : "/applications"} className="text-sm text-muted">
-          ← Back
+          {t("← Back")}
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -195,29 +200,31 @@ function ApplicationView() {
           <div className="flex gap-2">
             {app.fitVerdict && (
               <span className={`rounded-full px-3 py-1 text-sm font-medium ${verdictLabel[app.fitVerdict].className}`}>
-                {verdictLabel[app.fitVerdict].text}
+                {t(verdictLabel[app.fitVerdict].text)}
               </span>
             )}
-            <span className="rounded-full border border-border px-3 py-1 text-sm">{statusLabel[app.status]}</span>
+            <span className="rounded-full border border-border px-3 py-1 text-sm">{t(statusLabel[app.status])}</span>
           </div>
         </div>
       </div>
 
       {app.postingClosedAt && (
         <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-800 dark:text-red-300">
-          <p className="font-medium">This posting seems to be closed.</p>
+          <p className="font-medium">{t("This posting seems to be closed.")}</p>
           <p className="mt-0.5">
-            Checked {app.postingClosedAt.toDate().toLocaleDateString()}: {app.postingClosedReason || "the page is no longer available"}. You
-            may want to dismiss it, or check the company&apos;s careers page for a newer version.
+            {t("Checked {date}: {reason}. You may want to dismiss it, or check the company's careers page for a newer version.", {
+              date: date(app.postingClosedAt.toDate(), "short"),
+              reason: t(app.postingClosedReason || "the page is no longer available"),
+            })}
           </p>
         </section>
       )}
 
       {!app.postingClosedAt && looksGeneric(app.applyUrl) && (
         <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
-          <p className="font-medium">This link goes to a general careers page, not to the posting itself.</p>
+          <p className="font-medium">{t("This link goes to a general careers page, not to the posting itself.")}</p>
           <p className="mt-0.5">
-            Look for the exact offer on that page. If you find it, add it with “+ Add an offer you found” and dismiss this one.
+            {t("Look for the exact offer on that page. If you find it, add it with “+ Add an offer you found” and dismiss this one.")}
           </p>
         </section>
       )}
@@ -226,13 +233,13 @@ function ApplicationView() {
         <div className="grid gap-4 md:grid-cols-2">
           {app.matchReason && (
             <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
-              <h2 className="font-medium">Why it fits you</h2>
+              <h2 className="font-medium">{t("Why it fits you")}</h2>
               <RichText text={app.matchReason} className="mt-2" />
             </section>
           )}
           {app.research && (
             <section className="rounded-xl border border-card-edge bg-card p-5 text-sm">
-              <h2 className="font-medium">About {app.organization}</h2>
+              <h2 className="font-medium">{t("About {name}", { name: app.organization })}</h2>
               <RichText text={app.research} className="mt-2 text-muted" />
             </section>
           )}
@@ -241,9 +248,9 @@ function ApplicationView() {
 
       {app.status === "suggested" && (
         <section className="flex flex-wrap items-start gap-3 rounded-xl border border-card-edge bg-card p-5">
-          <p className="w-full text-sm text-muted">Is this offer for you?</p>
+          <p className="w-full text-sm text-muted">{t("Is this offer for you?")}</p>
           <button onClick={() => setStatus("interested")} className="rounded-lg bg-accent px-4 py-2 font-medium text-white">
-            I&apos;m interested
+            {t("I'm interested")}
           </button>
           <DismissForm onDismiss={dismiss} />
         </section>
@@ -268,21 +275,21 @@ function ApplicationView() {
         {showLetter && (
           <section id="letter" className="scroll-mt-4 rounded-xl border border-card-edge bg-card p-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium">Motivation letter</h2>
+              <h2 className="font-medium">{t("Motivation letter")}</h2>
               <span className="text-xs text-muted">
-                {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes"}
+                {t(saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes")}
               </span>
             </div>
             {app.approachNote && (
               <div className="mt-2 rounded-lg bg-accent/5 p-3 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">The angle BAPTOU took</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("The angle BAPTOU took")}</p>
                 <RichText text={app.approachNote} className="mt-1" />
               </div>
             )}
             <AiBar
-              action={letter ? "Rewrite with BAPTOU" : "Write my letter"}
-              placeholder={letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize"}
-              busyLabel="BAPTOU is researching and writing… (1–3 min)"
+              action={t(letter ? "Rewrite with BAPTOU" : "Write my letter")}
+              placeholder={t(letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize")}
+              busyLabel={t("BAPTOU is researching and writing… (1–3 min)")}
               onRun={writeLetter}
             />
             <textarea
@@ -297,21 +304,23 @@ function ApplicationView() {
             />
             <div className="mt-3 flex flex-wrap gap-2">
               <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-                Save as version
+                {t("Save as version")}
               </button>
-              <CopyButton text={letter} label="Copy letter" />
+              <CopyButton text={letter} label={t("Copy letter")} copiedLabel={t("Copied")} />
             </div>
             {versions.length > 0 && (
               <details className="mt-4 text-sm">
-                <summary className="cursor-pointer text-muted">Version history ({versions.length})</summary>
+                <summary className="cursor-pointer text-muted">{t("Version history ({n})", { n: versions.length })}</summary>
                 <ul className="mt-2 grid gap-2">
                   {versions.map((v) => (
                     <li key={v.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2">
                       <span className="text-muted">
-                        {v.author === "baptou" ? "BAPTOU draft" : "Your version"} ·{" "}
-                        {v.createdAt?.toDate().toLocaleString() ?? "just now"}
+                        {t(v.author === "baptou" ? "BAPTOU draft" : "Your version")} ·{" "}
+                        {v.createdAt ? dateTime(v.createdAt.toDate()) : t("just now")}
                       </span>
-                      <button onClick={() => restore(v)} className="text-accent">Restore</button>
+                      <button onClick={() => restore(v)} className="text-accent">
+                        {t("Restore")}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -322,12 +331,12 @@ function ApplicationView() {
 
           {showEmail && (
           <section className="rounded-xl border border-card-edge bg-card p-5">
-            <h2 className="font-medium">Email draft</h2>
-            <p className="mt-1 text-sm text-muted">Nothing is sent until you click “Approve &amp; send”.</p>
+            <h2 className="font-medium">{t("Email draft")}</h2>
+            <p className="mt-1 text-sm text-muted">{t("Nothing is sent until you click “Approve & send”.")}</p>
             <AiBar
-              action={email ? "Rewrite email" : "Draft an email"}
-              placeholder={email ? "e.g. Warmer tone, in French" : "Optional: who it's for, what to say"}
-              busyLabel="BAPTOU is writing the email…"
+              action={t(email ? "Rewrite email" : "Draft an email")}
+              placeholder={t(email ? "e.g. Warmer tone, in French" : "Optional: who it's for, what to say")}
+              busyLabel={t("BAPTOU is writing the email…")}
               onRun={writeEmail}
             />
             {email && (
@@ -336,13 +345,13 @@ function ApplicationView() {
                 <input
                   value={email.to}
                   onChange={(e) => { const next = { ...email, to: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
-                  placeholder="To"
+                  placeholder={t("To")}
                   className="rounded-lg border border-border bg-background px-3 py-2"
                 />
                 <input
                   value={email.subject}
                   onChange={(e) => { const next = { ...email, subject: e.target.value }; setEmail(next); scheduleSave({ emailDraft: next }); }}
-                  placeholder="Subject"
+                  placeholder={t("Subject")}
                   className="rounded-lg border border-border bg-background px-3 py-2"
                 />
                 <textarea
@@ -357,7 +366,7 @@ function ApplicationView() {
                 disabled={sending || !!app.emailSentAt}
                 className="mt-3 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
               >
-                {app.emailSentAt ? "Sent" : sending ? "Sending…" : "Approve & send"}
+                {t(app.emailSentAt ? "Sent" : sending ? "Sending…" : "Approve & send")}
               </button>
               {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
               </>
@@ -369,12 +378,12 @@ function ApplicationView() {
             <div className="flex flex-wrap gap-4 text-sm">
               {!showLetter && (
                 <button onClick={() => setWantLetter(true)} className="text-muted underline">
-                  {app.applicationForm ? "This form doesn't ask for a letter. Write one anyway" : "Write a motivation letter"}
+                  {t(app.applicationForm ? "This form doesn't ask for a letter. Write one anyway" : "Write a motivation letter")}
                 </button>
               )}
               {!showEmail && (
                 <button onClick={() => setWantEmail(true)} className="text-muted underline">
-                  Draft an email to the recruiter
+                  {t("Draft an email to the recruiter")}
                 </button>
               )}
             </div>
@@ -389,8 +398,8 @@ function ApplicationView() {
       <section className="rounded-xl border border-card-edge bg-card p-5">
         {!app.applicationForm && !!app.packFields?.length && (
           <>
-            <h2 className="font-medium">Quick answers</h2>
-            <p className="mt-1 text-sm text-muted">Prepare the application above to get them in the form&apos;s exact format.</p>
+            <h2 className="font-medium">{t("Quick answers")}</h2>
+            <p className="mt-1 text-sm text-muted">{t("Prepare the application above to get them in the form's exact format.")}</p>
           </>
         )}
         <ul className="mt-3 grid gap-3 empty:hidden">
@@ -398,7 +407,7 @@ function ApplicationView() {
             <li key={f.label} className="rounded-lg border border-border p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium">{f.label}</p>
-                <CopyButton text={f.value} label="Copy" />
+                <CopyButton text={f.value} label={t("Copy")} copiedLabel={t("Copied")} />
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{f.value}</p>
             </li>
@@ -412,12 +421,12 @@ function ApplicationView() {
               rel="noopener noreferrer"
               className="rounded-lg bg-accent px-4 py-2 font-medium text-white"
             >
-              Open posting ↗
+              {t("Open posting")} ↗
             </a>
           )}
           {app.status !== "applied" && (
             <button onClick={() => setStatus("applied")} className="rounded-lg border border-border px-4 py-2">
-              Mark as applied
+              {t("Mark as applied")}
             </button>
           )}
           {app.status !== "suggested" && app.status !== "applied" && !app.emailSentAt && <DismissForm onDismiss={dismiss} />}
@@ -433,6 +442,7 @@ function AiBar({
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -442,7 +452,7 @@ function AiBar({
       await onRun(instructions);
       setInstructions("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorText(err, t));
     } finally {
       setBusy(false);
     }
@@ -468,16 +478,17 @@ function AiBar({
 /** Location, start, duration and deadline as small tags under the title. */
 function FactTags({ app }: { app: Application }) {
   const [now] = useState(() => Date.now());
+  const { t, date } = useI18n();
   const deadline = app.deadline?.toDate();
   const soon = deadline && deadline.getTime() - now < 7 * 86_400_000;
   const facts = [
     [app.location, app.country].filter(Boolean).join(", "),
-    app.startDate && `Starts ${app.startDate}`,
+    app.startDate && t("Starts {date}", { date: app.startDate }),
     app.duration,
     app.contractType,
     app.rhythm,
     app.salary,
-    app.school && `School: ${app.school}`,
+    app.school && t("School: {name}", { name: app.school }),
   ].filter(Boolean) as string[];
   if (!facts.length && !deadline) return null;
   return (
@@ -493,14 +504,14 @@ function FactTags({ app }: { app: Application }) {
             soon ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border text-muted"
           }`}
         >
-          Deadline {deadline.toLocaleDateString()}
+          {t("Deadline {date}", { date: date(deadline, "short") })}
         </span>
       )}
     </div>
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text, label, copiedLabel }: { text: string; label: string; copiedLabel: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -511,7 +522,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       }}
       className="rounded-lg border border-border px-3 py-1.5 text-sm"
     >
-      {copied ? "Copied" : label}
+      {copied ? copiedLabel : label}
     </button>
   );
 }

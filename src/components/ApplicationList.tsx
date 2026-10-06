@@ -13,6 +13,7 @@ import { looksGeneric } from "@/lib/postingLink";
 import { replyKind } from "@/components/Replies";
 import type { Timestamp } from "firebase/firestore";
 import type { Application } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 export const statusLabel: Record<Application["status"], string> = {
   suggested: "To review",
@@ -37,6 +38,7 @@ type Item = Application & { id: string };
 
 const batchTime = (a: Item) => (a.batchAt ?? a.createdAt)?.toMillis?.() ?? 0;
 const dayOf = (ms: number) => new Date(ms).toDateString();
+const dayStart = (ms: number) => new Date(new Date(ms).toDateString()).getTime();
 
 export type ApplicationItem = Item;
 
@@ -46,11 +48,13 @@ export type LastRun = { at?: Timestamp; batchAt?: Timestamp; summary?: string };
 
 export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty: string; lastRun?: LastRun }) {
   const [tab, setTab] = useState<Tab>("latest");
+  const { t, date, dateTime } = useI18n();
 
   // Latest batch = the offers of the search's last run. Runs from before runs were recorded fall back
   // to the most recent day that produced offers.
   const runBatch = lastRun?.batchAt?.toMillis();
-  const latestDay = apps.length ? dayOf(Math.max(...apps.map(batchTime))) : null;
+  const latestMs = apps.length ? Math.max(...apps.map(batchTime)) : null;
+  const latestDay = latestMs != null ? dayOf(latestMs) : null;
   const lists: Record<Tab, Item[]> = {
     latest: runBatch
       ? apps.filter((a) => a.batchAt?.toMillis() === runBatch)
@@ -67,35 +71,35 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
   const tabs: { id: Tab; label: string; hint: string }[] = [
     {
       id: "latest",
-      label: "Latest batch",
+      label: t("Latest batch"),
       hint: runBatch
-        ? `Found by this search's last run, ${new Date(runBatch).toLocaleString()}.`
-        : latestDay
-          ? `Found by this search's last run, on ${new Date(latestDay).toLocaleDateString()}.`
+        ? t("Found by this search's last run, {date}.", { date: dateTime(runBatch) })
+        : latestMs != null
+          ? t("Found by this search's last run, on {date}.", { date: date(dayStart(latestMs)) })
           : "",
     },
-    { id: "review", label: "To review", hint: "Everything from this search you haven't decided on yet." },
-    { id: "interested", label: "Interested", hint: "The ones you're interested in or working on." },
+    { id: "review", label: t("To review"), hint: t("Everything from this search you haven't decided on yet.") },
+    { id: "interested", label: t("Interested"), hint: t("The ones you're interested in or working on.") },
   ];
 
   return (
     <div className="mt-6">
       <div role="tablist" className="flex gap-1 scroll-row border-b border-border">
-        {tabs.map((t) => (
+        {tabs.map((tb) => (
           <button
-            key={t.id}
+            key={tb.id}
             role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === tb.id}
+            onClick={() => setTab(tb.id)}
             className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
-              tab === t.id ? "border-accent font-medium text-accent" : "border-transparent text-muted"
+              tab === tb.id ? "border-accent font-medium text-accent" : "border-transparent text-muted"
             }`}
           >
-            {t.label} <span className="text-xs">({lists[t.id].length})</span>
+            {tb.label} <span className="text-xs">({lists[tb.id].length})</span>
           </button>
         ))}
       </div>
-      <p className="mt-2 text-sm text-muted">{tabs.find((t) => t.id === tab)?.hint}</p>
+      <p className="mt-2 text-sm text-muted">{tabs.find((tb) => tb.id === tab)?.hint}</p>
 
       {sorted.length === 0 ? (
         <p className="mt-4 rounded-xl border border-card-edge bg-card p-5 text-muted">
@@ -103,11 +107,11 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
             ? empty
             : tab === "latest"
               ? runBatch
-                ? `The last run (${new Date(runBatch).toLocaleString()}) found nothing new. Earlier suggestions are under “To review”.`
+                ? t("The last run ({date}) found nothing new. Earlier suggestions are under “To review”.", { date: dateTime(runBatch) })
                 : empty
               : tab === "interested"
-                ? "Mark offers as interesting to keep them here."
-                : "Nothing here."}
+                ? t("Mark offers as interesting to keep them here.")
+                : t("Nothing here.")}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">
@@ -124,6 +128,7 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
 
 function OfferCard({ app: a }: { app: Item }) {
   const { user } = useAuth();
+  const { t, date } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   async function interested() {
@@ -140,48 +145,48 @@ function OfferCard({ app: a }: { app: Item }) {
             <p className="text-sm text-muted">
               {a.organization}
               {a.country ? ` · ${a.country}` : ""}
-              {a.deadline ? ` · deadline ${a.deadline.toDate().toLocaleDateString()}` : ""}
+              {a.deadline ? ` · ${t("deadline {date}", { date: date(a.deadline.toDate(), "short") })}` : ""}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
             {a.lastReply && a.lastReply.kind !== "other" && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${replyKind[a.lastReply.kind].className}`}>
-                {replyKind[a.lastReply.kind].label}
+                {t(replyKind[a.lastReply.kind].label)}
               </span>
             )}
             {a.postingClosedAt && (
               <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                Posting closed
+                {t("Posting closed")}
               </span>
             )}
             {!a.postingClosedAt && looksGeneric(a.applyUrl) && (
               <span
                 className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
-                title="This link goes to a careers page, not to the posting itself"
+                title={t("This link goes to a careers page, not to the posting itself")}
               >
-                General careers page
+                {t("General careers page")}
               </span>
             )}
             {a.source === "manual" && (
-              <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted">Added by you</span>
+              <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted">{t("Added by you")}</span>
             )}
             {a.fromJobBoard && (
               <span
                 className="rounded-full border border-border px-2 py-0.5 text-xs text-muted"
-                title="BAPTOU couldn't find this offer on the organization's own website"
+                title={t("BAPTOU couldn't find this offer on the organization's own website")}
               >
-                Via a job board
+                {t("Via a job board")}
               </span>
             )}
             {a.fitVerdict && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${verdictLabel[a.fitVerdict].className}`}>
-                {verdictLabel[a.fitVerdict].text}
+                {t(verdictLabel[a.fitVerdict].text)}
               </span>
             )}
             {a.matchScore != null && (
-              <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{a.matchScore}% match</span>
+              <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{t("{n}% match", { n: a.matchScore })}</span>
             )}
-            <span className="rounded-full border border-border px-2 py-0.5 text-xs text-foreground">{statusLabel[a.status]}</span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs text-foreground">{t(statusLabel[a.status])}</span>
           </div>
         </div>
         {a.matchReason && <RichText text={a.matchReason} limit={2} className="mt-2 text-sm text-muted" />}
@@ -190,14 +195,14 @@ function OfferCard({ app: a }: { app: Item }) {
       {a.status === "suggested" && (
         <div className="mt-3 flex flex-wrap items-start gap-2 text-sm">
           <button onClick={interested} className="rounded-lg bg-accent px-3 py-1.5 font-medium text-white">
-            I&apos;m interested
+            {t("I'm interested")}
           </button>
           <DismissForm
             onDismiss={async (reason) => {
               try {
                 await dismissOffer({ applicationId: a.id, reason });
               } catch (e) {
-                setError(e instanceof Error ? e.message : "Something went wrong");
+                setError(errorText(e, t));
               }
             }}
           />

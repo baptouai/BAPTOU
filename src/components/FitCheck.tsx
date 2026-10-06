@@ -7,6 +7,7 @@ import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
 import type { ChatMessage, FitVerdict } from "@/lib/types";
+import { errorText, useI18n } from "@/lib/i18n";
 
 const askAboutOffer = httpsCallable<{ applicationId: string; question: string }>(functions, "askAboutOffer", {
   timeout: 300_000,
@@ -27,6 +28,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!user) return;
@@ -42,7 +44,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
       await askAboutOffer({ applicationId, question: text.trim() });
       setQuestion("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(errorText(e, t));
     } finally {
       setBusy(false);
     }
@@ -52,14 +54,14 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
 
   return (
     <section className="rounded-xl border border-card-edge bg-card p-5">
-      <h2 className="font-medium">Is this for me?</h2>
+      <h2 className="font-medium">{t("Is this for me?")}</h2>
       <p className="mt-1 text-sm text-muted">
-        Ask BAPTOU anything about this offer. It researches the organization and gives you an honest opinion.
+        {t("Ask BAPTOU anything about this offer. It researches the organization and gives you an honest opinion.")}
       </p>
 
       {messages.length === 0 && !busy && (
-        <button onClick={() => ask(STARTER)} className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">
-          Ask if it&apos;s really for me
+        <button onClick={() => ask(t(STARTER))} className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white">
+          {t("Ask if it's really for me")}
         </button>
       )}
 
@@ -72,7 +74,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
             {m.verdict && (
               <p className="mb-2">
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${verdictLabel[m.verdict].className}`}>
-                  {verdictLabel[m.verdict].text}
+                  {t(verdictLabel[m.verdict].text)}
                 </span>
                 <span className="ml-2 text-muted">{m.verdictReason}</span>
               </p>
@@ -84,7 +86,7 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
 
       {last?.followUpQuestions?.length ? (
         <div className="mt-3 text-sm">
-          <p className="text-muted">BAPTOU would like to know:</p>
+          <p className="text-muted">{t("BAPTOU would like to know:")}</p>
           <ul className="mt-1 grid gap-1">
             {last.followUpQuestions.map((q) => (
               <li key={q}>
@@ -110,11 +112,11 @@ export function FitCheck({ applicationId }: { applicationId: string }) {
             onChange={(e) => setQuestion(e.target.value)}
             rows={2}
             disabled={busy}
-            placeholder="Ask a question or answer BAPTOU's"
+            placeholder={t("Ask a question or answer BAPTOU's")}
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
           <button disabled={busy || !question.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            {busy ? "Thinking… (up to 1 min)" : "Ask"}
+            {t(busy ? "Thinking… (up to 1 min)" : "Ask")}
           </button>
         </form>
       )}

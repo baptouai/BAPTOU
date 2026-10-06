@@ -166,22 +166,41 @@ export const cancelSubscription = onCall({ region: REGION, secrets: [stripeKey, 
 
   const endsAt = sub.cancel_at ? (sub.cancel_at as number) * 1000 : null;
   if (!undo && endsAt) {
-    await emailUser(uid, {
-      subject: `Your BAPTOU subscription ends on ${longDate(endsAt)}`,
-      body: `Hi,
+    await emailUser(uid, (lang) =>
+      lang === "fr"
+        ? {
+            subject: `Votre abonnement BAPTOU se termine le ${longDate(endsAt, lang)}`,
+            body: `Bonjour,
 
-We've received the cancellation of your ${plan.type === "annual" ? "yearly" : "monthly"} BAPTOU subscription, on ${longDate(Date.now())}.
+Nous avons bien reçu la résiliation de votre abonnement BAPTOU ${plan.type === "annual" ? "annuel" : "mensuel"}, le ${longDate(Date.now(), lang)}.
 
-It ends on ${longDate(endsAt)}. You keep full access until then${
-        committed
-          ? ". Your yearly plan is committed for 12 months, so the monthly payments until that date are still due; there is none after it."
-          : ", and there will be no further payment."
-      }
+Il se termine le ${longDate(endsAt, lang)}. Vous gardez un accès complet jusque-là${
+              committed
+                ? ". Votre formule annuelle comporte un engagement de 12 mois : les mensualités jusqu'à cette date restent dues, et il n'y en a plus après."
+                : ", sans autre paiement."
+            }
+
+Vous avez changé d'avis ? Gardez votre abonnement depuis la page Formules : ${APP_URL}/plans
+
+BAPTOU`,
+          }
+        : {
+            subject: `Your BAPTOU subscription ends on ${longDate(endsAt, lang)}`,
+            body: `Hi,
+
+We've received the cancellation of your ${plan.type === "annual" ? "yearly" : "monthly"} BAPTOU subscription, on ${longDate(Date.now(), lang)}.
+
+It ends on ${longDate(endsAt, lang)}. You keep full access until then${
+              committed
+                ? ". Your yearly plan is committed for 12 months, so the monthly payments until that date are still due; there is none after it."
+                : ", and there will be no further payment."
+            }
 
 Changed your mind? Keep your subscription from the Plans page: ${APP_URL}/plans
 
 BAPTOU`,
-    });
+          },
+    );
   }
   return { endsAt };
 });
