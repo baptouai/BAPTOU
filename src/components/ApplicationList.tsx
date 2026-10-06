@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { DismissForm } from "@/components/DismissForm";
 import { verdictLabel } from "@/components/FitCheck";
 import { RichText } from "@/components/RichText";
+import { looksGeneric } from "@/lib/postingLink";
 import type { Timestamp } from "firebase/firestore";
 import type { Application } from "@/lib/types";
 
@@ -145,6 +146,14 @@ function OfferCard({ app: a }: { app: Item }) {
             {a.postingClosedAt && (
               <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
                 Posting closed
+              </span>
+            )}
+            {!a.postingClosedAt && looksGeneric(a.applyUrl) && (
+              <span
+                className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                title="This link goes to a careers page, not to the posting itself"
+              >
+                General careers page
               </span>
             )}
             {a.source === "manual" && (

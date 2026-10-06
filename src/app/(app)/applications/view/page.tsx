@@ -16,6 +16,7 @@ import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import { RichText } from "@/components/RichText";
+import { looksGeneric } from "@/lib/postingLink";
 import type { Application, LetterVersion } from "@/lib/types";
 
 const AUTOSAVE_MS = 800;
@@ -208,6 +209,15 @@ function ApplicationView() {
           <p className="mt-0.5">
             Checked {app.postingClosedAt.toDate().toLocaleDateString()}: {app.postingClosedReason || "the page is no longer available"}. You
             may want to dismiss it, or check the company&apos;s careers page for a newer version.
+          </p>
+        </section>
+      )}
+
+      {!app.postingClosedAt && looksGeneric(app.applyUrl) && (
+        <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
+          <p className="font-medium">This link goes to a general careers page, not to the posting itself.</p>
+          <p className="mt-0.5">
+            Look for the exact offer on that page. If you find it, add it with “+ Add an offer you found” and dismiss this one.
           </p>
         </section>
       )}

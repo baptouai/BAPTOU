@@ -6,6 +6,23 @@ import { db, REGION } from "./shared.js";
 // Checks whether a posting's page still exists, with a plain HTTP request (no AI, no cost). Careers sites
 // that block bots or render everything in JavaScript give "unknown", which is treated as open.
 
+/**
+ * A link to a careers section rather than to one posting (e.g. /careers/graduate-opportunities).
+ * Keep in sync with src/lib/postingLink.ts in the app.
+ */
+export function looksGeneric(url: string) {
+  try {
+    const u = new URL(url);
+    const path = decodeURIComponent(u.pathname).toLowerCase().replace(/\/+$/, "");
+    if (/\d{3,}|[a-f0-9]{10,}/.test(path + u.search)) return false; // posting ids
+    const last = path.split("/").pop() ?? "";
+    if (!last) return true;
+    return /^(careers?|jobs?|vacanc(y|ies)|opportunit(y|ies)|graduates?|graduate-(opportunities|programmes?|programs?|jobs)|early-careers?|internships?|students?|placements?|join-us|work-with-us|join|recrutement|emplois?|offres?(-d-emploi)?|stages?|alternances?|nous-rejoindre|search|search-results|en|fr|int-en)$/.test(last);
+  } catch {
+    return false;
+  }
+}
+
 export type PostingCheck = { status: "open" | "closed" | "unknown"; reason?: string };
 
 const CLOSED_TEXT = [

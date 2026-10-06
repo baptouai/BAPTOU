@@ -7,7 +7,7 @@ import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { loadDismissed, offerKey, urlId } from "./offers.js";
-import { checkPostings } from "./postings.js";
+import { checkPostings, looksGeneric } from "./postings.js";
 import { anthropicKey, db, type Kind, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
@@ -85,7 +85,7 @@ const JOB_SYSTEM = `You are BAPTOU's job scout. You search the web for real, cur
 
 Rules:
 - Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link. Open a page when you need to check that a posting is still open.
-- Prefer the company's own careers page or the original job-board posting. The url must lead to that specific posting.
+- Prefer the company's own careers page or the original job-board posting. The url must lead to that specific posting, never to a general careers or "opportunities" page.
 - Entry-level, junior or graduate roles only, unless the student asks otherwise. Skip internships, alternances and senior roles.
 - Respect the criteria (roles, locations, work mode, contract type, minimum salary, start date, languages). Mention any compromise in matchReason.
 - Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
@@ -285,10 +285,12 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     const batchAt = Timestamp.now(); // groups this run's offers into the "Latest batch" list
     // Dead links (removed or expired postings) never reach the student. Plain HTTP check, no AI.
     const links = await checkPostings(result.offers.map((o) => o.url));
-    const dropped = result.offers.filter((o) => links.get(o.url)?.status === "closed").length;
+    // Also dropped: links to a careers section instead of the posting itself.
+    const unusable = (url: string) => links.get(url)?.status === "closed" || looksGeneric(url);
+    const dropped = result.offers.filter((o) => unusable(o.url)).length;
     for (const o of result.offers) {
       if (created >= maxPerRun) break;
-      if (links.get(o.url)?.status === "closed") continue;
+      if (unusable(o.url)) continue;
       const id = urlId(o.url);
       const key = offerKey(o.organization, o.title);
       // Hard guarantee, whatever the model returned: turned-down and already-listed offers never come back.

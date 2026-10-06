@@ -3,7 +3,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { urlId } from "./offers.js";
-import { checkPosting } from "./postings.js";
+import { checkPosting, looksGeneric } from "./postings.js";
 import { offerItem } from "./search.js";
 import { anthropicKey, db, type Kind, kindLabel, MODELS, REGION } from "./shared.js";
 
@@ -68,7 +68,7 @@ export const addApplicationFromUrl = onCall(
         { type: "text", text: `Today is ${today()}. Expected kind: ${kindLabel(kind)}.\nLink: ${url}` },
       ],
     });
-    if (!result.isPosting && !force) {
+    if ((!result.isPosting || looksGeneric(url)) && !force) {
       throw new HttpsError("failed-precondition", "This link doesn't look like a specific posting.", { notPosting: true });
     }
 
