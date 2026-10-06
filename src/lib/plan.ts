@@ -37,6 +37,8 @@ export type Entitlement = {
   budgetUsd: number;
   until: number | null;
   cancelAtPeriodEnd?: boolean;
+  endsAt?: number | null; // set once the subscription is cancelled
+  commitmentEnd?: number | null; // yearly plan
 };
 
 type PlanInfo = { entitlement: Entitlement | null; gmailRead: boolean; budgetUsd: number };

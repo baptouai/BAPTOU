@@ -24,3 +24,6 @@ p, li { color: var(--muted); }
 a { color: var(--accent); }
 ul { padding-left: 20px; }
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 56px 0 0; }
+/* Details still to fill in before these pages go live. */
+mark.todo { background: #fde68a; color: #78350f; padding: 0 4px; border-radius: 3px; }

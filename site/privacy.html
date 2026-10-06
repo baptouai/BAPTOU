@@ -12,7 +12,7 @@
     <header><img src="logo.svg" alt=""><a href="index.html" style="color:inherit;text-decoration:none">BAPTOU</a></header>
 
     <h1>Privacy policy</h1>
-    <p>Last updated: 4 October 2026</p>
+    <p>Last updated: 6 October 2026</p>
     <p>
       This policy explains what data BAPTOU collects, why, where it is stored and what rights you have.
       BAPTOU is operated by Baptiste Petit, who is the data controller.
@@ -21,9 +21,11 @@
 
     <h2>Data we collect</h2>
     <ul>
-      <li><strong>Google account basics</strong>: your name and email address, used to sign you in.</li>
+      <li><strong>Google account basics</strong>: your name and email address, used to sign you in and to email you about new offers (you can turn these emails off in your Profile).</li>
       <li><strong>Documents you upload</strong>: CVs, transcripts, diplomas and past motivation letters, and the profile BAPTOU builds from them.</li>
-      <li><strong>What you create in the app</strong>: internship searches, suggested offers, letters, application answers, email drafts and your questions to BAPTOU.</li>
+      <li><strong>What you create in the app</strong>: searches (internships, jobs, alternances, master's programmes), suggested offers, letters, application answers, email drafts and your questions to BAPTOU.</li>
+      <li><strong>Your nationalities</strong>, if you enter them, to answer work permit and visa questions and estimate tuition fees.</li>
+      <li><strong>Subscription data</strong>: your plan, its status and renewal date. Payments are handled by Stripe: BAPTOU never sees or stores your card number.</li>
       <li><strong>Gmail data, only if you connect Gmail</strong> (see below).</li>
       <li><strong>Usage counters</strong>: how much AI processing your account uses, to enforce monthly limits.</li>
     </ul>
@@ -31,7 +33,7 @@
     <h2>Gmail data</h2>
     <p>If you choose to connect Gmail, BAPTOU asks Google for two permissions:</p>
     <ul>
-      <li><strong>Read your email</strong> (<code>gmail.readonly</code>): when you ask BAPTOU to find people to contact, it searches your mailbox and reads the matching conversations, to suggest contacts and write emails that follow on from past exchanges.</li>
+      <li><strong>Read your email</strong> (<code>gmail.readonly</code>): when you ask BAPTOU to find people to contact, it searches your mailbox and reads the matching conversations, to suggest contacts and write emails that follow on from past exchanges. Every morning it also looks at the emails you received since its last check for replies to your applications (see below).</li>
       <li><strong>Send email on your behalf</strong> (<code>gmail.send</code>): used only to send an email you approved by clicking “Approve &amp; send” in the app. BAPTOU never sends anything on its own.</li>
     </ul>
     <p>
@@ -41,7 +43,16 @@
       Newsletters and automated senders are left out. It also stores what it produces for you: the contacts you
       ask it to write to (with a short summary of your past exchanges) and the email drafts. To write a draft, it
       reads your last conversation with that person at that moment, without storing it. The access token Google
-      gives BAPTOU is stored encrypted. When you disconnect Gmail, you choose whether to keep the index (so offers
+      gives BAPTOU is stored encrypted.
+    </p>
+    <p>
+      <strong>Replies to your applications.</strong> Every morning, BAPTOU looks at the senders and subjects of
+      the emails you received since its last check, and keeps those that come from an organization you applied
+      to or contacted (or from its recruitment platform). Only those emails are read and analysed by Claude, to tell you what
+      they say and what to do next. BAPTOU stores that summary with the sender, subject and date, not the email
+      itself.
+    </p>
+    <p> When you disconnect Gmail, you choose whether to keep the index (so offers
       still show people you know) or delete it. You can disconnect Gmail at any time in the app, which revokes
       BAPTOU's access immediately; you can also revoke it from your Google account settings.
     </p>
@@ -58,6 +69,8 @@
     <ul>
       <li><strong>Google Firebase / Google Cloud</strong> (hosting, database, file storage), in the European Union (Belgium and the EU multi-region).</li>
       <li><strong>Anthropic</strong> (Claude AI): to read your documents, research organizations, write letters and emails, and analyse the email excerpts relevant to a request. Anthropic processes this data to return results to BAPTOU and does not use it to train its models.</li>
+      <li><strong>Stripe</strong> (payments): your email address, payment details and billing history, if you subscribe. Stripe processes your payment details under its own <a href="https://stripe.com/privacy">privacy policy</a>.</li>
+      <li><strong>Gmail</strong>: BAPTOU's own emails to you (new offers, invitations) are sent through Google's email service.</li>
     </ul>
     <p>Your data is not sold or shared with anyone else.</p>
 
@@ -65,13 +78,16 @@
     <p>
       Your data is processed to provide the service you signed up for (performance of a contract) and, for Gmail,
       on the basis of your consent, which you can withdraw at any time by disconnecting Gmail. Your data is kept
-      while your account exists and deleted when you ask us to delete your account.
+      while your account exists. When you delete your account, it is deleted straight away, including your
+      uploaded files. Billing records (invoices and payments) are kept for 10 years, as French accounting law
+      requires.
     </p>
 
     <h2>Your rights</h2>
     <p>
       Under the GDPR you can access, correct, export or delete your data, object to or restrict its processing,
-      and withdraw your consent. To exercise these rights, email
+      and withdraw your consent. In the app, your Profile page has <strong>Export my data</strong> (a file with
+      everything BAPTOU stores about you) and <strong>Delete my account</strong>. For anything else, email
       <a href="mailto:baptiste.clement.petit@gmail.com">baptiste.clement.petit@gmail.com</a>. You can also lodge a
       complaint with your data protection authority (in France, the <a href="https://www.cnil.fr">CNIL</a>).
     </p>

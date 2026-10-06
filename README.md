@@ -44,6 +44,19 @@ AI features only work for invited users. To invite someone, create a document in
 (database `baptou`) at `access/<their email in lowercase>`, optionally with a number field
 `monthlyLimitUsd` (default 5).
 
+## Emails to users
+
+Invitations, new-offer emails and cancellation confirmations are sent from the owner's Gmail
+(`config/app.ownerUid`, which must have Gmail connected), with "BAPTOU" as the sender name
+(`functions/src/notify.ts`). New offers: one summary per search run, or a dedicated email for each
+offer scoring 90% or more. Users turn them off on their Profile page.
+
+## Legal pages
+
+`site/terms.html` (CGV/CGU, French with English translation) and `site/legal.html` (mentions
+légales) contain highlighted blanks (`<mark class="todo">`). They are excluded from hosting in
+`firebase.json` until filled in; then remove them from `ignore` and deploy `hosting:site`.
+
 ## Deploy rules
 
 ```bash
@@ -61,4 +74,5 @@ npx firebase deploy --only firestore,storage
 5. Gmail sending after approval (`gmail.send` scope)
 6. Gmail contact search (`gmail.readonly`, test users only until CASA)
 7. Master's programme discovery, deadlines and application packs
-8. Billing (Stripe), usage limits, privacy policy, account deletion
+8. ✅ Billing (Stripe, test mode), usage limits, privacy policy, account export and deletion, in-app cancellation
+9. Legal pages live, Stripe live mode, own domain and transactional email

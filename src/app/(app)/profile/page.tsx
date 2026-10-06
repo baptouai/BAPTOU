@@ -11,6 +11,7 @@ import type { DocumentKind, UploadedDocument } from "@/lib/types";
 import { ProfileSummary } from "@/components/ProfileSummary";
 import { GmailConnect } from "@/components/GmailConnect";
 import { Nationalities } from "@/components/Nationalities";
+import { AccountSettings } from "@/components/AccountSettings";
 
 const kinds: { value: DocumentKind; label: string }[] = [
   { value: "cv", label: "CV" },
@@ -120,6 +121,8 @@ export default function ProfilePage() {
       <Suspense>
         <GmailConnect />
       </Suspense>
+
+      <AccountSettings />
     </div>
   );
 }

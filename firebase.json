@@ -47,7 +47,9 @@
       "cleanUrls": true,
       "ignore": [
         "firebase.json",
-        "**/.*"
+        "**/.*",
+        "terms.html",
+        "legal.html"
       ]
     },
     {

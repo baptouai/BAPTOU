@@ -1,13 +1,12 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { GMAIL_SECRETS, gmailFor, sendMail } from "./gmail.js";
-import { db, REGION } from "./shared.js";
+import { GMAIL_SECRETS, sendMail } from "./gmail.js";
+import { APP_URL, ownerMailer } from "./notify.js";
+import { REGION } from "./shared.js";
 
 // When BAPTOU Admin gifts a subscription with "Send invitation email" ticked, it sets `notify: true` on
 // access/{email}. This sends the invitation from the owner's Gmail, then clears the flag.
-
-const APP_URL = "https://baptou-app.web.app";
 
 function invitation(email: string, ownerName: string, until: Date | null) {
   const fr = until ? `jusqu'au ${until.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : "sans date de fin";
@@ -53,13 +52,9 @@ export const sendGiftInvitation = onDocumentWritten(
     if (!after?.exists || after.get("notify") !== true) return;
     const email = decodeURIComponent(event.params.email);
     try {
-      const ownerUid = (await db.doc("config/app").get()).get("ownerUid") as string | undefined;
-      if (!ownerUid) throw new Error("config/app.ownerUid is not set");
-      const owner = await db.doc(`users/${ownerUid}`).get();
-      const ownerName = (owner.get("displayName") as string | undefined) ?? "BAPTOU";
+      const { gmail, name } = await ownerMailer();
       const until = (after.get("expiresAt") as Timestamp | undefined)?.toDate() ?? null;
-      const mail = invitation(email, ownerName, until);
-      await sendMail(await gmailFor(ownerUid), { to: email, ...mail });
+      await sendMail(gmail, { to: email, ...invitation(email, name, until) });
       await after.ref.update({ notify: false, notifiedAt: FieldValue.serverTimestamp(), notifyError: FieldValue.delete() });
       logger.info("Gift invitation sent", { email });
     } catch (e) {

@@ -131,6 +131,15 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
   }
 });
 
+/** Revokes the user's Gmail grant at Google (best effort). */
+export async function revokeGmail(uid: string) {
+  const enc = (await db.doc(`private/${uid}`).get()).get("gmail.refreshToken") as string | undefined;
+  if (!enc) return;
+  await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(enc))}`, { method: "POST" }).catch(
+    () => {},
+  );
+}
+
 /**
  * Revokes BAPTOU's Gmail access and deletes the stored token. The contact index is kept (offers still
  * match against it) unless `clearIndex` is set.
@@ -138,13 +147,7 @@ export const gmailOAuthCallback = onRequest({ region: REGION, secrets: GMAIL_SEC
 export const gmailDisconnect = onCall({ region: REGION, secrets: GMAIL_SECRETS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
-  const priv = await db.doc(`private/${uid}`).get();
-  const enc = priv.get("gmail.refreshToken") as string | undefined;
-  if (enc) {
-    await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(enc))}`, { method: "POST" }).catch(
-      () => {},
-    );
-  }
+  await revokeGmail(uid);
   const clearIndex = request.data?.clearIndex === true;
   await db.doc(`private/${uid}`).update({ gmail: FieldValue.delete() });
   await db.doc(`users/${uid}`).update({
@@ -289,11 +292,11 @@ const encodeHeader = (v: string) => (/^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?$
 /** Sends one plain-text email from the user's Gmail, as a reply in `threadId` when given. */
 export async function sendMail(
   gmail: Gmail,
-  mail: { to: string; subject: string; body: string; threadId?: string },
+  mail: { to: string; subject: string; body: string; threadId?: string; fromName?: string },
 ) {
   const reply = mail.threadId ? await threadReplyInfo(gmail, mail.threadId) : null;
   const headers = [
-    `From: ${gmail.email}`,
+    `From: ${mail.fromName ? `${encodeHeader(mail.fromName)} <${gmail.email}>` : gmail.email}`,
     `To: ${mail.to}`,
     `Subject: ${encodeHeader(mail.subject)}`,
     "MIME-Version: 1.0",

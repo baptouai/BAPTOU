@@ -5,6 +5,8 @@ import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { GMAIL_SECRETS } from "./gmail.js";
+import { APP_URL, emailUser, longDate } from "./notify.js";
 import { db, entitlementFor, type Plan, REGION } from "./shared.js";
 
 // Payments with Stripe (plain REST, no SDK). The three contracts are Stripe prices found by lookup key;
@@ -28,7 +30,7 @@ function encode(obj: Record<string, unknown>, prefix = ""): [string, string][] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function stripe<T = any>(method: "GET" | "POST", path: string, body?: Record<string, unknown>): Promise<T> {
+async function stripe<T = any>(method: "GET" | "POST" | "DELETE", path: string, body?: Record<string, unknown>): Promise<T> {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     method,
     headers: { Authorization: `Bearer ${stripeKey.value()}`, "Content-Type": "application/x-www-form-urlencoded" },
@@ -93,8 +95,8 @@ export const createCheckout = onCall({ region: REGION, secrets: [stripeKey] }, a
 });
 
 /**
- * Stripe's customer portal (payment method, invoices, cancellation). During the yearly plan's 12-month
- * commitment, the portal is opened without the cancel option.
+ * Stripe's customer portal, for the payment method and invoices. Cancelling goes through cancelSubscription
+ * (end date by email, yearly commitment respected), so the portal is opened without the cancel option.
  */
 export const billingPortal = onCall({ region: REGION, secrets: [stripeKey] }, async (request) => {
   const uid = request.auth?.uid;
@@ -104,9 +106,7 @@ export const billingPortal = onCall({ region: REGION, secrets: [stripeKey] }, as
   const customer = priv.get("stripeCustomerId") as string | undefined;
   if (!customer) throw new HttpsError("failed-precondition", "You don't have a paid plan yet.");
 
-  const plan = priv.get("plan") as Plan | undefined;
-  const committed = plan?.type === "annual" && (plan.commitmentEnd?.toMillis() ?? 0) > Date.now();
-  const configuration = await portalConfiguration(!committed);
+  const configuration = await portalConfiguration(false);
   const origin = RETURN_ORIGINS.includes(returnTo) ? returnTo : RETURN_ORIGINS[0];
   const session = await stripe("POST", "billing_portal/sessions", {
     customer,
@@ -135,6 +135,57 @@ async function portalConfiguration(canCancel: boolean) {
   return config.id as string;
 }
 
+/**
+ * Cancelling from the Plans page, in a few clicks as French law requires. Monthly: ends at the end of the
+ * paid month. Yearly: ends when the 12-month commitment does (or at the end of the month once it's over).
+ * `undo` keeps the subscription. The user gets the end date by email.
+ */
+export const cancelSubscription = onCall({ region: REGION, secrets: [stripeKey, ...GMAIL_SECRETS] }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const undo = request.data?.undo === true;
+  const plan = (await db.doc(`private/${uid}`).get()).get("plan") as Plan | undefined;
+  if (!plan?.subscriptionId || (plan.status !== "active" && plan.status !== "past_due")) {
+    throw new HttpsError("failed-precondition", "You don't have an active subscription.");
+  }
+  const path = `subscriptions/${plan.subscriptionId}`;
+  const committedUntil = plan.type === "annual" ? (plan.commitmentEnd?.toMillis() ?? 0) : 0;
+  const committed = committedUntil > Date.now();
+  let body: Record<string, unknown>;
+  if (undo) {
+    // Stripe accepts only one of the two at a time.
+    const current = await stripe("GET", path);
+    body = current.cancel_at_period_end ? { cancel_at_period_end: false } : { cancel_at: "" };
+  } else if (committed) {
+    body = { cancel_at: Math.floor(committedUntil / 1000), proration_behavior: "none" };
+  } else {
+    body = { cancel_at_period_end: true };
+  }
+  const sub = await stripe("POST", path, body);
+  await syncSubscription(sub);
+
+  const endsAt = sub.cancel_at ? (sub.cancel_at as number) * 1000 : null;
+  if (!undo && endsAt) {
+    await emailUser(uid, {
+      subject: `Your BAPTOU subscription ends on ${longDate(endsAt)}`,
+      body: `Hi,
+
+We've received the cancellation of your ${plan.type === "annual" ? "yearly" : "monthly"} BAPTOU subscription, on ${longDate(Date.now())}.
+
+It ends on ${longDate(endsAt)}. You keep full access until then${
+        committed
+          ? ". Your yearly plan is committed for 12 months, so the monthly payments until that date are still due; there is none after it."
+          : ", and there will be no further payment."
+      }
+
+Changed your mind? Keep your subscription from the Plans page: ${APP_URL}/plans
+
+BAPTOU`,
+    });
+  }
+  return { endsAt };
+});
+
 // --- Webhook
 
 /** Checks Stripe's signature (HMAC-SHA256 of "timestamp.payload"), within 5 minutes. */
@@ -152,6 +203,8 @@ async function uidForCustomer(customerId: string) {
 }
 
 async function setPlan(uid: string, plan: Plan & { subscriptionId?: string }) {
+  // A deleted account stays deleted (Stripe sends the cancellation event after the deletion).
+  if (!(await getAuth().getUser(uid).catch(() => null))) return logger.info("Plan event for a deleted account", { uid });
   // Replace the whole plan, so fields from an older plan don't linger.
   await db.doc(`private/${uid}`).set({ plan, planUpdatedAt: FieldValue.serverTimestamp() }, { mergeFields: ["plan", "planUpdatedAt"] });
 }
@@ -174,7 +227,8 @@ async function syncSubscription(sub: any) {
     type,
     status,
     ...(periodEnd ? { currentPeriodEnd: Timestamp.fromMillis(periodEnd * 1000) } : {}),
-    cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+    cancelAtPeriodEnd: !!sub.cancel_at_period_end || !!sub.cancel_at,
+    ...(sub.cancel_at ? { cancelAt: Timestamp.fromMillis(sub.cancel_at * 1000) } : {}),
     subscriptionId: sub.id,
     ...(type === "annual" && sub.start_date
       ? { commitmentEnd: Timestamp.fromMillis(addMonths(sub.start_date * 1000, COMMITMENT_MONTHS)) }
@@ -220,3 +274,17 @@ export const stripeWebhook = onRequest({ region: REGION, secrets: [stripeKey, st
     res.status(500).send("error"); // Stripe retries
   }
 });
+
+/**
+ * Account deletion: stops the subscription right away (no further payments) and forgets the customer
+ * mapping. The Stripe customer and its invoices stay in Stripe (accounting records must be kept).
+ */
+export async function endBillingForDeletedAccount(uid: string, priv: FirebaseFirestore.DocumentSnapshot) {
+  const subscriptionId = priv.get("plan.subscriptionId") as string | undefined;
+  const status = priv.get("plan.status") as Plan["status"] | undefined;
+  if (subscriptionId && (status === "active" || status === "past_due")) {
+    await stripe("DELETE", `subscriptions/${subscriptionId}`);
+  }
+  const customerId = priv.get("stripeCustomerId") as string | undefined;
+  if (customerId) await db.doc(`stripeCustomers/${customerId}`).delete();
+}

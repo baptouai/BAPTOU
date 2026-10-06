@@ -99,6 +99,7 @@ export type Plan = {
   currentPeriodEnd?: FirebaseFirestore.Timestamp;
   cancelAtPeriodEnd?: boolean;
   commitmentEnd?: FirebaseFirestore.Timestamp; // annual plan: paid monthly, committed for 12 months
+  cancelAt?: FirebaseFirestore.Timestamp; // when a cancelled subscription ends
   subscriptionId?: string;
 };
 
@@ -107,6 +108,8 @@ export type Entitlement = {
   budgetUsd: number;
   until: number | null; // ms; null = no end date
   cancelAtPeriodEnd?: boolean;
+  endsAt?: number | null; // ms; set once the subscription is cancelled
+  commitmentEnd?: number | null; // ms; yearly plan
 };
 
 const isLive = (end?: { toMillis(): number } | null) => !end || end.toMillis() > Date.now();
@@ -123,6 +126,8 @@ export async function entitlementFor(uid: string, priv?: FirebaseFirestore.Docum
       budgetUsd: PLAN_BUDGET_USD,
       until: plan.currentPeriodEnd?.toMillis() ?? null,
       cancelAtPeriodEnd: plan.cancelAtPeriodEnd,
+      endsAt: plan.cancelAt?.toMillis() ?? null,
+      commitmentEnd: plan.commitmentEnd?.toMillis() ?? null,
     };
   }
 

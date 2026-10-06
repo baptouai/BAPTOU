@@ -8,6 +8,9 @@ import { formatPct, PLANS, refreshPlan, usePlan } from "@/lib/plan";
 
 const createCheckout = httpsCallable<{ plan: string; returnTo: string }, { url: string }>(functions, "createCheckout");
 const billingPortal = httpsCallable<{ returnTo: string }, { url: string }>(functions, "billingPortal");
+const cancelSubscription = httpsCallable<{ undo?: boolean }, { endsAt: number | null }>(functions, "cancelSubscription");
+
+const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
 
 const KIND_LABEL = {
   owner: "Owner",
@@ -31,8 +34,14 @@ function Plans() {
   const { plan, loading, spentUsd, pctOf } = usePlan(reload);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [now] = useState(() => Date.now());
   const e = plan?.entitlement;
   const paid = e && (e.kind === "monthly" || e.kind === "annual" || e.kind === "pass");
+  const subscribed = e?.kind === "monthly" || e?.kind === "annual";
+  // When a cancellation would take effect: the end of the yearly commitment, otherwise the end of the paid month.
+  const committedUntil = e?.kind === "annual" && e.commitmentEnd && e.commitmentEnd > now ? e.commitmentEnd : null;
+  const cancelDate = committedUntil ?? e?.until ?? null;
 
   // Back from Stripe: the plan is activated by Stripe's confirmation, a few seconds later. Ask again until it shows.
   const waiting = checkout === "success" && !loading && !paid && reload < 10;
@@ -53,6 +62,21 @@ function Plans() {
       window.location.assign(data.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+      setBusy(null);
+    }
+  }
+
+  async function cancel(undo: boolean) {
+    setBusy(undo ? "undo" : "cancel");
+    setError(null);
+    try {
+      await cancelSubscription({ undo });
+      refreshPlan();
+      setReload((n) => n + 1);
+      setConfirming(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
       setBusy(null);
     }
   }
@@ -97,11 +121,13 @@ function Plans() {
                 <p>
                   <span className="font-medium">{KIND_LABEL[e.kind]}</span>
                   <span className="text-muted">
-                    {e.until
-                      ? ` · ${e.cancelAtPeriodEnd || e.kind === "pass" || e.kind === "gift" ? "until" : "renews on"} ${new Date(e.until).toLocaleDateString()}`
-                      : e.kind === "gift"
-                        ? " · no end date"
-                        : ""}
+                    {e.endsAt
+                      ? ` · ends on ${day(e.endsAt)}`
+                      : e.until
+                        ? ` · ${e.kind === "pass" || e.kind === "gift" ? "until" : "renews on"} ${day(e.until)}`
+                        : e.kind === "gift"
+                          ? " · no end date"
+                          : ""}
                   </span>
                 </p>
                 <p className="text-muted">{formatPct(pctOf(spentUsd))} of this month&apos;s allowance used.</p>
@@ -112,12 +138,50 @@ function Plans() {
           </div>
           {paid && e?.kind !== "pass" && (
             <button onClick={manage} disabled={!!busy} className="rounded-lg border border-border px-4 py-2 disabled:opacity-50">
-              {busy === "portal" ? "Opening…" : "Manage subscription"}
+              {busy === "portal" ? "Opening…" : "Payment method & invoices"}
             </button>
           )}
         </div>
-        {e?.kind === "annual" && (
-          <p className="mt-2 text-xs text-muted">The yearly plan is committed for 12 months; you can cancel it after that.</p>
+        {committedUntil && !e?.endsAt && (
+          <p className="mt-2 text-xs text-muted">The yearly plan is committed for 12 months, until {day(committedUntil)}.</p>
+        )}
+
+        {subscribed && (
+          <div className="mt-4 border-t border-border pt-4">
+            {e?.endsAt ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-muted">
+                  You cancelled your subscription. You keep full access until {day(e.endsAt)}, with no payment after that.
+                </p>
+                <button onClick={() => cancel(true)} disabled={!!busy} className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50">
+                  {busy === "undo" ? "Saving…" : "Keep my subscription"}
+                </button>
+              </div>
+            ) : confirming ? (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+                <p className="font-medium">Cancel your subscription?</p>
+                <p className="mt-1 text-muted">
+                  {cancelDate ? `It will end on ${day(cancelDate)}. You keep full access until then` : "It will end at the end of the current period"}
+                  {committedUntil
+                    ? ". Your yearly plan is committed for 12 months: the monthly payments until that date are still due, and there is none after it."
+                    : ", and there will be no further payment."}{" "}
+                  You&apos;ll get a confirmation by email.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button onClick={() => cancel(false)} disabled={!!busy} className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white disabled:opacity-50">
+                    {busy === "cancel" ? "Cancelling…" : "Confirm cancellation"}
+                  </button>
+                  <button onClick={() => setConfirming(false)} disabled={!!busy} className="rounded-lg border border-border px-4 py-2 disabled:opacity-50">
+                    Keep my subscription
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setConfirming(true)} className="text-muted underline-offset-2 hover:text-foreground hover:underline">
+                Cancel subscription
+              </button>
+            )}
+          </div>
         )}
       </section>
 

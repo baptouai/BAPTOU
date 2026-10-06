@@ -8,9 +8,15 @@ import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { loadDismissed, offerKey, urlId } from "./offers.js";
 import { checkPostings, looksGeneric } from "./postings.js";
+import { type NewOffer, notifyNewOffers } from "./notify.js";
+import { GMAIL_SECRETS } from "./gmail.js";
 import { anthropicKey, db, type Kind, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
+// Calibrated so that 90+ ("almost ideal") is rare: the user gets a dedicated email for those.
+const SCORE_SCALE =
+  "0 to 100. 90+ only when it matches almost everything (role, field, location, dates, level, languages, requirements the student meets); 75-89 strong match with one gap; 60-74 decent; below 60 don't suggest it";
+
 type Search = {
   kind?: Kind; // missing = internship (searches created before other kinds existed)
   name: string;
@@ -49,7 +55,7 @@ export const OffersSchema = z.object({
       startDate: z.string().describe("As stated in the posting, or empty"),
       duration: z.string().describe("As stated in the posting, or empty"),
       postingLanguage: z.string().describe("Language the posting is written in"),
-      matchScore: z.number().describe("0 to 100"),
+      matchScore: z.number().describe(SCORE_SCALE),
       matchReason: z.string().describe("2-4 reasons this fits the student, citing their profile. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
       companyBrief: z.string().describe("3-5 facts on the company: what it does, size, recent news, culture. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
@@ -137,7 +143,7 @@ export const ProgrammesSchema = z.object({
       startDate: z.string().describe("Intake, e.g. September 2027"),
       duration: z.string().describe("Programme length, e.g. 1 year"),
       postingLanguage: z.string().describe("Language of instruction"),
-      matchScore: z.number().describe("0 to 100"),
+      matchScore: z.number().describe(SCORE_SCALE),
       matchReason: z.string().describe("2-4 reasons this programme fits the student's degree, grades and goals. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
       companyBrief: z
         .string()
@@ -282,6 +288,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     });
 
     let created = 0;
+    const fresh: NewOffer[] = []; // this run's new offers, for the email to the user
     const batchAt = Timestamp.now(); // groups this run's offers into the "Latest batch" list
     // Dead links (removed or expired postings) never reach the student. Plain HTTP check, no AI.
     const links = await checkPostings(result.offers.map((o) => o.url));
@@ -323,6 +330,15 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
         });
         created++;
         existingKeys.add(key);
+        fresh.push({
+          id,
+          title: o.title,
+          organization: o.organization,
+          location: o.location,
+          matchScore: Math.round(Math.min(Math.max(o.matchScore, 0), 100)),
+          matchReason: o.matchReason,
+          deadline: o.deadline,
+        });
       } catch {
         // Already exists: same posting suggested before.
       }
@@ -340,6 +356,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${result.summary}`,
       totalFound: FieldValue.increment(created),
     });
+    await notifyNewOffers(uid, searchId, search.name, fresh);
   } catch (e) {
     logger.error("runSearch failed", { uid, searchId, error: String(e) });
     await searchRef.update({
@@ -355,7 +372,7 @@ const queue = () => getFunctions().taskQueue(`locations/${REGION}/functions/runS
 export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string }>(
   {
     region: REGION,
-    secrets: [anthropicKey],
+    secrets: [anthropicKey, ...GMAIL_SECRETS], // Gmail: the new-offer email
     timeoutSeconds: 900,
     memory: "512MiB",
     retryConfig: { maxAttempts: 1 },

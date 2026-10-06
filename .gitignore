@@ -46,3 +46,4 @@ API.txt
 
 # firebase deploy cache
 .firebase/
+firebase-debug.log
