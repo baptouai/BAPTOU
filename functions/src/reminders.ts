@@ -31,7 +31,7 @@ export const commitmentReminders = onSchedule(
 Your 12-month commitment for the yearly BAPTOU plan ends on ${longDate(end)}.
 
 What happens next:
-- If you do nothing, your plan continues month by month at the same price (€11.49 per month), and you can cancel it at any time.
+- If you do nothing, your plan continues month by month at the same monthly price, and you can cancel it at any time.
 - If you don't want it to continue, cancel it from the Plans page before ${longDate(end)}: it will end on that date, with no payment after it.
 
 Plans page: ${APP_URL}/plans

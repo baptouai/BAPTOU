@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -107,6 +108,9 @@ export async function runAgent<T>(opts: {
         system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
         tools,
         messages,
+        // Which end user a request is for (a hash, no personal data), so Anthropic can act on one abusive
+        // user rather than on BAPTOU's whole account.
+        metadata: { user_id: endUser(opts.uid) },
       })
       .finalMessage();
     runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
@@ -170,6 +174,8 @@ export async function runAgent<T>(opts: {
   done(MAX_CONTINUATIONS + maxToolCalls);
   throw new HttpsError("deadline-exceeded", "BAPTOU took too long. Try again.");
 }
+
+const endUser = (uid: string) => createHash("sha256").update(`baptou:${uid}`).digest("hex").slice(0, 32);
 
 /** Loads the profile built by `buildProfile`, or fails with a clear message. */
 export async function loadProfile(uid: string) {

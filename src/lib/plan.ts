@@ -6,27 +6,27 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 
-// Prices (VAT included) for the three contracts: €6 of AI per month + margin + payment fees + 20% VAT.
+// Prices (VAT included) for the three contracts: €10 of AI per month + margin + payment fees + 20% VAT.
 // Shown on the Plans page; the amounts actually charged are set on the Stripe prices.
 export const PLANS = [
   {
     id: "monthly",
     name: "Monthly",
-    price: "€13.99",
+    price: "€18.99",
     per: "per month",
     detail: "Renews every month. Cancel anytime.",
   },
   {
     id: "annual",
     name: "Yearly",
-    price: "€11.49",
+    price: "€16.49",
     per: "per month, for 12 months",
     detail: "The best price, paid monthly. 12-month commitment.",
   },
   {
     id: "pass",
     name: "One month",
-    price: "€13.99",
+    price: "€18.99",
     per: "once",
     detail: "One month of BAPTOU, no renewal.",
   },
@@ -53,7 +53,7 @@ function loadPlan(uid: string) {
       uid,
       promise: myPlan()
         .then(({ data }) => data)
-        .catch(() => ({ entitlement: null, gmailRead: false, budgetUsd: 6.6 })),
+        .catch(() => ({ entitlement: null, gmailRead: false, budgetUsd: 11 })),
     };
   }
   return cache.promise;
@@ -82,7 +82,7 @@ export function usePlan(reloadKey = 0) {
     });
   }, [user, reloadKey]);
 
-  const budget = plan?.entitlement?.budgetUsd ?? plan?.budgetUsd ?? 6.6;
+  const budget = plan?.entitlement?.budgetUsd ?? plan?.budgetUsd ?? 11;
   return {
     plan,
     loading: !plan,

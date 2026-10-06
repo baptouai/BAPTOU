@@ -52,10 +52,10 @@ const PRICES: Record<Model, { input: number; output: number }> = {
 };
 const WEB_SEARCH_USD = 0.01; // $10 per 1,000 searches
 
-// AI allowance included in every subscription (and gift): €6 a month. Costs are computed in USD, so the
+// AI allowance included in every subscription (and gift): €10 a month. Costs are computed in USD, so the
 // allowance is stored in USD (rate kept deliberately round; revisit if EUR/USD moves a lot).
 const EUR_TO_USD = 1.1;
-export const PLAN_BUDGET_EUR = 6;
+export const PLAN_BUDGET_EUR = 10;
 export const PLAN_BUDGET_USD = Math.round(PLAN_BUDGET_EUR * EUR_TO_USD * 100) / 100;
 
 // Stored in Google Secret Manager: `npx firebase functions:secrets:set ANTHROPIC_API_KEY`

@@ -15,7 +15,7 @@ const auth = require(join(here, "..", "node_modules", "firebase-tools", "lib", "
 
 const PROJECT = "baptou-5041c";
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/baptou/documents`;
-const DEFAULT_LIMIT = 6.6; // €6 allowance; keep in sync with PLAN_BUDGET_USD in functions/src/shared.ts
+const DEFAULT_LIMIT = 11; // €10 allowance; keep in sync with PLAN_BUDGET_USD in functions/src/shared.ts
 const GMAIL_READ_CAP = 100; // keep in sync with functions/src/access.ts
 const PORT = 4545;
 const SENDER = "baptouai@gmail.com"; // BAPTOU's own mailbox, which sends its emails to users
