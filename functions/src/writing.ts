@@ -7,6 +7,7 @@ import { toContentBlock } from "./profile.js";
 import { letterLimit } from "./form.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+import { HUMAN_STYLE } from "./style.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -36,7 +37,9 @@ Rules:
 - Research the organization on the web so the letter is specific (projects, values, recent news) rather than generic.
 - Write in the language of the posting unless the student asks otherwise.
 - Be concise and concrete: link the student's real achievements to what this organization needs.
-- If the student gives instructions or has edited a draft, follow their instructions and keep their edits unless told otherwise.`;
+- If the student gives instructions or has edited a draft, follow their instructions and keep their edits unless told otherwise.
+
+${HUMAN_STYLE}`;
 
 async function loadContext(uid: string, applicationId: string) {
   const appRef = db.doc(`users/${uid}/applications/${applicationId}`);

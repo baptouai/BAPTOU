@@ -689,6 +689,28 @@ export const fr: Record<string, string> = {
   "Paused while {n} offers wait for your review. Go through them (interested or not for me) and BAPTOU searches again the next morning.":
     "En pause : {n} offres attendent votre avis. Passez-les en revue (intéressé ou pas pour moi) et BAPTOU recherchera de nouveau le lendemain matin.",
   "This date has already passed.": "Cette date est déjà passée.",
+  "Check this": "À vérifier",
+  "Applications you've sent, with their latest news. Open one to follow it.":
+    "Les candidatures que vous avez envoyées, avec leurs dernières nouvelles. Ouvrez-en une pour la suivre.",
+  "Once you've applied, mark the offer as applied on its page to follow it here.":
+    "Une fois votre candidature envoyée, marquez l'offre comme envoyée sur sa page pour la suivre ici.",
+  "applied {date}": "envoyée le {date}",
+  "Follow-up": "Suivi",
+  "Offer received": "Offre reçue",
+  "Waiting for a reply": "En attente de réponse",
+  "Applied on {date} (today).": "Envoyée le {date} (aujourd'hui).",
+  "Applied on {date} (yesterday).": "Envoyée le {date} (hier).",
+  "Applied on {date} ({n} days ago).": "Envoyée le {date} (il y a {n} jours).",
+  "No news for {n} days. A short, polite follow-up email often gets things moving.":
+    "Pas de nouvelles depuis {n} jours. Un court email de relance, poli, fait souvent avancer les choses.",
+  "Draft a follow-up email": "Rédiger un email de relance",
+  "You emailed the recruiter from BAPTOU.": "Vous avez écrit au recruteur depuis BAPTOU.",
+  "You applied.": "Vous avez envoyé votre candidature.",
+  "BAPTOU checks your mailbox every morning and adds any reply about this application here (needs Gmail reading).":
+    "BAPTOU vérifie votre boîte mail chaque matin et ajoute ici toute réponse à cette candidature (nécessite la lecture de Gmail).",
+  "Mark as rejected": "Marquer comme refusée",
+  "Mark as still in progress": "Marquer comme toujours en cours",
+  "BAPTOU's suggestion: make sure it's what you want to say": "Suggestion de BAPTOU : vérifiez que c'est bien ce que vous voulez dire",
   "Use {date}": "Utiliser {date}",
   "the offer on the organization's own site is closed": "l'offre est fermée sur le site de l'organisation",
   "the posting is no longer on the company's Workday site": "l'offre n'est plus sur le site Workday de l'entreprise",

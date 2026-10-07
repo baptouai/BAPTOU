@@ -166,10 +166,14 @@ ${full
         createdAt: FieldValue.serverTimestamp(),
       });
       if (appId) {
-        await db.doc(`users/${uid}/applications/${appId}`).update({
+        const appRef = db.doc(`users/${uid}/applications/${appId}`);
+        const appliedAt = (await appRef.get()).get("appliedAt");
+        await appRef.update({
           lastReply: { kind: r.kind, at: FieldValue.serverTimestamp(), messageId: m.id },
           // A rejection closes the application; an acknowledgement means it was sent.
           ...(r.kind === "rejection" ? { status: "rejected" } : r.kind === "received" ? { status: "applied" } : {}),
+          // Any reply means the application was sent: date it from the reply if the student never marked it.
+          ...(appliedAt ? {} : { appliedAt: Timestamp.fromMillis(Number(m.internalDate ?? Date.now())) }),
           updatedAt: FieldValue.serverTimestamp(),
         });
       }

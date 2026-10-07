@@ -56,7 +56,7 @@ export const OffersSchema = z.object({
       duration: z.string().describe("As stated in the posting, or empty"),
       postingLanguage: z.string().describe("Language the posting is written in"),
       matchScore: z.number().describe(SCORE_SCALE),
-      matchReason: z.string().describe("2-4 reasons this fits the student, citing their profile. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
+      matchReason: z.string().describe("2-4 reasons this fits the student, citing their profile. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs. Never a placeholder."),
       companyBrief: z.string().describe("3-5 facts on the company: what it does, size, recent news, culture. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
   ),
@@ -158,7 +158,7 @@ export const ProgrammesSchema = z.object({
       duration: z.string().describe("Programme length, e.g. 1 year"),
       postingLanguage: z.string().describe("Language of instruction"),
       matchScore: z.number().describe(SCORE_SCALE),
-      matchReason: z.string().describe("2-4 reasons this programme fits the student's degree, grades and goals. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
+      matchReason: z.string().describe("2-4 reasons this programme fits the student's degree, grades and goals. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs. Never a placeholder."),
       companyBrief: z
         .string()
         .describe("4-6 facts: tuition per year for this student, admission requirements (degree, grades, tests such as GRE/IELTS), reputation, career outcomes. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
@@ -213,6 +213,9 @@ function pick(o: object, keys: string[]) {
     keys.map((k) => [k, (o as Record<string, unknown>)[k]]).filter(([, v]) => typeof v === "string" && v),
   );
 }
+
+// When a run stops at its limits, the model sometimes fills a text with "placeholder": show nothing instead.
+const real = (text: string) => (/^\s*(placeholder|n\/?a|tbd|todo|none|-)\s*\.?\s*$/i.test(text) ? "" : text);
 
 function parseDate(s: string): Timestamp | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -378,7 +381,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     }
 
     const picked = await choose(first.offers, maxPerRun);
-    let summary = first.summary;
+    let summary = real(first.summary);
     let leads = first.leadsToCheckNext;
     const secondStats: AgentStats = { costUsd: 0 };
 
@@ -430,8 +433,8 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
           duration: o.duration,
           postingLanguage: o.postingLanguage,
           matchScore,
-          matchReason: o.matchReason,
-          research: o.companyBrief,
+          matchReason: real(o.matchReason),
+          research: real(o.companyBrief),
           // Contract details for jobs and alternances (absent on other kinds).
           ...pick(o, ["contractType", "salary", "rhythm", "school"]),
           letter: "",
@@ -440,7 +443,7 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
           updatedAt: FieldValue.serverTimestamp(),
         });
         created++;
-        fresh.push({ id, title: o.title, organization: o.organization, location: o.location, matchScore, matchReason: o.matchReason, deadline: o.deadline });
+        fresh.push({ id, title: o.title, organization: o.organization, location: o.location, matchScore, matchReason: real(o.matchReason), deadline: o.deadline });
       } catch {
         // Already exists: same posting suggested before.
       }

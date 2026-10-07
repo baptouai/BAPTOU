@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { runAgent } from "./agent.js";
 import { MODELS } from "./shared.js";
+import { HUMAN_STYLE } from "./style.js";
 
 // Application forms often cap answers at N characters. BAPTOU's answers must never exceed the cap:
 // over-long texts get one quick shortening pass, then a clean cut as a guarantee.
@@ -22,6 +23,10 @@ export const ShortenSchema = z.object({ texts: z.array(z.string()).describe("The
 const SYSTEM = `You shorten a student's application texts so they fit an application form's character limits.
 Keep the facts, the meaning, the tone and the language. Cut filler and repetition first, then less important details.
 Each text must be at most its limit in characters (spaces included); aim for about 90% of it.
+Don't make the texts sound more formal or machine-written while shortening.
+
+${HUMAN_STYLE}
+
 Call submit_texts once with every text, in the order given.`;
 
 /** Returns the texts, each within its limit (texts with limit 0 are untouched). */

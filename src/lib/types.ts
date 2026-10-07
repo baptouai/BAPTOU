@@ -52,6 +52,7 @@ export type Application = {
   fromJobBoard?: boolean; // the link is a job board's copy: the organization doesn't publish it itself
   postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
   postingClosedReason?: string;
+  appliedAt?: Timestamp; // when the student marked it applied, or when a reply showed it was sent
   lastReply?: { kind: "received" | "interview" | "rejection" | "offer" | "request" | "other"; at: Timestamp; messageId: string };
   dismissReason?: string; // why the user turned it down; future searches learn from it
   fitVerdict?: FitVerdict; // BAPTOU's latest answer to "is this for me?"
@@ -160,6 +161,7 @@ export type FormField = {
   suggestedDocument: DocumentKind | "none";
   entries: FormEntry[];
   needsUser: boolean;
+  check?: boolean; // BAPTOU's suggestion to confirm (pay expectations, availability, opinions)
   note: string;
   isCoverLetter?: boolean; // missing on forms prepared before this flag existed
   worthPreparing?: boolean; // needs real work (documents, education, experience, written answers); missing on older forms

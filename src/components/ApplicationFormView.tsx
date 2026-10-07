@@ -193,7 +193,8 @@ export function ApplicationFormView({
       {local && (
         <>
           {local.notes && <RichText text={local.notes} className="mt-3 rounded-lg bg-accent/10 p-3 text-sm" />}
-          {local.source !== "pasted" && (!local.seenOnForm || local.loginRequired) ? (
+          {/* Only for a form BAPTOU had to guess; gone once the real form is in (pasted, read or unlocked). */}
+          {local.source !== "pasted" && local.source !== "unlocked" && (!local.seenOnForm || local.loginRequired) ? (
             <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-800 dark:text-amber-300">
                 {t(
@@ -205,7 +206,7 @@ export function ApplicationFormView({
               </p>
               {local.loginRequired && <UnlockForm applicationId={applicationId} url={local.formUrl} />}
               <PasteForm
-                collapsed={local.loginRequired}
+                collapsed
                 intro={t("To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.")}
                 formUrl={local.formUrl}
                 onSubmit={prepare}
@@ -514,6 +515,14 @@ function FieldView({
       </p>
       {field.needsUser && (
         <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">{t("Your answer")}</span>
+      )}
+      {!field.needsUser && field.check && (
+        <span
+          className="rounded-full border border-amber-500/40 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"
+          title={t("BAPTOU's suggestion: make sure it's what you want to say")}
+        >
+          {t("Check this")}
+        </span>
       )}
     </div>
   );

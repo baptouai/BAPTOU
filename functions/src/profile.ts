@@ -8,7 +8,7 @@ import { anthropicKey, assertBudget, bucket, claude, db, fallbackFor, MODELS, re
 
 const MAX_DOCUMENTS = 15;
 
-const ProfileSchema = z.object({
+export const ProfileSchema = z.object({
   fullName: z.string(),
   headline: z.string().describe("One-line summary, e.g. 'Business graduate seeking a finance master's abroad'"),
   education: z.array(

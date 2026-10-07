@@ -31,9 +31,10 @@ export const dismissOffer = httpsCallable<{ applicationId: string; reason: strin
   "dismissOffer",
 );
 
-const INTERESTED: Application["status"][] = ["interested", "editing", "approved", "applied", "rejected"];
+const INTERESTED: Application["status"][] = ["interested", "editing", "approved"];
+const APPLIED: Application["status"][] = ["applied", "rejected"];
 
-type Tab = "latest" | "review" | "interested";
+type Tab = "latest" | "review" | "interested" | "applied";
 type Item = Application & { id: string };
 
 const batchTime = (a: Item) => (a.batchAt ?? a.createdAt)?.toMillis?.() ?? 0;
@@ -61,9 +62,13 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
       : apps.filter((a) => dayOf(batchTime(a)) === latestDay),
     review: apps.filter((a) => a.status === "suggested"),
     interested: apps.filter((a) => INTERESTED.includes(a.status)),
+    applied: apps.filter((a) => APPLIED.includes(a.status)),
   };
+  const appliedTime = (a: Item) => (a.appliedAt ?? a.updatedAt)?.toMillis?.() ?? 0;
   const sorted = [...lists[tab]].sort((a, b) =>
-    tab === "interested"
+    tab === "applied"
+      ? appliedTime(b) - appliedTime(a)
+      : tab === "interested"
       ? (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0)
       : (b.matchScore ?? 0) - (a.matchScore ?? 0) || batchTime(b) - batchTime(a),
   );
@@ -80,6 +85,7 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
     },
     { id: "review", label: t("To review"), hint: t("Everything from this search you haven't decided on yet.") },
     { id: "interested", label: t("Interested"), hint: t("The ones you're interested in or working on.") },
+    { id: "applied", label: t("Applied"), hint: t("Applications you've sent, with their latest news. Open one to follow it.") },
   ];
 
   return (
@@ -111,7 +117,9 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
                 : empty
               : tab === "interested"
                 ? t("Mark offers as interesting to keep them here.")
-                : t("Nothing here.")}
+                : tab === "applied"
+                  ? t("Once you've applied, mark the offer as applied on its page to follow it here.")
+                  : t("Nothing here.")}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">
@@ -145,7 +153,11 @@ function OfferCard({ app: a }: { app: Item }) {
             <p className="text-sm text-muted">
               {a.organization}
               {a.country ? ` · ${a.country}` : ""}
-              {a.deadline ? ` · ${t("deadline {date}", { date: date(a.deadline.toDate(), "short") })}` : ""}
+              {APPLIED.includes(a.status) && a.appliedAt
+                ? ` · ${t("applied {date}", { date: date(a.appliedAt.toDate(), "short") })}`
+                : a.deadline
+                  ? ` · ${t("deadline {date}", { date: date(a.deadline.toDate(), "short") })}`
+                  : ""}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1.5">

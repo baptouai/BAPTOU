@@ -15,6 +15,7 @@ import { sendApprovedEmail } from "@/components/Contacts";
 import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
 import { FitCheck, verdictLabel } from "@/components/FitCheck";
+import { FollowUp } from "@/components/FollowUp";
 import { RichText } from "@/components/RichText";
 import { looksGeneric } from "@/lib/postingLink";
 import type { Application, LetterVersion } from "@/lib/types";
@@ -148,9 +149,21 @@ function ApplicationView() {
 
   async function setStatus(status: Application["status"], extra: Partial<Application> = {}) {
     if (!appRef) return;
-    await updateDoc(appRef, { status, ...extra, updatedAt: serverTimestamp() });
+    // The first time it's marked applied, remember when (the follow-up counts the days from there).
+    const applied = status === "applied" && !app?.appliedAt ? { appliedAt: serverTimestamp() as never } : {};
+    await updateDoc(appRef, { status, ...applied, ...extra, updatedAt: serverTimestamp() });
     setApp((a) => (a ? { ...a, status } : a));
   }
+
+  async function draftFollowUp(appliedOn: string) {
+    setWantEmail(true);
+    await writeEmail(
+      `A short, polite follow-up on my application${appliedOn ? ` sent on ${appliedOn}` : ""}: ask whether there is any news and restate my interest in one sentence. No pressure, and don't repeat my whole profile.`,
+    );
+    document.getElementById("email")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  const sent = app?.status === "applied" || app?.status === "rejected";
 
   // Approval and sending are one click: the approved draft is saved, then the server sends exactly
   // what is stored (not what the browser sends), from the user's Gmail.
@@ -208,7 +221,7 @@ function ApplicationView() {
         </div>
       </div>
 
-      {app.postingClosedAt && (
+      {app.postingClosedAt && !sent && (
         <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-800 dark:text-red-300">
           <p className="font-medium">{t("This posting seems to be closed.")}</p>
           <p className="mt-0.5">
@@ -228,6 +241,8 @@ function ApplicationView() {
           </p>
         </section>
       )}
+
+      {sent && <FollowUp applicationId={id} app={app} onDraftFollowUp={draftFollowUp} onSetStatus={(s) => setStatus(s)} />}
 
       {(app.matchReason || app.research) && (
         <div className="grid gap-4 md:grid-cols-2">
@@ -330,7 +345,7 @@ function ApplicationView() {
           )}
 
           {showEmail && (
-          <section className="rounded-xl border border-card-edge bg-card p-5">
+          <section id="email" className="scroll-mt-4 rounded-xl border border-card-edge bg-card p-5">
             <h2 className="font-medium">{t("Email draft")}</h2>
             <p className="mt-1 text-sm text-muted">{t("Nothing is sent until you click “Approve & send”.")}</p>
             <AiBar

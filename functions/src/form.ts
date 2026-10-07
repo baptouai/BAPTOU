@@ -4,6 +4,7 @@ import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+import { HUMAN_STYLE } from "./style.js";
 
 type Form = z.infer<typeof FormSchema>;
 
@@ -45,12 +46,17 @@ const Field = z.object({
   required: z.boolean(),
   charLimit: z.number().describe("Character limit shown on the form, 0 if none"),
   options: z.array(z.string()).describe("Choices for choice fields, empty otherwise"),
-  value: z.string().describe("The prepared answer. Empty if only the student can answer (needsUser)"),
+  value: z.string().describe("The prepared answer. Empty only when needsUser is true"),
   suggestedDocument: z
     .enum(["cv", "transcript", "motivation_letter", "diploma", "other", "none"])
     .describe("For file fields: which of the student's documents to attach"),
   entries: z.array(Entry).describe("For 'entries' fields (experience, education lists), otherwise empty"),
-  needsUser: z.boolean().describe("True for facts BAPTOU cannot know: phone, address, work permit, salary, consents"),
+  needsUser: z
+    .boolean()
+    .describe("True only for what BAPTOU can't know or must not answer for the student: phone, address, ID numbers, references, consents and personal declarations"),
+  check: z
+    .boolean()
+    .describe("True when the value is BAPTOU's suggestion the student should confirm: pay expectations, availability, preferences, opinions"),
   worthPreparing: z
     .boolean()
     .describe(
@@ -89,8 +95,13 @@ const SYSTEM = `You are BAPTOU. You prepare a student's application in the exact
    - Free-text questions (message to the hiring team, why us, ...): tailored, specific answers within the character limit, consistent with the motivation letter if there is one.
    - File fields: say which document to attach.
    - Cover/motivation letter (text box or file): set isCoverLetter and put the full letter text in value. Reuse the student's letter for this application if there is one, otherwise write it.
-4. Never invent facts. Anything only the student can answer (phone, address, salary expectations, consents, diversity questions) gets needsUser = true and an empty value.
-   Work authorization, visa sponsorship and fee-status questions: answer them from the student's nationalities when the profile lists them (e.g. a British citizen has the right to work in the UK and needs no sponsorship); otherwise needsUser = true.
+4. Answer every question you can, as the student would. Never invent facts about the student.
+   - Pay or salary expectations: give a realistic figure or range for this role, level, contract and place (the posting's own figure if it gives one, otherwise typical pay you know or find), in the form's format; set check = true and say in note where the figure comes from.
+   - Availability, start date, duration, notice, preferences, motivation and other judgment questions: answer from the profile, what the student is looking for and the offer; set check = true when it's a choice the student should confirm.
+   - Work authorization, visa sponsorship and fee status: answer from the student's nationalities when the profile lists them (e.g. a British citizen has the right to work in the UK and needs no sponsorship); otherwise needsUser = true.
+   - needsUser = true with an empty value only for what BAPTOU can't know or must not answer for the student: phone, address, ID or passport numbers, references' details, consents, and personal declarations (criminal record, health or disability, diversity and equal-opportunity questions).
+
+${HUMAN_STYLE}
 When done, call submit_form exactly once.`;
 
 // When the student pastes the text of the real form (after signing in on the careers site), that text is
@@ -113,6 +124,30 @@ async function readForm(
   unlocked = false,
 ) {
   const docs = await db.collection(`users/${uid}/documents`).select("kind", "fileName").get();
+  // For availability, start date, duration and pay questions: what the student asked for, and what the posting says.
+  const search = app.searchId ? (await db.doc(`users/${uid}/searches/${app.searchId}`).get()).data() : undefined;
+  const wants = search
+    ? [
+        search.startDate && `start ${search.startDate}`,
+        search.duration && `duration ${search.duration}`,
+        search.locations && `places ${search.locations}`,
+        search.workMode && search.workMode !== "any" && `work mode ${search.workMode}`,
+        search.contractType && `contract ${search.contractType}`,
+        search.salaryMin && `minimum pay ${search.salaryMin}`,
+        search.notes && `notes: ${search.notes}`,
+      ]
+        .filter(Boolean)
+        .join("; ")
+    : "";
+  const posting = [
+    app.location && `location ${app.location}`,
+    app.startDate && `start ${app.startDate}`,
+    app.duration && `duration ${app.duration}`,
+    app.contractType && `contract ${app.contractType}`,
+    app.salary && `pay ${app.salary}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
   const documentList = docs.docs.map((d) => `- ${d.get("kind")}: ${d.get("fileName")}`).join("\n");
   const letter = app.letter ? `:\n"""\n${app.letter}\n"""` : ": not written yet";
 
@@ -130,7 +165,9 @@ async function readForm(
         text: `Today is ${today()}.
 ${kindLabel(app.type)}: ${app.title} at ${app.organization}
 Posting link: ${app.applyUrl}
-
+${posting ? `Posting details: ${posting}
+` : ""}${wants ? `What the student is looking for: ${wants}
+` : ""}
 Student's uploaded documents:
 ${documentList || "none"}
 
@@ -182,17 +219,17 @@ export async function prepareAndSave(
     if (adoptLetter) {
       await appRef.collection("letterVersions").add({ text: coverLetter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
     }
+    // A form read from the student's paste (or after confirming their email) is the real one, whatever the
+    // model said: the app hides the "couldn't see the real form" notice for it.
+    const resolved: FormSource = source ?? (formText ? "pasted" : form.seenOnForm ? "read" : "inferred");
+    const stored = resolved === "pasted" || resolved === "unlocked" ? { ...form, seenOnForm: true, loginRequired: false } : form;
     await appRef.update({
-      applicationForm: {
-        ...form,
-        source: source ?? (formText ? "pasted" : form.seenOnForm ? "read" : "inferred"),
-        preparedAt: FieldValue.serverTimestamp(),
-      },
+      applicationForm: { ...stored, source: resolved, preparedAt: FieldValue.serverTimestamp() },
       applicationFormStatus: "ready",
       ...(adoptLetter ? { letter: coverLetter } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    return form;
+    return { ...stored, source: resolved };
   } catch (e) {
     await appRef.update({
       applicationFormStatus: "error",
