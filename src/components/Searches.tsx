@@ -176,6 +176,14 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
         </div>
       )}
       {s.runState === "error" && s.lastError && <p className="mt-2 text-sm text-red-600">{t(s.lastError)}</p>}
+      {s.status === "active" && !!s.waitingForReview && (
+        <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          {t(
+            "Paused while {n} offers wait for your review. Go through them (interested or not for me) and BAPTOU searches again the next morning.",
+            { n: s.waitingForReview },
+          )}
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
         {s.status === "active" && (
           <>
@@ -361,6 +369,7 @@ export function SearchForm({
       </Field>
       <Field label={t(k.start[0])}>
         <input value={form.startDate} onChange={set("startDate")} placeholder={t(k.start[1])} className={input} />
+        <PastDateHint value={form.startDate} onFix={(fixed) => setForm((f) => ({ ...f, startDate: fixed }))} />
       </Field>
       {k.duration && (
         <Field label={t(k.duration[0])}>
@@ -498,6 +507,45 @@ function OffersCostHint({
           : "About {run} of your monthly allowance per run, at most {month} a month.",
         { run: formatPct(run), month: formatPct(Math.min(monthly, 100)) },
       )}
+    </span>
+  );
+}
+
+const MONTHS: [RegExp, number][] = [
+  [/^(jan|janv)/, 0], [/^(feb|fév|fev)/, 1], [/^mar/, 2], [/^(apr|avr)/, 3], [/^(may|mai)/, 4], [/^(jun|juin)/, 5],
+  [/^(jul|juil)/, 6], [/^(aug|aoû|aou)/, 7], [/^sep/, 8], [/^oct/, 9], [/^nov/, 10], [/^(dec|déc)/, 11],
+];
+
+/** The month a free-text start date points to ("January 2027", "janvier 2027", "01/2027", "2027-01"), if any. */
+function parseMonth(text: string): { month: number; year: number } | null {
+  const s = text.trim().toLowerCase();
+  let m = /^(\d{4})-(\d{1,2})/.exec(s) ?? null;
+  if (m) return { year: Number(m[1]), month: Number(m[2]) - 1 };
+  m = /^(\d{1,2})\/(\d{4})$/.exec(s);
+  if (m) return { year: Number(m[2]), month: Number(m[1]) - 1 };
+  m = /^([a-zéû]+)\.?\s+(\d{4})$/.exec(s);
+  if (m) {
+    const month = MONTHS.find(([re]) => re.test(m![1]))?.[1];
+    if (month != null) return { year: Number(m[2]), month };
+  }
+  return null;
+}
+
+/** Warns when the start date has already passed (a common slip: last year's number), with a one-click fix. */
+function PastDateHint({ value, onFix }: { value: string; onFix: (fixed: string) => void }) {
+  const { t } = useI18n();
+  const [now] = useState(() => new Date());
+  const parsed = parseMonth(value);
+  if (!parsed || new Date(parsed.year, parsed.month + 1, 1) > now) return null;
+  // The next time that month comes round.
+  const nextYear = new Date(now.getFullYear(), parsed.month + 1, 1) > now ? now.getFullYear() : now.getFullYear() + 1;
+  const fixed = value.replace(String(parsed.year), String(nextYear));
+  return (
+    <span className="text-xs text-amber-700 dark:text-amber-400">
+      {t("This date has already passed.")}{" "}
+      <button type="button" onClick={() => onFix(fixed)} className="underline">
+        {t("Use {date}", { date: fixed })}
+      </button>
     </span>
   );
 }

@@ -90,12 +90,14 @@ export async function runAgent<T>(opts: {
   let nudged = false;
   let runCost = 0;
   let searches = 0;
+  // Tokens over the whole run, to see where a run's cost goes (fresh input, cache writes and reads, output).
+  const tokens = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
   let fetches = 0;
   let limited = false;
   const visited: string[] = []; // search queries and opened pages, for the log
   const done = (turns: number) => {
     if (opts.stats) Object.assign(opts.stats, { costUsd: runCost, searches, fetches, limited });
-    logger.info("Agent run", { task: opts.task, turns, costUsd: Math.round(runCost * 1000) / 1000, searches, fetches, limited, visited: visited.slice(0, 40) });
+    logger.info("Agent run", { task: opts.task, turns, costUsd: Math.round(runCost * 1000) / 1000, searches, fetches, limited, tokens, visited: visited.slice(0, 40) });
   };
 
   for (let i = 0; i < MAX_CONTINUATIONS + maxToolCalls; i++) {
@@ -118,6 +120,10 @@ export async function runAgent<T>(opts: {
       .finalMessage();
     runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
     searches += response.usage.server_tool_use?.web_search_requests ?? 0;
+    tokens.input += response.usage.input_tokens ?? 0;
+    tokens.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
+    tokens.cacheRead += response.usage.cache_read_input_tokens ?? 0;
+    tokens.output += response.usage.output_tokens ?? 0;
     fetches += response.usage.server_tool_use?.web_fetch_requests ?? 0;
     for (const b of response.content) {
       if (b.type === "server_tool_use") {

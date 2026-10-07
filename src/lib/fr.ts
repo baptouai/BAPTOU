@@ -686,6 +686,12 @@ export const fr: Record<string, string> = {
     "Ce site demande une vérification anti-robot (CAPTCHA), que BAPTOU ne contourne pas. Ouvrez le formulaire vous-même, puis collez-le ici.",
   "This site wants an account with a password, which BAPTOU doesn't create for you. Sign up there yourself, then paste the form here.":
     "Ce site demande un compte avec mot de passe, que BAPTOU ne crée pas à votre place. Inscrivez-vous vous-même, puis collez le formulaire ici.",
+  "Paused while {n} offers wait for your review. Go through them (interested or not for me) and BAPTOU searches again the next morning.":
+    "En pause : {n} offres attendent votre avis. Passez-les en revue (intéressé ou pas pour moi) et BAPTOU recherchera de nouveau le lendemain matin.",
+  "This date has already passed.": "Cette date est déjà passée.",
+  "Use {date}": "Utiliser {date}",
+  "the offer on the organization's own site is closed": "l'offre est fermée sur le site de l'organisation",
+  "the posting is no longer on the company's Workday site": "l'offre n'est plus sur le site Workday de l'entreprise",
   "BAPTOU couldn't get to the form. Open it yourself, then paste it here.":
     "BAPTOU n'a pas pu accéder au formulaire. Ouvrez-le vous-même, puis collez-le ici.",
 };

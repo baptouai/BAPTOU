@@ -126,6 +126,7 @@ export type Search = {
   lastRunCostUsd?: number;
   frequencyDays?: number; // 1, 3 or 7; missing = every day
   nextRunAt?: Timestamp | null; // the daily job skips the search until then (backs off after empty runs)
+  waitingForReview?: number; // paused this morning: this many of its offers were waiting unreviewed
   lastError?: string;
   totalFound?: number;
   createdAt: Timestamp;

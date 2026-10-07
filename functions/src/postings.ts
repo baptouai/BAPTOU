@@ -73,7 +73,14 @@ const pageText = (html: string) =>
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ");
 
-export async function checkPosting(url: string): Promise<PostingCheck> {
+/**
+ * Checks that a posting is still open. With `organization`, a copy on a third-party site (job board,
+ * aggregator) is followed to the organization's own posting when the page links to it: copies often stay
+ * online after the real offer has closed.
+ */
+export async function checkPosting(url: string, organization?: string): Promise<PostingCheck> {
+  const workday = await checkWorkday(url);
+  if (workday) return workday;
   try {
     const res = await fetch(url, {
       redirect: "follow",
@@ -94,22 +101,83 @@ export async function checkPosting(url: string): Promise<PostingCheck> {
       return { status: "closed", reason: "the link now redirects to a general careers page" };
     }
 
-    const text = pageText(await res.text());
+    const html = await res.text();
+    const text = pageText(html);
     const hit = CLOSED_TEXT.find((p) => p.test(text));
     if (hit) return { status: "closed", reason: "the page says the posting is no longer available" };
+
+    if (organization && !isOfficial(url, organization)) {
+      const official = officialLinks(html, res.url, organization).slice(0, 2);
+      if (official.length) {
+        const checks = await Promise.all(official.map((l) => checkPosting(l)));
+        if (checks.some((c) => c.status === "open")) return { status: "open" };
+        if (checks.every((c) => c.status === "closed")) {
+          return { status: "closed", reason: "the offer on the organization's own site is closed" };
+        }
+      }
+    }
     return { status: "open" };
   } catch {
     return { status: "unknown" };
   }
 }
 
+/**
+ * Workday pages are an empty shell until JavaScript runs, so their text can't say whether a posting closed.
+ * Workday's own job API can: a posting's details are there while it's open, and refused once it's gone.
+ * Returns null for links that aren't Workday postings.
+ */
+async function checkWorkday(url: string): Promise<PostingCheck | null> {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)myworkdayjobs\.com$/i.test(u.hostname)) return null;
+  // /{optional locale}/{site}/job/{location}/{title}_{id}
+  const m = /^\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?([^/]+)(\/job\/.+)$/.exec(u.pathname);
+  if (!m) return null;
+  const tenant = u.hostname.split(".")[0];
+  try {
+    const res = await fetch(`https://${u.hostname}/wday/cxs/${tenant}/${m[1]}${m[2]}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 Chrome/130" },
+    });
+    if (res.ok) return { status: "open" };
+    if ([403, 404, 410].includes(res.status)) return { status: "closed", reason: "the posting is no longer on the company's Workday site" };
+    return { status: "unknown" };
+  } catch {
+    return { status: "unknown" };
+  }
+}
+
+/** Links on a page (in its links or its scripts) to a specific posting on the organization's own site or application system. */
+function officialLinks(html: string, base: string, organization: string) {
+  const links = new Set<string>();
+  const candidates = [
+    ...[...html.matchAll(/href\s*=\s*["']([^"'#]+)["']/gi)].map((m) => m[1]),
+    ...[...html.matchAll(/https?:\/\/[^\s"'<>\\]+/gi)].map((m) => m[0]),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const link = new URL(candidate.replace(/&amp;/g, "&"), base).href;
+      const { pathname, search } = new URL(link);
+      if (isOfficial(link, organization) && /\d{3,}|[a-f0-9]{8,}/i.test(pathname + search) && !looksGeneric(link)) links.add(link);
+    } catch {
+      // not a usable link
+    }
+  }
+  return [...links];
+}
+
 /** Checks many links, a few at a time. */
-export async function checkPostings(urls: string[], concurrency = 5) {
+export async function checkPostings(items: { url: string; organization?: string }[], concurrency = 5) {
   const results = new Map<string, PostingCheck>();
-  for (let i = 0; i < urls.length; i += concurrency) {
-    const batch = urls.slice(i, i + concurrency);
-    const checks = await Promise.all(batch.map(checkPosting));
-    batch.forEach((u, j) => results.set(u, checks[j]));
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const checks = await Promise.all(batch.map((it) => checkPosting(it.url, it.organization)));
+    batch.forEach((it, j) => results.set(it.url, checks[j]));
   }
   return results;
 }
@@ -124,10 +192,12 @@ export const recheckPostings = onSchedule(
     const live = await db
       .collectionGroup("applications")
       .where("status", "in", ["suggested", "interested", "editing"])
-      .select("applyUrl", "postingClosedAt")
+      .select("applyUrl", "organization", "postingClosedAt")
       .get();
     const todo = live.docs.filter((d) => d.get("applyUrl") && !d.get("postingClosedAt"));
-    const results = await checkPostings(todo.map((d) => d.get("applyUrl") as string));
+    const results = await checkPostings(
+      todo.map((d) => ({ url: d.get("applyUrl") as string, organization: (d.get("organization") as string | undefined) ?? "" })),
+    );
     let closed = 0;
     for (const d of todo) {
       const r = results.get(d.get("applyUrl"));

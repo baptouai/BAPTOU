@@ -60,7 +60,7 @@ export const OffersSchema = z.object({
       companyBrief: z.string().describe("3-5 facts on the company: what it does, size, recent news, culture. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
   ),
-  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found"),
+  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found, even if it stopped early. Never a placeholder."),
   leadsToCheckNext: z
     .array(z.string())
     .describe("Up to 8 web searches worth trying next run (organizations or queries you didn't get to), written as search queries, not careers-page links"),
@@ -95,11 +95,12 @@ Rules:
 - Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes), nearby start dates. Say so in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
 - Entry-level, junior or graduate roles only, unless the student asks otherwise. Skip internships, alternances and senior roles.
 - Respect the criteria (roles, locations, work mode, contract type, minimum salary, start date, languages). Mention any compromise in matchReason.
 - Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
+- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
 - Start with the leads the previous run didn't have time to check, if any.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
@@ -113,11 +114,12 @@ Rules:
 - Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; give their link only when the company doesn't publish the offer itself. The url must lead to that specific offer.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> alternance 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes), nearby start dates. Say so in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
 - Alternance offers only (not internships or regular jobs). Most start in September; check the start date and the contract length (usually 1 to 3 years).
 - Respect the criteria (roles, locations, contract type, rhythm, start date). Mention any compromise in matchReason.
 - The school matters: if the student already has a school, prefer offers compatible with its programme and rhythm; if they still need one, favour offers whose company names a partner school, and say so in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
+- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
 - Skip any offer in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
 - Start with the leads the previous run didn't have time to check, if any.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
@@ -131,10 +133,11 @@ Rules:
 - Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes), nearby start dates. Say so in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
 - Respect the search criteria (roles, locations, work mode, duration, start date, languages). Mention any compromise in matchReason.
 - Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
+- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
 - Start with the leads the previous run didn't have time to check, if any.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
@@ -161,7 +164,7 @@ export const ProgrammesSchema = z.object({
         .describe("4-6 facts: tuition per year for this student, admission requirements (degree, grades, tests such as GRE/IELTS), reputation, career outcomes. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
   ),
-  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found"),
+  summary: z.string().describe("One short sentence for the student (max 25 words): what this run found, even if it stopped early. Never a placeholder."),
   leadsToCheckNext: z
     .array(z.string())
     .describe("Up to 8 web searches worth trying next run (organizations or queries you didn't get to), written as search queries, not careers-page links"),
@@ -299,7 +302,10 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
         prompt: [
           // Same first block in every pass and run, so it is served from the prompt cache.
           { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },
-          { type: "text", text: `Today is ${today()}.\n${criteria}\n${extra}Find ${count} new ${NOUN[kind]}.\n${lists}` },
+          {
+            type: "text",
+            text: `Today is ${today()}. If the start date or intake asked for has already passed, the student means the next one (the same month next year): search for that, and say so in the summary.\n${criteria}\n${extra}Find ${count} new ${NOUN[kind]}.\n${lists}`,
+          },
         ],
       });
 
@@ -310,7 +316,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     const first = await scout(
       maxPerRun + spare,
       // Searches cost about $0.02 each; an opened page about $0.03 and makes every later step dearer, so few.
-      { searches: Math.min(12 + 2 * maxPerRun, 40), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.2 + 0.04 * maxPerRun },
+      { searches: Math.min(8 + 2 * maxPerRun, 30), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.15 + 0.04 * maxPerRun },
       `${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches; try them first:\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
       firstStats,
     );
@@ -349,7 +355,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       });
       // Dead links (removed, filled or expired postings) and links to a careers section never reach the student.
       // Plain HTTP checks, no AI.
-      const links = await checkPostings(candidates.map((o) => o.url));
+      const links = await checkPostings(candidates.map((o) => ({ url: o.url, organization: o.organization })));
       const usable = candidates.filter((o) => {
         if (links.get(o.url)?.status !== "closed" && !looksGeneric(o.url)) return true;
         dropped++;
@@ -383,7 +389,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       try {
         const second = await scout(
           missing + 2,
-          { searches: Math.min(4 + 2 * missing, 12), fetches: Math.min(1 + Math.ceil(missing / 2), 4), usd: 0.05 + 0.04 * missing },
+          { searches: Math.min(3 + 2 * missing, 10), fetches: Math.min(1 + Math.ceil(missing / 2), 4), usd: 0.05 + 0.03 * missing },
           `This is a second pass: the first one this run came up short.
 Found earlier this run (skip them): ${picked.map((o) => o.url).join("\n") || "none"}
 Closed, expired or not a specific posting (skip them): ${rejected.join("\n") || "none"}
@@ -464,6 +470,9 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
 
 const queue = () => getFunctions().taskQueue(`locations/${REGION}/functions/runSearchTask`);
 
+// A search pauses when this many runs' worth of its offers (at least 10) are waiting unreviewed.
+const BACKLOG_RUNS = 3;
+
 /** One search run, dispatched by Cloud Tasks so many users' searches run in parallel. */
 export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string }>(
   {
@@ -483,6 +492,8 @@ export const dailySearches = onSchedule(
   async () => {
     const active = await db.collectionGroup("searches").where("status", "==", "active").get();
     const now = Timestamp.now();
+    let queued = 0;
+    let skipped = 0;
     for (const doc of active.docs) {
       const uid = doc.ref.parent.parent!.id;
       const endsAt = doc.get("endsAt") as Timestamp | null;
@@ -492,10 +503,31 @@ export const dailySearches = onSchedule(
       }
       const nextRunAt = doc.get("nextRunAt") as Timestamp | null | undefined;
       if (nextRunAt && nextRunAt.toMillis() > now.toMillis()) continue; // not due yet
-      await doc.ref.update({ runState: "queued" });
+
+      // Nobody is reading: when offers from this search pile up unreviewed, pause it rather than pay for
+      // more. It resumes by itself the morning after the student has gone through them.
+      const perRun = Math.max(Number(doc.get("maxPerRun")) || 5, 1);
+      const waiting = await db
+        .collection(`users/${uid}/applications`)
+        .where("searchId", "==", doc.id)
+        .where("status", "==", "suggested")
+        .count()
+        .get()
+        .then((r) => r.data().count)
+        .catch((e) => {
+          logger.warn("Couldn't count waiting offers; running the search anyway", { uid, searchId: doc.id, error: String(e) });
+          return 0;
+        });
+      if (waiting >= Math.max(BACKLOG_RUNS * perRun, 10)) {
+        await doc.ref.update({ waitingForReview: waiting });
+        skipped++;
+        continue;
+      }
+      await doc.ref.update({ runState: "queued", waitingForReview: FieldValue.delete() });
       await queue().enqueue({ uid, searchId: doc.id });
+      queued++;
     }
-    logger.info(`Queued ${active.size} searches`);
+    logger.info("Morning searches", { active: active.size, queued, pausedForReview: skipped });
   },
 );
 
