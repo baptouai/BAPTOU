@@ -505,6 +505,10 @@ export const fr: Record<string, string> = {
   "Applications close {date}": "Clôture des candidatures {date}",
   "applications open {date}": "candidatures ouvertes le {date}",
   "No recommendation letters needed": "Aucune lettre de recommandation demandée",
+  "Estimated chance of admission": "Chance d'admission estimée",
+  "Estimated chance of getting an interview": "Chance estimée d'obtenir un entretien",
+  "BAPTOU's estimate from your profile and how selective this is: a guide, not a promise.":
+    "Estimation de BAPTOU à partir de votre profil et de la sélectivité : une indication, pas une promesse.",
   "1 recommendation letter needed": "1 lettre de recommandation demandée",
   "{n} recommendation letters needed": "{n} lettres de recommandation demandées",
   "LinkedIn profile": "Profil LinkedIn",

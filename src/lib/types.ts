@@ -41,6 +41,8 @@ export type Application = {
   recommendationLetters?: number; // master's programmes: recommendation letters the application asks for (0 = none)
   matchReason?: string; // why BAPTOU suggests it
   matchScore?: number; // 0-100
+  chance?: number; // 0-100: estimated chance of an interview, or of admission for a master's
+  chanceReason?: string;
   location?: string;
   startDate?: string; // as stated in the posting (or the programme's intake)
   duration?: string;

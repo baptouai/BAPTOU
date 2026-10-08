@@ -57,6 +57,12 @@ export const OffersSchema = z.object({
       duration: z.string().describe("As stated in the posting, or empty"),
       postingLanguage: z.string().describe("Language the posting is written in"),
       matchScore: z.number().describe(SCORE_SCALE),
+      chance: z
+        .number()
+        .describe(
+          "Realistic estimate, 0 to 100, of this student getting an interview: how well they meet the requirements, against how competitive the offer is (famous companies and graduate schemes are very selective, rarely above 20%)",
+        ),
+      chanceReason: z.string().describe("Why, in one short sentence (max 20 words): the student's strongest point and the main risk"),
       matchReason: z.string().describe("2-4 reasons this fits the student, citing their profile. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs. Never a placeholder."),
       companyBrief: z.string().describe("3-5 facts on the company: what it does, size, recent news, culture. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
     }),
@@ -165,6 +171,12 @@ export const ProgrammesSchema = z.object({
       duration: z.string().describe("Programme length, e.g. 1 year"),
       postingLanguage: z.string().describe("Language of instruction"),
       matchScore: z.number().describe(SCORE_SCALE),
+      chance: z
+        .number()
+        .describe(
+          "Realistic estimate, 0 to 100, of this student being admitted: their degree and grades against the requirements, and how selective the programme is (use published acceptance rates when known; top programmes rarely exceed 30%)",
+        ),
+      chanceReason: z.string().describe("Why, in one short sentence (max 20 words): the student's strongest point and the main risk"),
       matchReason: z.string().describe("2-4 reasons this programme fits the student's degree, grades and goals. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs. Never a placeholder."),
       companyBrief: z
         .string()
@@ -491,6 +503,9 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
           postingLanguage: o.postingLanguage,
           matchScore,
           matchReason: real(o.matchReason),
+          // BAPTOU's estimate of the student's chance (an interview, or admission for a master's).
+          chance: Math.round(Math.min(Math.max(o.chance, 0), 100)),
+          chanceReason: real(o.chanceReason),
           research: real(o.companyBrief),
           // Contract details for jobs and alternances (absent on other kinds).
           ...pick(o, ["contractType", "salary", "rhythm", "school"]),

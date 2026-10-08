@@ -293,6 +293,8 @@ function ApplicationView() {
         </div>
       </div>
 
+      {app.chance != null && <Chance app={app} />}
+
       {app.postingClosedAt && !sent && (
         <section className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-800 dark:text-red-300">
           <p className="font-medium">{t("This posting seems to be closed.")}</p>
@@ -510,6 +512,30 @@ function AiBar({
       </button>
       {error && <p className="text-sm text-red-600 sm:basis-full">{error}</p>}
     </form>
+  );
+}
+
+/** At the top of the offer: BAPTOU's estimate of the student's chance (admission, or an interview). */
+function Chance({ app }: { app: Application }) {
+  const { t } = useI18n();
+  const n = app.chance ?? 0;
+  const tone =
+    n >= 60
+      ? "border-green-500/40 bg-green-500/10 text-green-800 dark:text-green-300"
+      : n >= 30
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+        : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-300";
+  return (
+    <section className={`flex items-start gap-4 rounded-xl border p-4 ${tone}`}>
+      <p className="text-3xl font-semibold tabular-nums leading-none">{n}%</p>
+      <div className="min-w-0 text-sm">
+        <p className="font-medium">
+          {t(app.type === "masters" ? "Estimated chance of admission" : "Estimated chance of getting an interview")}
+        </p>
+        {app.chanceReason && <p className="mt-0.5">{app.chanceReason}</p>}
+        <p className="mt-1 text-xs opacity-80">{t("BAPTOU's estimate from your profile and how selective this is: a guide, not a promise.")}</p>
+      </div>
+    </section>
   );
 }
 
