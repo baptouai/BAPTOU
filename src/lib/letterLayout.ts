@@ -1,6 +1,7 @@
 // The motivation letter laid out on one A4 page, as the student's school teaches it (Centrale Nantes,
 // "CV & cover letters"): one font, 12 pt text and 14 pt for the name, the sender's details and the date at the
-// top right, the recipient below on the left, the text aligned left, the signature above the typed name.
+// top right, the recipient below on the left, the signature above the typed name. The paragraphs are justified
+// (the student's choice), with hyphenation in the letter's language so the spacing stays even.
 // French letters follow the French layout instead: sender at the top left, recipient on the right, "Ville, le …".
 // The same markup is measured in the app (does it fit on one page?) and printed to PDF.
 
@@ -22,7 +23,7 @@ const FONT = `Calibri, Carlito, "Segoe UI", Arial, sans-serif`;
 
 export const LETTER_CSS = `
 .bl-page{box-sizing:border-box;width:${PAGE.widthMm}mm;height:${PAGE.heightMm}mm;padding:${PAGE.marginYMm}mm ${PAGE.marginXMm}mm;background:#fff;color:#111;font-family:${FONT};line-height:1.32;overflow:hidden}
-.bl-content p{margin:0 0 .75em}
+.bl-content p{margin:0 0 .75em;text-align:justify;-webkit-hyphens:auto;hyphens:auto}
 .bl-name{font-size:1.17em;font-weight:700}
 .bl-block{white-space:pre-line}
 .bl-right{text-align:right}
@@ -95,7 +96,7 @@ export function fitLetter(p: LetterParts): number | null {
   if (typeof document === "undefined") return 12;
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none";
-  host.innerHTML = `<style>${LETTER_CSS}</style><div class="bl-page">${letterMarkup({ ...p, signatureUrl: undefined })}</div>`;
+  host.innerHTML = `<style>${LETTER_CSS}</style><div class="bl-page" lang="${p.lang}">${letterMarkup({ ...p, signatureUrl: undefined })}</div>`;
   document.body.appendChild(host);
   try {
     const page = host.querySelector<HTMLElement>(".bl-page")!;
@@ -118,7 +119,7 @@ export function printLetter(p: LetterParts, title: string) {
   if (!w) return;
   w.document.write(`<!doctype html><html lang="${p.lang}"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>@page{size:A4;margin:0}html,body{margin:0;background:#fff}${LETTER_CSS}.bl-page{font-size:${pt}pt}</style></head>
-<body><div class="bl-page">${letterMarkup(p)}</div>
+<body><div class="bl-page" lang="${p.lang}">${letterMarkup(p)}</div>
 <script>
   // Print once the signature image has loaded (or failed), so it is on the PDF.
   const img = document.querySelector(".bl-sign img");
