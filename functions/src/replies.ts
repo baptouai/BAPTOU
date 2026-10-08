@@ -8,7 +8,7 @@ import { z } from "zod";
 import { runAgent, today } from "./agent.js";
 import { GMAIL_SECRETS, type Gmail, gmailFor, requireGmailRead } from "./gmail.js";
 import { domainTokens, offerTokens } from "./mailIndex.js";
-import { anthropicKey, db, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, entitlementFor, MODELS, REGION, requireAccess } from "./shared.js";
 
 // Replies to applications: once a day (and on demand), new mail is matched to the student's applications
 // with the Gmail API only (free). Claude is called only when something matches, once for all matches.
@@ -206,8 +206,13 @@ export const scanRepliesTask = onTaskDispatched<{ uid: string }>(
 /** Every morning, after the mail index and searches: check every Gmail-reading user's new mail. */
 export const dailyReplies = onSchedule({ region: REGION, schedule: "every day 07:30", timeZone: "Europe/Paris" }, async () => {
   const users = await db.collection("users").where("gmail.canRead", "==", true).select().get();
-  for (const u of users.docs) await queue().enqueue({ uid: u.id });
-  logger.info(`Queued reply scans for ${users.size} users`);
+  let queued = 0;
+  for (const u of users.docs) {
+    if (!(await entitlementFor(u.id))) continue; // no subscription or gift: nothing runs
+    await queue().enqueue({ uid: u.id });
+    queued++;
+  }
+  logger.info(`Queued reply scans for ${queued} users`);
 });
 
 /** "Check now" on the dashboard. */
@@ -216,6 +221,7 @@ export const scanRepliesNow = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     await requireGmailRead(uid);
     return { found: await scanReplies(uid) };
   },

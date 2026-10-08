@@ -6,7 +6,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { GMAIL_SECRETS, type Gmail, gmailFor, requireGmailRead } from "./gmail.js";
-import { db, REGION } from "./shared.js";
+import { db, entitlementFor, REGION, requireAccess } from "./shared.js";
 
 // users/{uid}/mailIndex/{id}: one entry per person the user exchanged email with, built from message
 // headers only (From/To/Cc/Date/Subject) through the Gmail API. No AI is involved, so it costs no credit.
@@ -254,6 +254,7 @@ export const indexMailboxTask = onTaskDispatched<{ uid: string }>(
 export const refreshMailIndex = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  await requireAccess(uid);
   const user = await db.doc(`users/${uid}`).get();
   if (!user.get("gmail.email")) throw new HttpsError("failed-precondition", "Connect your Gmail first (Profile page).");
   await requireGmailRead(uid);
@@ -266,6 +267,11 @@ export const refreshMailIndex = onCall({ region: REGION }, async (request) => {
 /** Every morning, add the previous day's mail to every connected user's index. */
 export const dailyMailIndex = onSchedule({ region: REGION, schedule: "every day 06:30", timeZone: "Europe/Paris" }, async () => {
   const connected = await db.collection("users").where("gmail.canRead", "==", true).select().get();
-  for (const u of connected.docs) await enqueueMailIndex(u.id);
-  logger.info(`Queued mail index for ${connected.size} users`);
+  let queued = 0;
+  for (const u of connected.docs) {
+    if (!(await entitlementFor(u.id))) continue; // no subscription or gift: nothing runs
+    await enqueueMailIndex(u.id);
+    queued++;
+  }
+  logger.info(`Queued mail index for ${queued} users`);
 });

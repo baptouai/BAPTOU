@@ -222,8 +222,8 @@ export const fr: Record<string, string> = {
   "Payment cancelled. Nothing was charged.": "Paiement annulé. Rien n'a été débité.",
   "Your plan": "Votre formule",
   "{pct} of this month's allowance used.": "{pct} du crédit du mois utilisés.",
-  "You don't have a plan yet. Choose one below to use BAPTOU's AI features.":
-    "Vous n'avez pas encore de formule. Choisissez-en une ci-dessous pour utiliser les fonctions IA de BAPTOU.",
+  "You don't have a plan yet. Choose one below to start using BAPTOU.":
+    "Vous n'avez pas encore de formule. Choisissez-en une ci-dessous pour commencer à utiliser BAPTOU.",
   "Opening…": "Ouverture…",
   "Payment method & invoices": "Moyen de paiement et factures",
   "The yearly plan is committed for 12 months, until {date}.": "La formule annuelle comporte un engagement de 12 mois, jusqu'au {date}.",
@@ -506,6 +506,11 @@ export const fr: Record<string, string> = {
   "applications open {date}": "candidatures ouvertes le {date}",
   "No recommendation letters needed": "Aucune lettre de recommandation demandée",
   "Estimated chance of admission": "Chance d'admission estimée",
+  "Choose a plan to start": "Choisissez une formule pour commencer",
+  "BAPTOU is available with a subscription: daily searches, applications prepared in each form's format, letters and emails.":
+    "BAPTOU est disponible avec un abonnement : recherches quotidiennes, candidatures préparées au format de chaque formulaire, lettres et emails.",
+  "Were you given a subscription? It's linked to an email address: you're signed in as {email}. If it was sent to another address, sign out and sign in with that one.":
+    "On vous a offert un abonnement ? Il est lié à une adresse email : vous êtes connecté avec {email}. S'il a été envoyé à une autre adresse, déconnectez-vous et reconnectez-vous avec celle-ci.",
   "Estimated chance of getting an interview": "Chance estimée d'obtenir un entretien",
   "BAPTOU's estimate from your profile and how selective this is: a guide, not a promise.":
     "Estimation de BAPTOU à partir de votre profil et de la sélectivité : une indication, pas une promesse.",

@@ -148,7 +148,7 @@ function Plans() {
                 <p className="text-muted">{t("{pct} of this month's allowance used.", { pct: formatPct(pctOf(spentUsd)) })}</p>
               </div>
             ) : (
-              <p className="mt-1 text-muted">{t("You don't have a plan yet. Choose one below to use BAPTOU's AI features.")}</p>
+              <p className="mt-1 text-muted">{t("You don't have a plan yet. Choose one below to start using BAPTOU.")}</p>
             )}
           </div>
           {paid && e?.kind !== "pass" && (

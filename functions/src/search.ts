@@ -11,7 +11,7 @@ import { loadDismissed, looseOfferKey, offerKey, urlId } from "./offers.js";
 import { checkPostings, isOfficial, looksGeneric } from "./postings.js";
 import { type NewOffer, notifyNewOffers } from "./notify.js";
 import { GMAIL_SECRETS } from "./gmail.js";
-import { anthropicKey, claude, db, type Kind, MODELS, REGION } from "./shared.js";
+import { anthropicKey, claude, db, entitlementFor, type Kind, MODELS, REGION, requireAccess } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 // Calibrated so that 90+ ("almost ideal") is rare: the user gets a dedicated email for those.
@@ -623,6 +623,7 @@ export const dailySearches = onSchedule(
     const now = Timestamp.now();
     let queued = 0;
     let skipped = 0;
+    let noAccess = 0;
     for (const doc of active.docs) {
       const uid = doc.ref.parent.parent!.id;
       const endsAt = doc.get("endsAt") as Timestamp | null;
@@ -632,6 +633,11 @@ export const dailySearches = onSchedule(
       }
       const nextRunAt = doc.get("nextRunAt") as Timestamp | null | undefined;
       if (nextRunAt && nextRunAt.toMillis() > now.toMillis()) continue; // not due yet
+      // No subscription or gift (any more): nothing runs until the student subscribes.
+      if (!(await entitlementFor(uid))) {
+        noAccess++;
+        continue;
+      }
 
       // Nobody is reading: when offers from this search pile up unreviewed, pause it rather than pay for
       // more. It resumes by itself the morning after the student has gone through them.
@@ -656,7 +662,7 @@ export const dailySearches = onSchedule(
       await queue().enqueue({ uid, searchId: doc.id, batch: true });
       queued++;
     }
-    logger.info("Morning searches", { active: active.size, queued, pausedForReview: skipped });
+    logger.info("Morning searches", { active: active.size, queued, pausedForReview: skipped, noAccess });
   },
 );
 
@@ -664,6 +670,7 @@ export const dailySearches = onSchedule(
 export const runSearchNow = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  await requireAccess(uid);
   const searchId = z.string().min(1).parse(request.data?.searchId);
   const ref = db.doc(`users/${uid}/searches/${searchId}`);
   const search = (await ref.get()).data() as Search | undefined;

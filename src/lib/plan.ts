@@ -41,7 +41,8 @@ export type Entitlement = {
   commitmentEnd?: number | null; // yearly plan
 };
 
-type PlanInfo = { entitlement: Entitlement | null; gmailRead: boolean; budgetUsd: number };
+// `failed`: the server couldn't be asked (offline…). That is not "no plan": the app isn't locked for it.
+type PlanInfo = { entitlement: Entitlement | null; gmailRead: boolean; budgetUsd: number; failed?: boolean };
 
 const myPlan = httpsCallable<void, PlanInfo>(functions, "myPlan");
 
@@ -53,15 +54,21 @@ function loadPlan(uid: string) {
       uid,
       promise: myPlan()
         .then(({ data }) => data)
-        .catch(() => ({ entitlement: null, gmailRead: false, budgetUsd: 11 })),
+        .catch(() => {
+          cache = null; // ask again next time
+          return { entitlement: null, gmailRead: false, budgetUsd: 11, failed: true };
+        }),
     };
   }
   return cache.promise;
 }
 
-/** Forgets the cached plan (e.g. after a payment), so the next usePlan() asks the server again. */
+const listeners = new Set<() => void>();
+
+/** Forgets the cached plan (e.g. after a payment) and has every usePlan() ask the server again. */
 export function refreshPlan() {
   cache = null;
+  listeners.forEach((l) => l());
 }
 
 /** The user's plan (from the server) and this month's usage as a share of the allowance. */
@@ -70,6 +77,15 @@ export function usePlan(reloadKey = 0) {
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   const [spentUsd, setSpentUsd] = useState(0);
   const [byTask, setByTask] = useState<Record<string, number>>({});
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const listener = () => setVersion((v) => v + 1);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -80,7 +96,7 @@ export function usePlan(reloadKey = 0) {
       setSpentUsd(u?.month === thisMonth ? u.spentUsd : 0);
       setByTask(u?.month === thisMonth ? (u.byTask ?? {}) : {});
     });
-  }, [user, reloadKey]);
+  }, [user, reloadKey, version]);
 
   const budget = plan?.entitlement?.budgetUsd ?? plan?.budgetUsd ?? 11;
   return {

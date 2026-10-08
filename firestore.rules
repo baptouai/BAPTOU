@@ -5,6 +5,19 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // Whether the user may use BAPTOU: the owner's own limit, a live paid subscription, or a live gift
+    // (keep in sync with entitlementFor in functions/src/shared.ts). Without it, the app is read-only:
+    // nothing can be created or changed, only deleted or exported.
+    function hasAccess(uid) {
+      let priv = /databases/$(database)/documents/private/$(uid);
+      let gift = /databases/$(database)/documents/access/$(request.auth.token.get('email', '').lower());
+      return (exists(priv) && (
+          get(priv).data.get('monthlyLimitUsd', null) != null
+          || (get(priv).data.get('plan', {}).get('status', '') in ['active', 'past_due']
+              && get(priv).data.plan.get('currentPeriodEnd', request.time + duration.value(1, 'd')) > request.time)))
+        || (exists(gift) && get(gift).data.get('expiresAt', request.time + duration.value(1, 'd')) > request.time);
+    }
+
     match /users/{uid} {
       // The app may only write these fields. Subscription, usage, Gmail and mail-index state are written
       // by the server (so nobody can grant themselves a plan from the browser).
@@ -16,14 +29,15 @@ service cloud.firestore {
       allow update: if isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(appFields());
 
       match /documents/{docId} {
-        allow read, write: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && hasAccess(uid);
       }
 
       // People from the mailbox to contact, with draft emails. Created by findContacts; the user can
       // edit drafts or dismiss, but only the server records a send.
       match /contacts/{contactId} {
         allow read, delete: if isOwner(uid);
-        allow update: if isOwner(uid)
+        allow update: if isOwner(uid) && hasAccess(uid)
           && request.resource.data.status != 'sent'
           && request.resource.data.get('sentAt', null) == resource.data.get('sentAt', null);
       }
@@ -46,18 +60,20 @@ service cloud.firestore {
 
       // Internship searches: BAPTOU only searches while one is "active".
       match /searches/{searchId} {
-        allow read, write: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && hasAccess(uid);
       }
 
       match /applications/{appId} {
         allow read, delete: if isOwner(uid);
         // Only the server may record that an email was actually sent.
-        allow create: if isOwner(uid) && !('emailSentAt' in request.resource.data);
-        allow update: if isOwner(uid)
+        allow create: if isOwner(uid) && hasAccess(uid) && !('emailSentAt' in request.resource.data);
+        allow update: if isOwner(uid) && hasAccess(uid)
           && request.resource.data.get('emailSentAt', null) == resource.data.get('emailSentAt', null);
 
         match /letterVersions/{versionId} {
-          allow read, create: if isOwner(uid);
+          allow read: if isOwner(uid);
+          allow create: if isOwner(uid) && hasAccess(uid);
         }
 
         // "Is this for me?" conversation, written by the askAboutOffer function only.

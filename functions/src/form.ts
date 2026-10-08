@@ -3,7 +3,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
 import { HUMAN_STYLE } from "./style.js";
 
 type Form = z.infer<typeof FormSchema>;
@@ -256,6 +256,7 @@ export const prepareApplication = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     const { applicationId, formText } = z
       .object({ applicationId: z.string().min(1), formText: z.string().max(40_000).optional() })
       .parse(request.data);
@@ -280,6 +281,7 @@ export const fitApplicationLimits = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     const applicationId = z.string().min(1).parse(request.data?.applicationId);
     const appRef = db.doc(`users/${uid}/applications/${applicationId}`);
     const app = (await appRef.get()).data();

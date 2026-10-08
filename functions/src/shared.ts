@@ -198,16 +198,22 @@ async function limitFor(uid: string, priv: FirebaseFirestore.DocumentSnapshot): 
   return (await entitlementFor(uid, priv))?.budgetUsd ?? null;
 }
 
+const NO_ACCESS = "You need an active BAPTOU subscription for this. See the Plans page.";
+
+/**
+ * Refuses the call unless the user has access: a paid subscription, a gift, or the owner's own limit.
+ * Every callable that does something calls it; only billing and account functions (plans, checkout,
+ * export, deletion, Gmail disconnection) stay open to everyone signed in.
+ */
+export async function requireAccess(uid: string) {
+  if (!(await entitlementFor(uid))) throw new HttpsError("permission-denied", NO_ACCESS);
+}
+
 /** Refuses the call without an active subscription (or gift), or once this month's allowance is used. Call before every Claude request. */
 export async function assertBudget(uid: string) {
   const snap = await db.doc(`private/${uid}`).get();
   const limit = await limitFor(uid, snap);
-  if (limit == null) {
-    throw new HttpsError(
-      "permission-denied",
-      "You need an active BAPTOU subscription for this. See the Plans page.",
-    );
-  }
+  if (limit == null) throw new HttpsError("permission-denied", NO_ACCESS);
   const spent = (snap.get(`spendUsd.${month()}`) as number | undefined) ?? 0;
   if (spent >= limit) {
     throw new HttpsError(

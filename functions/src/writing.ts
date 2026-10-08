@@ -6,7 +6,7 @@ import { loadProfile, runAgent, today } from "./agent.js";
 import { toContentBlock } from "./profile.js";
 import { letterLimit } from "./form.js";
 import { fitToLimits } from "./limits.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
 import { HUMAN_STYLE } from "./style.js";
 
 const Input = z.object({
@@ -74,6 +74,7 @@ export const draftLetter = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     const { applicationId, instructions } = Input.parse(request.data);
     const { appRef, app, profile, pastLetters } = await loadContext(uid, applicationId);
     const current: string = app.letter ?? "";
@@ -128,6 +129,7 @@ export const draftEmail = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     const { applicationId, instructions } = Input.parse(request.data);
     const { appRef, app, profile, pastLetters } = await loadContext(uid, applicationId);
     if (app.emailSentAt) throw new HttpsError("failed-precondition", "This email was already sent.");

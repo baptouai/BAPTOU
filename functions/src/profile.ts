@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import mammoth from "mammoth";
 import { z } from "zod";
-import { anthropicKey, assertBudget, bucket, claude, db, fallbackFor, MODELS, recordUsage, REGION } from "./shared.js";
+import { anthropicKey, assertBudget, bucket, claude, db, fallbackFor, MODELS, recordUsage, REGION, requireAccess } from "./shared.js";
 
 const MAX_DOCUMENTS = 15;
 
@@ -76,6 +76,7 @@ export const buildProfile = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
 
     const docsSnap = await db
       .collection(`users/${uid}/documents`)

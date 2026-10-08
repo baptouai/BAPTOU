@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -35,6 +35,7 @@ export const askAboutOffer = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    await requireAccess(uid);
     const { applicationId, question } = Input.parse(request.data);
 
     const appRef = db.doc(`users/${uid}/applications/${applicationId}`);
