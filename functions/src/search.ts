@@ -50,7 +50,7 @@ export const OffersSchema = z.object({
       organization: z.string(),
       location: z.string(),
       country: z.string(),
-      url: z.string().describe("Direct link to the posting or its application page"),
+      url: z.string().describe("Direct link to this one posting or its application page; never a careers home page or a list of search results"),
       deadline: z.string().describe("YYYY-MM-DD, or empty if not stated"),
       startDate: z.string().describe("As stated in the posting, or empty"),
       duration: z.string().describe("As stated in the posting, or empty"),
@@ -92,7 +92,7 @@ const JOB_SYSTEM = `You are BAPTOU's job scout. You search the web for real, cur
 Rules:
 - Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. Search results keep postings long after they close, so prefer recent ones (this year's recruitment cycle) and skip any whose dates show a past cycle, e.g. "2025-26" or posted over 6 months ago.
-- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page.
+- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -111,7 +111,7 @@ const ALTERNANCE_SYSTEM = `You are BAPTOU's alternance scout. You search the web
 Rules:
 - Only return offers you actually found during this run (in search results or pages you opened). Never invent an offer, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. When a search result doesn't make this clear, open the posting to check.
-- Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; give their link only when the company doesn't publish the offer itself. The url must lead to that specific offer.
+- Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; give their link only when the company doesn't publish the offer itself. The url must lead to that specific offer, never to a list of offers (a job board's search results): when a search result is a list, find the offer's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> alternance 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -130,7 +130,7 @@ const SYSTEM = `You are BAPTOU's internship scout. You search the web for real, 
 Rules:
 - Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. When a search result doesn't make this clear, open the posting to check.
-- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page.
+- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -153,7 +153,10 @@ export const ProgrammesSchema = z.object({
       location: z.string().describe("City"),
       country: z.string(),
       url: z.string().describe("The programme's page or its application page on the university's website"),
-      deadline: z.string().describe("Next application deadline for the requested intake, YYYY-MM-DD, or empty if not stated"),
+      applicationsOpen: z
+        .string()
+        .describe("Date applications open for the requested intake (the round the student can still make), YYYY-MM-DD, or empty if not stated"),
+      deadline: z.string().describe("Date applications close for the requested intake (that same round), YYYY-MM-DD, or empty if not stated"),
       startDate: z.string().describe("Intake, e.g. September 2027"),
       duration: z.string().describe("Programme length, e.g. 1 year"),
       postingLanguage: z.string().describe("Language of instruction"),
@@ -176,6 +179,7 @@ Rules:
 - Only return programmes you actually found during this run, with their official university page. Never invent a programme, university or link.
 - The url must be the programme's own page or its application page on the university's website. Ranking and aggregator sites (Mastersportal, FindAMasters…) are only for finding programmes.
 - The application window for the requested intake must still be open, or open later. Skip programmes whose deadline has passed.
+- Give the dates applications open and close for that intake, as the university (or the national platform it uses, such as Mon Master or UCAS) states them. With several rounds, give the next round the student can still make.
 - Respect the criteria (fields, countries, intake, teaching language, tuition budget). Check the student's degree and grades against the admission requirements and say so in matchReason; mention any compromise.
 - Use the student's nationalities (in the profile) for tuition: give the fee that applies to them (home, EU or international) and any visa need.
 - Give real figures in the brief when the university publishes them (tuition for the student's situation, requirements, deadlines).
@@ -207,6 +211,12 @@ const NOUN: Record<Kind, string> = {
   masters: "master's programmes",
 };
 
+/** When applications open, for a master's programme that says so. */
+const opensAt = (o: object) => {
+  const v = (o as { applicationsOpen?: unknown }).applicationsOpen;
+  return typeof v === "string" ? parseDate(v, false) : null;
+};
+
 /** The listed string fields of an offer that are present and non-empty. */
 function pick(o: object, keys: string[]) {
   return Object.fromEntries(
@@ -217,9 +227,10 @@ function pick(o: object, keys: string[]) {
 // When a run stops at its limits, the model sometimes fills a text with "placeholder": show nothing instead.
 const real = (text: string) => (/^\s*(placeholder|n\/?a|tbd|todo|none|-)\s*\.?\s*$/i.test(text) ? "" : text);
 
-function parseDate(s: string): Timestamp | null {
+/** A YYYY-MM-DD date: its last second for a deadline, its first for an opening date. */
+function parseDate(s: string, endOfDay = true): Timestamp | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  const d = new Date(`${s}T23:59:59Z`);
+  const d = new Date(`${s}T${endOfDay ? "23:59:59" : "00:00:00"}Z`);
   return Number.isNaN(d.getTime()) ? null : Timestamp.fromDate(d);
 }
 
@@ -429,6 +440,8 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
           applyUrl: o.url,
           ...(isOfficial(o.url, o.organization) ? {} : { fromJobBoard: true }),
           deadline: parseDate(o.deadline),
+          // Master's programmes: when applications open (the deadline is when they close).
+          ...(opensAt(o) ? { applicationsOpenAt: opensAt(o) } : {}),
           startDate: o.startDate,
           duration: o.duration,
           postingLanguage: o.postingLanguage,

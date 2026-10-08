@@ -10,7 +10,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { dismissOffer, statusLabel } from "@/components/ApplicationList";
-import { ApplicationFormView, coverLetterField, formAsksForLetter } from "@/components/ApplicationFormView";
+import { ApplicationFormView, coverLetterField, printLetter } from "@/components/ApplicationFormView";
 import { sendApprovedEmail } from "@/components/Contacts";
 import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
@@ -18,7 +18,7 @@ import { FitCheck, verdictLabel } from "@/components/FitCheck";
 import { FollowUp } from "@/components/FollowUp";
 import { RichText } from "@/components/RichText";
 import { looksGeneric } from "@/lib/postingLink";
-import type { Application, LetterVersion } from "@/lib/types";
+import type { Application, FormField, LetterVersion } from "@/lib/types";
 import { errorText, useI18n } from "@/lib/i18n";
 
 const AUTOSAVE_MS = 800;
@@ -51,6 +51,7 @@ function ApplicationView() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Partial<Application> | null>(null);
   const loaded = useRef(false);
+  const serverLetter = useRef(""); // the letter as last saved, to tell the user's edits from BAPTOU's
   const [sending, setSending] = useState(false);
   const [wantLetter, setWantLetter] = useState(false);
   const [wantEmail, setWantEmail] = useState(false);
@@ -72,13 +73,17 @@ function ApplicationView() {
         loaded.current = true;
         setEmail(data.emailDraft);
         // Forms prepared before the letter was unified kept their cover letter inside the form only.
-        const fromForm = !data.letter ? coverLetterField(data.applicationForm)?.value : undefined;
+        const field = coverLetterField(data.applicationForm);
+        const fromForm = !data.letter && field && (field.isCoverLetter || field.kind !== "file") ? field.value : undefined;
         setLetter(data.letter || fromForm || "");
         if (fromForm) updateDoc(snap.ref, { letter: fromForm, updatedAt: serverTimestamp() });
       } else if (data.letter) {
-        // BAPTOU filled an empty letter (e.g. while preparing the form): show it unless the user is typing.
-        setLetter((current) => (current || pending.current?.letter !== undefined ? current : data.letter));
+        // BAPTOU wrote the letter (e.g. while preparing the form): show it, unless the user has changed theirs.
+        setLetter((current) =>
+          pending.current?.letter !== undefined || (current && current !== serverLetter.current) ? current : data.letter,
+        );
       }
+      serverLetter.current = data.letter ?? "";
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, id]);
@@ -195,8 +200,75 @@ function ApplicationView() {
   }
   if (!app) return <p className="text-muted">{t("Loading…")}</p>;
 
-  const showLetter = !!letter || wantLetter || formAsksForLetter(app.applicationForm);
+  // The letter appears in one place only: inside the form's letter field once the application is prepared
+  // (none if the form doesn't ask for one), in its own section before that.
+  const showLetter = !app.applicationForm && (!!letter || wantLetter);
   const showEmail = !!email || wantEmail;
+  const letterTitle = `${app.title} - ${app.organization}`;
+
+  const letterEditor = (field?: FormField) => (
+    <div>
+      {app.approachNote && (
+        <div className="mt-2 rounded-lg bg-accent/5 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("The angle BAPTOU took")}</p>
+          <RichText text={app.approachNote} className="mt-1" />
+        </div>
+      )}
+      <AiBar
+        action={t(letter ? "Rewrite with BAPTOU" : "Write my letter")}
+        placeholder={t(letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize")}
+        busyLabel={t("BAPTOU is researching and writing… (1–3 min)")}
+        onRun={writeLetter}
+      />
+      <textarea
+        value={letter}
+        maxLength={field?.charLimit || undefined}
+        onChange={(e) => {
+          setLetter(e.target.value);
+          scheduleSave({ letter: e.target.value });
+        }}
+        rows={field ? 14 : 18}
+        className="mt-3 w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed"
+      />
+      {!!field?.charLimit && !!letter && (
+        <p className={`text-xs ${letter.length > field.charLimit ? "text-red-600" : "text-muted"}`}>
+          {t("{n} / {max} characters", { n: letter.length, max: field.charLimit })}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <CopyButton text={letter} label={t("Copy letter")} copiedLabel={t("Copied")} />
+        {field?.kind === "file" && letter && (
+          <button onClick={() => printLetter(letter, letterTitle)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
+            {t("Save as PDF to attach")}
+          </button>
+        )}
+        <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">
+          {t("Save as version")}
+        </button>
+        <span className="text-xs text-muted">
+          {t(saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes")}
+        </span>
+      </div>
+      {versions.length > 0 && (
+        <details className="mt-4 text-sm">
+          <summary className="cursor-pointer text-muted">{t("Version history ({n})", { n: versions.length })}</summary>
+          <ul className="mt-2 grid gap-2">
+            {versions.map((v) => (
+              <li key={v.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2">
+                <span className="text-muted">
+                  {t(v.author === "baptou" ? "BAPTOU draft" : "Your version")} ·{" "}
+                  {v.createdAt ? dateTime(v.createdAt.toDate()) : t("just now")}
+                </span>
+                <button onClick={() => restore(v)} className="text-accent">
+                  {t("Restore")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
 
   return (
     <div className="grid gap-6">
@@ -235,7 +307,7 @@ function ApplicationView() {
 
       {!app.postingClosedAt && looksGeneric(app.applyUrl) && (
         <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
-          <p className="font-medium">{t("This link goes to a general careers page, not to the posting itself.")}</p>
+          <p className="font-medium">{t("This link goes to a careers page or a list of offers, not to the posting itself.")}</p>
           <p className="mt-0.5">
             {t("Look for the exact offer on that page. If you find it, add it with “+ Add an offer you found” and dismiss this one.")}
           </p>
@@ -276,71 +348,22 @@ function ApplicationView() {
         <>
         <ApplicationFormView
           applicationId={id}
+          applyUrl={app.applyUrl}
           form={app.applicationForm}
           status={app.applicationFormStatus}
           statusError={app.applicationFormError}
           autoPrepare={false} // each preparation costs Claude credit, so it only runs on click
           letter={letter}
-          title={`${app.title} - ${app.organization}`}
           onChange={(applicationForm) => scheduleSave({ applicationForm })}
-        onLetterFitted={setLetter}
+          onLetterFitted={setLetter}
+          renderLetter={letterEditor}
         />
 
-        {/* The letter box only when the form asks for one (or the user wants one); the email box only on request. */}
+        {/* Before the form is prepared: the letter box when wanted. The email box only on request. */}
         {showLetter && (
           <section id="letter" className="scroll-mt-4 rounded-xl border border-card-edge bg-card p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium">{t("Motivation letter")}</h2>
-              <span className="text-xs text-muted">
-                {t(saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : "Unsaved changes")}
-              </span>
-            </div>
-            {app.approachNote && (
-              <div className="mt-2 rounded-lg bg-accent/5 p-3 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("The angle BAPTOU took")}</p>
-                <RichText text={app.approachNote} className="mt-1" />
-              </div>
-            )}
-            <AiBar
-              action={t(letter ? "Rewrite with BAPTOU" : "Write my letter")}
-              placeholder={t(letter ? "e.g. Shorter, more formal, mention my Excel skills" : "Optional: anything to emphasize")}
-              busyLabel={t("BAPTOU is researching and writing… (1–3 min)")}
-              onRun={writeLetter}
-            />
-            <textarea
-              value={letter}
-              maxLength={coverLetterField(app.applicationForm)?.charLimit || undefined}
-              onChange={(e) => {
-                setLetter(e.target.value);
-                scheduleSave({ letter: e.target.value });
-              }}
-              rows={18}
-              className="mt-3 w-full rounded-lg border border-border bg-background p-3 leading-relaxed"
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-                {t("Save as version")}
-              </button>
-              <CopyButton text={letter} label={t("Copy letter")} copiedLabel={t("Copied")} />
-            </div>
-            {versions.length > 0 && (
-              <details className="mt-4 text-sm">
-                <summary className="cursor-pointer text-muted">{t("Version history ({n})", { n: versions.length })}</summary>
-                <ul className="mt-2 grid gap-2">
-                  {versions.map((v) => (
-                    <li key={v.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2">
-                      <span className="text-muted">
-                        {t(v.author === "baptou" ? "BAPTOU draft" : "Your version")} ·{" "}
-                        {v.createdAt ? dateTime(v.createdAt.toDate()) : t("just now")}
-                      </span>
-                      <button onClick={() => restore(v)} className="text-accent">
-                        {t("Restore")}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+            <h2 className="font-medium">{t("Motivation letter")}</h2>
+            {letterEditor()}
           </section>
           )}
 
@@ -389,11 +412,11 @@ function ApplicationView() {
           </section>
           )}
 
-          {(!showLetter || !showEmail) && (
+          {((!showLetter && !app.applicationForm) || !showEmail) && (
             <div className="flex flex-wrap gap-4 text-sm">
-              {!showLetter && (
+              {!showLetter && !app.applicationForm && (
                 <button onClick={() => setWantLetter(true)} className="text-muted underline">
-                  {t(app.applicationForm ? "This form doesn't ask for a letter. Write one anyway" : "Write a motivation letter")}
+                  {t("Write a motivation letter")}
                 </button>
               )}
               {!showEmail && (
@@ -493,9 +516,11 @@ function AiBar({
 /** Location, start, duration and deadline as small tags under the title. */
 function FactTags({ app }: { app: Application }) {
   const [now] = useState(() => Date.now());
-  const { t, date } = useI18n();
+  const { t, day } = useI18n();
   const deadline = app.deadline?.toDate();
   const soon = deadline && deadline.getTime() - now < 7 * 86_400_000;
+  const opens = app.applicationsOpenAt?.toDate();
+  const notOpenYet = opens && opens.getTime() > now;
   const facts = [
     [app.location, app.country].filter(Boolean).join(", "),
     app.startDate && t("Starts {date}", { date: app.startDate }),
@@ -505,7 +530,7 @@ function FactTags({ app }: { app: Application }) {
     app.salary,
     app.school && t("School: {name}", { name: app.school }),
   ].filter(Boolean) as string[];
-  if (!facts.length && !deadline) return null;
+  if (!facts.length && !deadline && !opens) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
       {facts.map((f) => (
@@ -513,13 +538,22 @@ function FactTags({ app }: { app: Application }) {
           {f}
         </span>
       ))}
+      {opens && (
+        <span
+          className={`rounded-full border px-2 py-0.5 ${
+            notOpenYet ? "border-accent/40 bg-accent/10 text-accent" : "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
+          }`}
+        >
+          {t(notOpenYet ? "Applications open {date}" : "Applications open since {date}", { date: day(opens) })}
+        </span>
+      )}
       {deadline && (
         <span
           className={`rounded-full border px-2 py-0.5 ${
             soon ? "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400" : "border-border text-muted"
           }`}
         >
-          {t("Deadline {date}", { date: date(deadline, "short") })}
+          {t(app.type === "masters" ? "Applications close {date}" : "Deadline {date}", { date: day(deadline) })}
         </span>
       )}
     </div>

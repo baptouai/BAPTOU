@@ -10,6 +10,10 @@ type Form = z.infer<typeof FormSchema>;
 
 const COVER_LETTER_LABEL = /cover(ing)? letter|motivation letter|lettre de motivation|anschreiben/i;
 
+// Shorter than this, a "letter" is a remark or a placeholder, not a letter.
+const MIN_LETTER_CHARS = 250;
+const isLetter = (text: string | undefined) => (text ?? "").trim().length >= MIN_LETTER_CHARS;
+
 /** The character limit the form puts on the cover letter, or 0. */
 export function letterLimit(form: Partial<Form> | undefined) {
   const fields = form?.sections?.flatMap((s) => s.fields) ?? [];
@@ -70,7 +74,9 @@ const Field = z.object({
 
 export const FormSchema = z.object({
   platform: z.string().describe("Application system: Workday, Greenhouse, Lever, SmartRecruiters, Teamtailor, company website, email, ..."),
-  formUrl: z.string().describe("URL of the actual application form, or the posting URL if the form couldn't be reached"),
+  formUrl: z
+    .string()
+    .describe("URL of the actual application form, or the posting link given to you if the form couldn't be reached; never a general careers page"),
   seenOnForm: z.boolean().describe("True if you saw the real form fields; false if the form is inferred from the platform/posting"),
   loginRequired: z
     .boolean()
@@ -94,7 +100,8 @@ const SYSTEM = `You are BAPTOU. You prepare a student's application in the exact
    - "entries" fields (work experience, education): one entry per relevant item, descriptions ready to paste.
    - Free-text questions (message to the hiring team, why us, ...): tailored, specific answers within the character limit, consistent with the motivation letter if there is one.
    - File fields: say which document to attach.
-   - Cover/motivation letter (text box or file): set isCoverLetter and put the full letter text in value. Reuse the student's letter for this application if there is one, otherwise write it.
+   - Cover/motivation letter (text box or file, even optional): set isCoverLetter and put the full letter itself in value, ready to send. Reuse the student's letter for this application if there is one, otherwise write it.
+   - A value is always the answer itself, never a remark about it (not "see the Questions section", not "use the letter"): remarks go in note.
 4. Answer every question you can, as the student would. Never invent facts about the student.
    - Pay or salary expectations: give a realistic figure or range for this role, level, contract and place (the posting's own figure if it gives one, otherwise typical pay you know or find), in the form's format; set check = true and say in note where the figure comes from.
    - Availability, start date, duration, notice, preferences, motivation and other judgment questions: answer from the profile, what the student is looking for and the offer; set check = true when it's a choice the student should confirm.
@@ -149,7 +156,7 @@ async function readForm(
     .filter(Boolean)
     .join("; ");
   const documentList = docs.docs.map((d) => `- ${d.get("kind")}: ${d.get("fileName")}`).join("\n");
-  const letter = app.letter ? `:\n"""\n${app.letter}\n"""` : ": not written yet";
+  const letter = isLetter(app.letter) ? `:\n"""\n${app.letter}\n"""` : ": not written yet";
 
   return runAgent({
     uid,
@@ -213,10 +220,14 @@ export async function prepareAndSave(
     const profile = await loadProfile(uid);
     const form = await fitFormLimits(uid, await readForm(uid, app, profile, formText, source === "unlocked"));
     // The letter lives in one place: the application's letter (editable, with version history).
-    // If the form needed one and none existed yet, BAPTOU's draft becomes that letter.
-    const coverLetter = form.sections.flatMap((s) => s.fields).find((f) => f.isCoverLetter && f.value)?.value;
-    const adoptLetter = !app.letter && coverLetter;
+    // If the form needed one and none existed yet (or only a remark stood in for it), BAPTOU's draft becomes
+    // that letter; a remark it replaces stays in the version history.
+    const coverLetter = form.sections.flatMap((s) => s.fields).find((f) => f.isCoverLetter && isLetter(f.value))?.value;
+    const adoptLetter = !isLetter(app.letter) && coverLetter;
     if (adoptLetter) {
+      if (app.letter?.trim()) {
+        await appRef.collection("letterVersions").add({ text: app.letter, author: "user", createdAt: FieldValue.serverTimestamp() });
+      }
       await appRef.collection("letterVersions").add({ text: coverLetter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
     }
     // A form read from the student's paste (or after confirming their email) is the real one, whatever the

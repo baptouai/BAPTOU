@@ -135,8 +135,9 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
 }
 
 function OfferCard({ app: a }: { app: Item }) {
+  const [now] = useState(() => Date.now());
   const { user } = useAuth();
-  const { t, date } = useI18n();
+  const { t, date, day } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   async function interested() {
@@ -155,8 +156,10 @@ function OfferCard({ app: a }: { app: Item }) {
               {a.country ? ` · ${a.country}` : ""}
               {APPLIED.includes(a.status) && a.appliedAt
                 ? ` · ${t("applied {date}", { date: date(a.appliedAt.toDate(), "short") })}`
-                : a.deadline
-                  ? ` · ${t("deadline {date}", { date: date(a.deadline.toDate(), "short") })}`
+                : a.applicationsOpenAt && a.applicationsOpenAt.toMillis() > now
+                  ? ` · ${t("applications open {date}", { date: day(a.applicationsOpenAt.toDate()) })}`
+                  : a.deadline
+                  ? ` · ${t("deadline {date}", { date: day(a.deadline.toDate()) })}`
                   : ""}
             </p>
           </div>
@@ -174,9 +177,9 @@ function OfferCard({ app: a }: { app: Item }) {
             {!a.postingClosedAt && looksGeneric(a.applyUrl) && (
               <span
                 className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
-                title={t("This link goes to a careers page, not to the posting itself")}
+                title={t("This link goes to a careers page or a list of offers, not to the posting itself")}
               >
-                {t("General careers page")}
+                {t("Not the posting itself")}
               </span>
             )}
             {a.source === "manual" && (

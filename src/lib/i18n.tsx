@@ -19,6 +19,11 @@ type I18n = {
   t: (text: string, vars?: Vars) => string;
   /** A date in the interface language, e.g. 7 October 2026 / 7 octobre 2026. */
   date: (d: Date | number | string, style?: "long" | "short") => string;
+  /**
+   * A calendar day stored as a date (a deadline, an opening date, "2026-11-02"): shown as that same day
+   * wherever the student is, not shifted by their time zone.
+   */
+  day: (d: Date | number | string, style?: "long" | "short") => string;
   /** A date and time in the interface language. */
   dateTime: (d: Date | number) => string;
 };
@@ -94,6 +99,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       t: (text, vars) => fill(lang === "fr" ? (fr[text] ?? text) : text, vars),
       date: (d, style = "long") =>
         new Date(d).toLocaleDateString(locale, style === "long" ? { day: "numeric", month: "long", year: "numeric" } : undefined),
+      day: (d, style = "short") =>
+        new Date(d).toLocaleDateString(locale, {
+          ...(style === "long" ? { day: "numeric", month: "long", year: "numeric" } : {}),
+          timeZone: "UTC",
+        }),
       dateTime: (d) => new Date(d).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" }),
     };
   }, [lang, setLang]);

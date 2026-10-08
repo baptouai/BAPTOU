@@ -51,7 +51,7 @@ export function FollowUp({
   onSetStatus: (status: Application["status"]) => Promise<void>;
 }) {
   const { user } = useAuth();
-  const { t, date } = useI18n();
+  const { t, date, day } = useI18n();
   const [replies, setReplies] = useState<(Reply & { id: string })[]>([]);
   const [now] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
@@ -92,7 +92,7 @@ export function FollowUp({
             <div className="mt-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted">
                 {t("Next step")}
-                {r.dueDate && <span className="normal-case"> · {t("by {date}", { date: date(r.dueDate, "short") })}</span>}
+                {r.dueDate && <span className="normal-case"> · {t("by {date}", { date: day(r.dueDate) })}</span>}
               </span>
               <RichText text={r.nextStep} />
             </div>

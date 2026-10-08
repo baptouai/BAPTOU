@@ -125,7 +125,7 @@ export function RepliesPanel() {
 
 function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
   const { user } = useAuth();
-  const { t, date } = useI18n();
+  const { t, date, day } = useI18n();
   const k = replyKind[r.kind];
   const markSeen = () => user && updateDoc(doc(db, "users", user.uid, "replies", r.id), { seen: true });
 
@@ -148,7 +148,7 @@ function ReplyCard({ reply: r }: { reply: Reply & { id: string } }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             {t("Next step")}
-            {r.dueDate && <span className="normal-case"> · {t("by {date}", { date: date(r.dueDate, "short") })}</span>}
+            {r.dueDate && <span className="normal-case"> · {t("by {date}", { date: day(r.dueDate) })}</span>}
           </p>
           <RichText text={r.nextStep} className="mt-1" />
         </div>

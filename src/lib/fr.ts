@@ -414,8 +414,9 @@ export const fr: Record<string, string> = {
   "Mark offers as interesting to keep them here.": "Marquez des offres comme intéressantes pour les garder ici.",
   "deadline {date}": "date limite {date}",
   "Posting closed": "Offre fermée",
-  "This link goes to a careers page, not to the posting itself": "Ce lien mène à une page carrières, pas à l'offre elle-même",
-  "General careers page": "Page carrières générale",
+  "This link goes to a careers page or a list of offers, not to the posting itself":
+    "Ce lien mène à une page carrières ou à une liste d'offres, pas à l'offre elle-même",
+  "Not the posting itself": "Pas l'offre elle-même",
   "Added by you": "Ajoutée par vous",
   "BAPTOU couldn't find this offer on the organization's own website": "BAPTOU n'a pas trouvé cette offre sur le site de l'organisation",
   "Via a job board": "Via un site d'emploi",
@@ -454,7 +455,8 @@ export const fr: Record<string, string> = {
   "the page no longer exists (410)": "la page n'existe plus (410)",
   "the link now redirects to a general careers page": "le lien renvoie maintenant vers une page carrières générale",
   "the page says the posting is no longer available": "la page indique que l'offre n'est plus disponible",
-  "This link goes to a general careers page, not to the posting itself.": "Ce lien mène à une page carrières générale, pas à l'offre elle-même.",
+  "This link goes to a careers page or a list of offers, not to the posting itself.":
+    "Ce lien mène à une page carrières ou à une liste d'offres, pas à l'offre elle-même.",
   "Look for the exact offer on that page. If you find it, add it with “+ Add an offer you found” and dismiss this one.":
     "Cherchez l'offre exacte sur cette page. Si vous la trouvez, ajoutez-la avec « + Ajouter une offre que vous avez trouvée » et écartez celle-ci.",
   "Why it fits you": "Pourquoi elle vous correspond",
@@ -488,7 +490,6 @@ export const fr: Record<string, string> = {
   "Sent": "Envoyé",
   "Sending…": "Envoi…",
   "Approve & send": "Valider et envoyer",
-  "This form doesn't ask for a letter. Write one anyway": "Ce formulaire ne demande pas de lettre. En rédiger une quand même",
   "Write a motivation letter": "Rédiger une lettre de motivation",
   "Draft an email to the recruiter": "Rédiger un email au recruteur",
   "Quick answers": "Réponses rapides",
@@ -499,6 +500,19 @@ export const fr: Record<string, string> = {
   "Starts {date}": "Début {date}",
   "School: {name}": "École : {name}",
   "Deadline {date}": "Date limite {date}",
+  "Applications open {date}": "Candidatures ouvertes le {date}",
+  "Applications open since {date}": "Candidatures ouvertes depuis le {date}",
+  "Applications close {date}": "Clôture des candidatures {date}",
+  "applications open {date}": "candidatures ouvertes le {date}",
+  "LinkedIn profile": "Profil LinkedIn",
+  "Change": "Modifier",
+  "Remove": "Retirer",
+  "BAPTOU adds it to application forms and emails that ask for it.":
+    "BAPTOU l'ajoute aux formulaires de candidature et aux emails qui le demandent.",
+  "That doesn't look like a LinkedIn profile link (linkedin.com/in/…).":
+    "Ce lien ne ressemble pas à un profil LinkedIn (linkedin.com/in/…).",
+  "LinkedIn doesn't let BAPTOU read profiles. To use what's on yours too, open your profile on LinkedIn, choose More (or Resources) then Save to PDF, and upload that PDF above as “Other”.":
+    "LinkedIn ne permet pas à BAPTOU de lire les profils. Pour utiliser aussi le contenu du vôtre, ouvrez votre profil sur LinkedIn, choisissez Plus (ou Ressources) puis Enregistrer au format PDF, et ajoutez ce PDF ci-dessus comme « Autre ».",
 
   // --- Application form
   "Application form": "Formulaire de candidature",
@@ -515,11 +529,6 @@ export const fr: Record<string, string> = {
     "BAPTOU ouvre la page de candidature et lit le formulaire. Vous pouvez continuer à lire l'offre en attendant.",
   "Some careers sites only show the form after you sign in or confirm your email. If that's the case, sign in there, then paste the form here.":
     "Certains sites carrières n'affichent le formulaire qu'après connexion ou confirmation de votre email. Dans ce cas, connectez-vous sur le site, puis collez le formulaire ici.",
-  "This careers site asks you to sign in or confirm your email before it shows the form.":
-    "Ce site carrières demande de vous connecter ou de confirmer votre email avant d'afficher le formulaire.",
-  "BAPTOU couldn't see the real form.": "BAPTOU n'a pas pu voir le vrai formulaire.",
-  "The fields below are what this platform usually asks, not the exact form.":
-    "Les champs ci-dessous sont ceux que cette plateforme demande habituellement, pas le formulaire exact.",
   "To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.":
     "Pour obtenir le formulaire exact : ouvrez-le, connectez-vous, sélectionnez toute la page du formulaire (Ctrl+A), copiez (Ctrl+C) et collez-la ici.",
   "The real form looks different? Paste it here and BAPTOU will follow it exactly.":
@@ -543,9 +552,6 @@ export const fr: Record<string, string> = {
   "Files to attach": "Fichiers à joindre",
   "No files requested.": "Aucun fichier demandé.",
   "Your answer": "Votre réponse",
-  "No letter yet. Write it in the Motivation letter section below.":
-    "Pas encore de lettre. Rédigez-la dans la partie Lettre de motivation ci-dessous.",
-  "Edit the letter": "Modifier la lettre",
   "Save as PDF to attach": "Enregistrer en PDF pour la joindre",
   "{n} / {max} characters": "{n} / {max} caractères",
   "Save this application's letter as PDF": "Enregistrer la lettre de cette candidature en PDF",
@@ -672,16 +678,7 @@ export const fr: Record<string, string> = {
   "BAPTOU couldn't read this application form.": "BAPTOU n'a pas pu lire ce formulaire de candidature.",
   "The search failed. It will try again tomorrow.": "La recherche a échoué. Elle réessaiera demain.",
 
-  // --- Unlock the form (email confirmation)
-  "BAPTOU can confirm your email for you when it can read your Gmail (Profile page; first 100 users for now).":
-    "BAPTOU peut confirmer votre email à votre place s'il peut lire votre Gmail (page Profil ; 100 premiers utilisateurs pour l'instant).",
-  "BAPTOU will open {site} in its own browser, type {email}, read the code the site sends to your Gmail, then read the form. It won't fill in or send your application. Continue?":
-    "BAPTOU va ouvrir {site} dans son propre navigateur, saisir {email}, lire le code que le site envoie sur votre Gmail, puis lire le formulaire. Il ne remplira ni n'enverra votre candidature. Continuer ?",
-  "Let BAPTOU confirm your email": "Laisser BAPTOU confirmer votre email",
-  "It types {email} on {site}, reads the code from your Gmail and opens the real form. Nothing is filled in or sent. About 1–3% of your monthly allowance.":
-    "Il saisit {email} sur {site}, lit le code dans votre Gmail et ouvre le vrai formulaire. Rien n'est rempli ni envoyé. Environ 1 à 3 % de votre crédit mensuel.",
-  "Unlocking… (up to 3 min)": "Déverrouillage… (jusqu'à 3 min)",
-  "Unlock the form": "Déverrouiller le formulaire",
+  // --- Unlock the form (server messages)
   "This site asks for a robot check (CAPTCHA), which BAPTOU doesn't get around. Open the form yourself, then paste it here.":
     "Ce site demande une vérification anti-robot (CAPTCHA), que BAPTOU ne contourne pas. Ouvrez le formulaire vous-même, puis collez-le ici.",
   "This site wants an account with a password, which BAPTOU doesn't create for you. Sign up there yourself, then paste the form here.":

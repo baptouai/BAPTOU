@@ -11,6 +11,7 @@ import type { DocumentKind, UploadedDocument } from "@/lib/types";
 import { ProfileSummary } from "@/components/ProfileSummary";
 import { GmailConnect } from "@/components/GmailConnect";
 import { Nationalities } from "@/components/Nationalities";
+import { LinkedInProfile } from "@/components/LinkedInProfile";
 import { AccountSettings } from "@/components/AccountSettings";
 import { errorText, useI18n } from "@/lib/i18n";
 
@@ -114,6 +115,8 @@ export default function ProfilePage() {
       </ul>
 
       <Nationalities />
+
+      <LinkedInProfile />
 
       <ProfileSummary hasDocuments={docs.length > 0} />
 

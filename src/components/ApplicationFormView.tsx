@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref } from "firebase/storage";
 import { db, functions, storage } from "@/lib/firebase";
@@ -9,55 +9,50 @@ import { useAuth } from "@/lib/auth-context";
 import { RichText } from "@/components/RichText";
 import type { ApplicationForm, FormEntry, FormField, UploadedDocument } from "@/lib/types";
 import { errorText, useI18n } from "@/lib/i18n";
+import { formLink } from "@/lib/postingLink";
 
 const fitApplicationLimits = httpsCallable<{ applicationId: string }, { letter: string }>(
   functions,
   "fitApplicationLimits",
   { timeout: 300_000 },
 );
-const unlockForm = httpsCallable<
-  { applicationId: string },
-  { status: "unlocked" | "busy" | "captcha" | "password_required" | "failed"; message?: string; note?: string }
->(functions, "unlockForm", { timeout: 540_000 });
 const prepareApplication = httpsCallable<{ applicationId: string; formText?: string }, ApplicationForm | null>(functions, "prepareApplication", {
   timeout: 540_000,
 });
 
 const COVER_LETTER_LABEL = /cover(ing)? letter|motivation letter|lettre de motivation|anschreiben|carta de presentaci/i;
 
-/** Whether the application asks for a motivation letter (as a text box or a file). */
-export function formAsksForLetter(form: ApplicationForm | undefined) {
-  return (
-    !!coverLetterField(form) ||
-    !!form?.sections.some((s) => s.fields.some((f) => f.kind === "file" && f.suggestedDocument === "motivation_letter"))
-  );
-}
-
-/** The form field asking for the cover/motivation letter, if any. Older forms lack the flag, so the label is checked too. */
+/**
+ * The form field asking for the cover/motivation letter (a text box or a file to attach), if any. Older forms
+ * lack the flag, so the label is checked too.
+ */
 export function coverLetterField(form: ApplicationForm | undefined): FormField | undefined {
   const fields = form?.sections.flatMap((s) => s.fields) ?? [];
   return (
     fields.find((f) => f.isCoverLetter) ??
-    fields.find((f) => f.isCoverLetter === undefined && (f.kind === "long_text" || f.kind === "file") && COVER_LETTER_LABEL.test(f.label))
+    fields.find((f) => f.isCoverLetter === undefined && (f.kind === "long_text" || f.kind === "file") && COVER_LETTER_LABEL.test(f.label)) ??
+    fields.find((f) => f.kind === "file" && f.suggestedDocument === "motivation_letter")
   );
 }
 
 /**
  * The application laid out like the organization's real form, every field prepared and editable.
- * Edits are passed to `onChange`, which autosaves them.
+ * Edits are passed to `onChange`, which autosaves them. The letter is written and edited inside the
+ * form's letter field (`renderLetter`), so it appears in one place only.
  */
 export function ApplicationFormView({
-  applicationId, form, status, statusError, autoPrepare, letter, title, onChange, onLetterFitted,
+  applicationId, applyUrl, form, status, statusError, autoPrepare, letter, onChange, onLetterFitted, renderLetter,
 }: {
   applicationId: string;
+  applyUrl: string | undefined;
   form: ApplicationForm | undefined;
   status: "preparing" | "ready" | "error" | undefined;
   statusError: string | undefined;
   autoPrepare: boolean; // prepare on first open, without waiting for a click
   letter: string;
-  title: string;
   onChange: (form: ApplicationForm) => void;
   onLetterFitted?: (letter: string) => void;
+  renderLetter: (field: FormField) => React.ReactNode;
 }) {
   const { user } = useAuth();
   const [local, setLocal] = useState(form);
@@ -120,6 +115,7 @@ export function ApplicationFormView({
 
   const fields = local?.sections.flatMap((s) => s.fields) ?? [];
   const coverField = coverLetterField(local);
+  const formUrl = formLink(local?.formUrl, applyUrl);
   // Only the parts that need work are laid out; routine fields (name, phone, address, consents…) are
   // just listed. Older forms have no flag, so they're judged by field type.
   const needsWork = (f: FormField) =>
@@ -193,25 +189,15 @@ export function ApplicationFormView({
       {local && (
         <>
           {local.notes && <RichText text={local.notes} className="mt-3 rounded-lg bg-accent/10 p-3 text-sm" />}
-          {/* Only for a form BAPTOU had to guess; gone once the real form is in (pasted, read or unlocked). */}
+          {/* Once the form is prepared, no warning box: the line under the title says whether it was estimated,
+              and the real form can still be pasted. */}
           {local.source !== "pasted" && local.source !== "unlocked" && (!local.seenOnForm || local.loginRequired) ? (
-            <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-              <p className="font-medium text-amber-800 dark:text-amber-300">
-                {t(
-                  local.loginRequired
-                    ? "This careers site asks you to sign in or confirm your email before it shows the form."
-                    : "BAPTOU couldn't see the real form.",
-                )}{" "}
-                {t("The fields below are what this platform usually asks, not the exact form.")}
-              </p>
-              {local.loginRequired && <UnlockForm applicationId={applicationId} url={local.formUrl} />}
-              <PasteForm
-                collapsed
-                intro={t("To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.")}
-                formUrl={local.formUrl}
-                onSubmit={prepare}
-              />
-            </div>
+            <PasteForm
+              collapsed
+              intro={t("To get the exact form: open it, sign in, select everything on the form page (Ctrl+A), copy (Ctrl+C) and paste it here.")}
+              formUrl={formUrl}
+              onSubmit={prepare}
+            />
           ) : (
             <PasteForm collapsed intro={t("The real form looks different? Paste it here and BAPTOU will follow it exactly.")} onSubmit={prepare} />
           )}
@@ -249,7 +235,7 @@ export function ApplicationFormView({
                         isCoverLetter={field === coverField}
                         docs={docs}
                         letter={letter}
-                        title={title}
+                        renderLetter={renderLetter}
                         onChange={(patch) => updateField(si, fi, patch)}
                       />
                     </li>
@@ -283,7 +269,7 @@ export function ApplicationFormView({
           )}
 
           <a
-            href={local.formUrl}
+            href={formUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 font-medium text-white"
@@ -293,73 +279,6 @@ export function ApplicationFormView({
         </>
       )}
     </section>
-  );
-}
-
-/**
- * "Unlock the form": with the student's go-ahead, BAPTOU confirms their email on the careers site in its own
- * browser (reading the code from their Gmail), then reads the real form. It never fills in or submits it.
- */
-function UnlockForm({ applicationId, url }: { applicationId: string; url: string }) {
-  const { user } = useAuth();
-  const { t } = useI18n();
-  const [gmail, setGmail] = useState<{ email?: string; canRead?: boolean } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  let site = url;
-  try {
-    site = new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    // keep the raw link
-  }
-
-  useEffect(() => {
-    if (!user) return;
-    return onSnapshot(doc(db, "users", user.uid), (snap) => setGmail((snap.get("gmail") as typeof gmail) ?? null));
-  }, [user]);
-
-  if (!gmail?.email || !gmail.canRead) {
-    return (
-      <p className="mt-2 text-xs">
-        {t("BAPTOU can confirm your email for you when it can read your Gmail (Profile page; first 100 users for now).")}
-      </p>
-    );
-  }
-
-  async function unlock() {
-    const question = t(
-      "BAPTOU will open {site} in its own browser, type {email}, read the code the site sends to your Gmail, then read the form. It won't fill in or send your application. Continue?",
-      { site, email: gmail!.email! },
-    );
-    if (!confirm(question)) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const { data } = await unlockForm({ applicationId });
-      if (data.status !== "unlocked" && data.status !== "busy") {
-        setMessage([data.message && t(data.message), data.note].filter(Boolean).join(" "));
-      }
-    } catch (e) {
-      setMessage(errorText(e, t));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="mt-3 rounded-lg border border-accent/40 bg-accent/5 p-3 text-foreground">
-      <p className="font-medium">{t("Let BAPTOU confirm your email")}</p>
-      <p className="mt-0.5 text-muted">
-        {t("It types {email} on {site}, reads the code from your Gmail and opens the real form. Nothing is filled in or sent. About 1–3% of your monthly allowance.", {
-          email: gmail.email,
-          site,
-        })}
-      </p>
-      <button onClick={unlock} disabled={busy} className="mt-2 rounded-lg bg-accent px-3 py-1.5 font-medium text-white disabled:opacity-50">
-        {t(busy ? "Unlocking… (up to 3 min)" : "Unlock the form")}
-      </button>
-      {message && <p className="mt-2 text-amber-800 dark:text-amber-300">{message}</p>}
-    </div>
   );
 }
 
@@ -497,13 +416,13 @@ function ChecklistColumn({
 }
 
 function FieldView({
-  field, isCoverLetter, docs, letter, title, onChange,
+  field, isCoverLetter, docs, letter, renderLetter, onChange,
 }: {
   field: FormField;
   isCoverLetter: boolean;
   docs: (UploadedDocument & { id: string })[];
   letter: string;
-  title: string;
+  renderLetter: (field: FormField) => React.ReactNode;
   onChange: (patch: Partial<FormField>) => void;
 }) {
   const { t } = useI18n();
@@ -528,35 +447,13 @@ function FieldView({
   );
   const note = field.note && <p className="mt-1 text-xs text-muted">{field.note}</p>;
 
-  // The letter is edited in one place only: the Motivation letter section below.
+  // The letter is written and edited right here, the only place it appears once there's a form.
   if (isCoverLetter) {
     return (
-      <div>
+      <div id="letter" className="scroll-mt-4">
         {header}
-        <div className="mt-2 rounded-lg border border-border bg-background p-3 text-sm">
-          {letter ? (
-            <p className="line-clamp-4 whitespace-pre-wrap text-muted">{letter}</p>
-          ) : (
-            <p className="text-muted">{t("No letter yet. Write it in the Motivation letter section below.")}</p>
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <a href="#letter" className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
-            {t("Edit the letter")} ↓
-          </a>
-          {letter && field.kind === "file" && (
-            <button onClick={() => printLetter(letter, title)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-              {t("Save as PDF to attach")}
-            </button>
-          )}
-          {letter && field.kind !== "file" && <CopyButton text={letter} />}
-        </div>
-        {field.charLimit > 0 && letter && (
-          <p className={`mt-1 text-xs ${letter.length > field.charLimit ? "text-red-600" : "text-muted"}`}>
-            {t("{n} / {max} characters", { n: letter.length, max: field.charLimit })}
-          </p>
-        )}
         {note}
+        {renderLetter(field)}
       </div>
     );
   }
@@ -569,7 +466,7 @@ function FieldView({
         {header}
         <div className="mt-2 flex flex-wrap gap-2">
           {isLetter && letter && (
-            <button onClick={() => printLetter(letter, title)} className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
+            <button onClick={() => printLetter(letter)} className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
               {t("Save this application's letter as PDF")}
             </button>
           )}
@@ -708,11 +605,11 @@ function CopyButton({ text, className = "" }: { text: string; className?: string
 }
 
 /** Opens the letter in a print-ready window; the browser's "Save as PDF" produces the attachment. */
-function printLetter(letter: string, title: string) {
+export function printLetter(letter: string, title = "") {
   const w = window.open("", "_blank");
   if (!w) return;
   const escaped = letter.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  w.document.write(`<!doctype html><title>Motivation letter - ${title.replace(/</g, "")}</title>
+  w.document.write(`<!doctype html><title>Motivation letter${title ? ` - ${title.replace(/</g, "")}` : ""}</title>
 <style>body{font:11.5pt/1.5 Georgia,serif;max-width:17cm;margin:2.5cm auto;white-space:pre-wrap}@page{margin:0}</style>
 <body>${escaped}</body>`);
   w.document.close();

@@ -7,16 +7,24 @@ import { db, REGION } from "./shared.js";
 // Checks whether a posting's page still exists, with a plain HTTP request (no AI, no cost). Careers sites
 // that block bots or render everything in JavaScript give "unknown", which is treated as open.
 
+const JOB_PARAM = /[?&](jk|jid|jl|job_?id|gh_jid|req(uisition)?_?id|posting_?id|id)=/i;
+const SEARCH_PARAM = /[?&](q|query|keywords?|search|kw|k|what)=/i;
+
 /**
- * A link to a careers section rather than to one posting (e.g. /careers/graduate-opportunities).
- * Keep in sync with src/lib/postingLink.ts in the app.
+ * A link to a careers section or a list of offers rather than to one posting (e.g. /careers/graduate-opportunities,
+ * a job board's search results). Keep in sync with src/lib/postingLink.ts in the app.
  */
 export function looksGeneric(url: string) {
   try {
     const u = new URL(url);
     const path = decodeURIComponent(u.pathname).toLowerCase().replace(/\/+$/, "");
-    if (/\d{3,}|[a-f0-9]{10,}/.test(path + u.search)) return false; // posting ids
     const last = path.split("/").pop() ?? "";
+    if (JOB_PARAM.test(u.search)) return false; // one posting, picked by its id
+    // Search results and lists of offers (e.g. indeed.com/q-intern-l-miami-jobs.html, ziprecruiter.com/Jobs/
+    // Intern/-in-Miami,FL, glassdoor …-SRCH_…), whatever numbers their links carry.
+    if (/srch_|\/jobs?\/search|\/search-jobs/.test(path) || /(^|-)jobs(-|\.|$)/.test(last) || last.startsWith("-in-")) return true;
+    if (SEARCH_PARAM.test(u.search)) return true;
+    if (/\d{3,}|[a-f0-9]{10,}/.test(path + u.search)) return false; // posting ids
     if (!last) return true;
     return /^(careers?|jobs?|vacanc(y|ies)|opportunit(y|ies)|graduates?|graduate-(opportunities|programmes?|programs?|jobs)|early-careers?|internships?|students?|placements?|join-us|work-with-us|join|recrutement|emplois?|offres?(-d-emploi)?|stages?|alternances?|nous-rejoindre|search|search-results|en|fr|int-en)$/.test(last);
   } catch {
