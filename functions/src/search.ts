@@ -1,3 +1,4 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -5,12 +6,12 @@ import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
-import { type AgentStats, loadProfile, runAgent, today } from "./agent.js";
+import { type AgentStats, loadProfile, runAgent, startAgentBatch, today } from "./agent.js";
 import { loadDismissed, looseOfferKey, offerKey, urlId } from "./offers.js";
 import { checkPostings, isOfficial, looksGeneric } from "./postings.js";
 import { type NewOffer, notifyNewOffers } from "./notify.js";
 import { GMAIL_SECRETS } from "./gmail.js";
-import { anthropicKey, db, type Kind, MODELS, REGION } from "./shared.js";
+import { anthropicKey, claude, db, type Kind, MODELS, REGION } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 // Calibrated so that 90+ ("almost ideal") is rare: the user gets a dedicated email for those.
@@ -197,9 +198,9 @@ function nextRunAfter(search: Search, created: number) {
   const base = search.frequencyDays ?? 1;
   const emptyStreak = created > 0 ? 0 : (search.emptyStreak ?? 0) + 1;
   const days = Math.min(base * 2 ** emptyStreak, Math.max(7, base));
-  // At 04:00 UTC on that day (before the 07:00 Paris job), so an evening run doesn't skip the next morning.
+  // At 03:00 UTC on that day (before the 06:00 Paris job), so an evening run doesn't skip the next morning.
   const target = new Date(Date.now() + days * 86_400_000);
-  target.setUTCHours(4, 0, 0, 0);
+  target.setUTCHours(3, 0, 0, 0);
   const nextRunAt = Timestamp.fromDate(target);
   return { emptyStreak, nextRunAt };
 }
@@ -234,7 +235,16 @@ function parseDate(s: string, endOfDay = true): Timestamp | null {
   return Number.isNaN(d.getTime()) ? null : Timestamp.fromDate(d);
 }
 
-async function runSearch(uid: string, searchId: string) {
+/**
+ * How a run is made. "now": ordinary requests (the student clicked Run now). "batch": the morning run, whose
+ * first pass goes out as a half-price batch; the run stops there and resumes as "result" when the answer is in.
+ */
+type RunMode =
+  | { kind: "now" }
+  | { kind: "batch" }
+  | { kind: "result"; response: Anthropic.Beta.BetaMessage; prompt: Anthropic.Beta.BetaContentBlockParam[] };
+
+async function runSearch(uid: string, searchId: string, mode: RunMode = { kind: "now" }) {
   const searchRef = db.doc(`users/${uid}/searches/${searchId}`);
   const search = (await searchRef.get()).data() as Search | undefined;
   if (!search || search.status !== "active") return;
@@ -296,15 +306,15 @@ ${kind === "job" ? `- Contract type: ${search.contractType || "any"}\n- Minimum 
 Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slice(0, 150).join("\n") : "none"}`;
 
     /** One scouting pass for `count` offers, within its own browsing and spending limits. */
-    const scout = (count: number, limits: { searches: number; fetches: number; usd: number }, extra: string, stats: AgentStats) =>
-      runAgent({
+    const scoutOpts = (count: number, limits: { searches: number; fetches: number; usd: number }, extra: string, stats: AgentStats) =>
+      ({
         uid,
         system: { internship: SYSTEM, job: JOB_SYSTEM, alternance: ALTERNANCE_SYSTEM, masters: MASTERS_SYSTEM }[kind],
         model: MODELS.search,
-        task: "search",
+        task: "search" as const,
         // Searches are cheap ($0.01); reading pages is what costs, and pages are size-capped in runAgent.
         web: { searches: limits.searches, fetches: limits.fetches },
-        effort: "low",
+        effort: "low" as const,
         maxPageTokens: 4000,
         maxRunUsd: limits.usd,
         stats,
@@ -320,19 +330,42 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
             type: "text",
             text: `Today is ${today()}. If the start date or intake asked for has already passed, the student means the next one (the same month next year): search for that, and say so in the summary.\n${criteria}\n${extra}Find ${count} new ${NOUN[kind]}.\n${lists}`,
           },
-        ],
+        ] as Anthropic.Beta.BetaContentBlockParam[],
       });
+    const scout = (count: number, limits: { searches: number; fetches: number; usd: number }, extra: string, stats: AgentStats) =>
+      runAgent(scoutOpts(count, limits, extra, stats));
 
     // The student asked for `maxPerRun` offers. BAPTOU asks for a few spares, since some links turn out to be
     // closed or to be a careers page, and keeps the best ones that pass the checks.
     const spare = Math.min(6, Math.ceil(maxPerRun / 2) + 2);
     const firstStats: AgentStats = { costUsd: 0 };
-    const first = await scout(
+    const firstOpts = scoutOpts(
       maxPerRun + spare,
       // Searches cost about $0.02 each; an opened page about $0.03 and makes every later step dearer, so few.
       { searches: Math.min(8 + 2 * maxPerRun, 30), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.15 + 0.04 * maxPerRun },
       `${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches; try them first:\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
       firstStats,
+    );
+
+    // Morning run: the first pass goes out as a half-price batch, and the run resumes when its answer is in.
+    if (mode.kind === "batch") {
+      try {
+        const batchId = await startAgentBatch(firstOpts, `${uid}_${searchId}`.slice(0, 64));
+        await db.doc(`private/${uid}/searchBatches/${batchId}`).set({
+          searchId,
+          prompt: firstOpts.prompt, // the exact request, in case its answer has to be continued
+          submittedAt: FieldValue.serverTimestamp(),
+        });
+        await queue().enqueue({ uid, searchId, batchId, polls: 0 }, { scheduleDelaySeconds: BATCH_POLL_SECONDS });
+        logger.info("Search batch submitted", { uid, searchId, batchId });
+        return; // stays "running" until the answer is in
+      } catch (e) {
+        if (e instanceof HttpsError) throw e; // e.g. allowance used up
+        logger.warn("Couldn't send the search as a batch; running it now", { uid, searchId, error: String(e) });
+      }
+    }
+    const first = await runAgent(
+      mode.kind === "result" ? { ...firstOpts, prompt: mode.prompt, first: mode.response } : firstOpts,
     );
 
     type Offer = (typeof first.offers)[number];
@@ -486,11 +519,58 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
 
 const queue = () => getFunctions().taskQueue(`locations/${REGION}/functions/runSearchTask`);
 
+// A morning batch is checked every 10 minutes (most finish within the hour). Past 4 hours, it is cancelled
+// and the search runs the ordinary way, so the student still gets offers that morning.
+const BATCH_POLL_SECONDS = 600;
+const BATCH_MAX_POLLS = 24;
+
+/** Checks a morning search's batch: when its answer is in, finishes the run with it; otherwise checks again later. */
+async function collectBatch(uid: string, searchId: string, batchId: string, polls: number) {
+  const stateRef = db.doc(`private/${uid}/searchBatches/${batchId}`);
+  const again = () => queue().enqueue({ uid, searchId, batchId, polls: polls + 1 }, { scheduleDelaySeconds: BATCH_POLL_SECONDS });
+  const giveUp = async (why: string) => {
+    logger.warn(`Search batch ${why}; running the search now`, { uid, searchId, batchId, polls });
+    await stateRef.delete();
+    await runSearch(uid, searchId);
+  };
+
+  let batch: Anthropic.Beta.Messages.BetaMessageBatch;
+  try {
+    batch = await claude().beta.messages.batches.retrieve(batchId);
+  } catch (e) {
+    logger.warn("Couldn't check a search batch", { uid, searchId, batchId, error: String(e) });
+    return polls < BATCH_MAX_POLLS ? again() : giveUp("unreachable");
+  }
+  if (batch.processing_status !== "ended") {
+    if (polls < BATCH_MAX_POLLS) return again();
+    await claude().beta.messages.batches.cancel(batchId).catch(() => undefined);
+    return giveUp("too slow");
+  }
+
+  let response: Anthropic.Beta.BetaMessage | undefined;
+  try {
+    for await (const r of await claude().beta.messages.batches.results(batchId)) {
+      if (r.result.type === "succeeded") response = r.result.message;
+      else logger.warn("Search batch request failed", { uid, searchId, batchId, result: r.result.type, error: JSON.stringify(r.result).slice(0, 500) });
+    }
+  } catch (e) {
+    logger.warn("Couldn't read a search batch's answer", { uid, searchId, batchId, error: String(e) });
+    return polls < BATCH_MAX_POLLS ? again() : giveUp("unreadable");
+  }
+  const state = (await stateRef.get()).data();
+  if (!response || !state) return giveUp(response ? "state lost" : "failed");
+  await stateRef.delete();
+  await runSearch(uid, searchId, { kind: "result", response, prompt: state.prompt });
+}
+
 // A search pauses when this many runs' worth of its offers (at least 10) are waiting unreviewed.
 const BACKLOG_RUNS = 3;
 
-/** One search run, dispatched by Cloud Tasks so many users' searches run in parallel. */
-export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string }>(
+/**
+ * One search run, dispatched by Cloud Tasks so many users' searches run in parallel. `batch`: a morning run
+ * (sent as a half-price batch). `batchId`: check that batch and finish the run when its answer is in.
+ */
+export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string; batch?: boolean; batchId?: string; polls?: number }>(
   {
     region: REGION,
     secrets: [anthropicKey, ...GMAIL_SECRETS], // Gmail: the new-offer email
@@ -499,12 +579,19 @@ export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string }>
     retryConfig: { maxAttempts: 1 },
     rateLimits: { maxConcurrentDispatches: 5 },
   },
-  async (req) => runSearch(req.data.uid, req.data.searchId),
+  async (req) => {
+    const { uid, searchId, batch, batchId, polls } = req.data;
+    if (batchId) return collectBatch(uid, searchId, batchId, polls ?? 0);
+    return runSearch(uid, searchId, batch ? { kind: "batch" } : { kind: "now" });
+  },
 );
 
-/** Every morning: end expired searches and queue a run for every active one. */
+/**
+ * Every morning: end expired searches and queue a run for every active one. Runs go out as half-price
+ * batches, mostly answered within the hour, so offers still arrive by about 7:00.
+ */
 export const dailySearches = onSchedule(
-  { region: REGION, schedule: "every day 07:00", timeZone: "Europe/Paris" },
+  { region: REGION, schedule: "every day 06:00", timeZone: "Europe/Paris" },
   async () => {
     const active = await db.collectionGroup("searches").where("status", "==", "active").get();
     const now = Timestamp.now();
@@ -540,7 +627,7 @@ export const dailySearches = onSchedule(
         continue;
       }
       await doc.ref.update({ runState: "queued", waitingForReview: FieldValue.delete() });
-      await queue().enqueue({ uid, searchId: doc.id });
+      await queue().enqueue({ uid, searchId: doc.id, batch: true });
       queued++;
     }
     logger.info("Morning searches", { active: active.size, queued, pausedForReview: skipped });

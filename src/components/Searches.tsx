@@ -263,8 +263,9 @@ export function SearchForm({
     rhythm: existing?.rhythm ?? "",
     school: existing?.school ?? "",
     notes: existing?.notes ?? "",
-    maxPerRun: existing?.maxPerRun ?? 5,
-    frequencyDays: existing?.frequencyDays ?? 1,
+    // Fewer, bigger runs cost less per offer (each run has a fixed part): 10 offers every 3 days by default.
+    maxPerRun: existing?.maxPerRun ?? RECOMMENDED_OFFERS,
+    frequencyDays: existing?.frequencyDays ?? 3,
     endsOn: toDateInput(existing?.endsAt), // empty = until stopped
   });
   const [busy, setBusy] = useState(false);
@@ -476,13 +477,14 @@ export function SearchForm({
   );
 }
 
-const RECOMMENDED_OFFERS = 5;
+const RECOMMENDED_OFFERS = 10;
 const MAX_OFFERS = 50; // the server also caps here; guards against typos like 500
 
-// Rough cost of one run (Sonnet 5, low effort, capped browsing): a fixed part for searching plus a part
-// per offer, spares and the occasional second pass included. Measured: about $0.45-0.55 for 5 offers.
+// Rough cost of one morning run (Sonnet 5, low effort, capped browsing): a fixed part for searching plus a
+// part per offer, spares and the occasional second pass included. Measured at full price: about $0.45-0.55
+// for 5 offers; morning runs are sent as batches, which halve the text part (web searches keep their fee).
 // An estimate; the real cost of each run is shown on the search after it runs.
-const estimateRunUsd = (offers: number) => 0.15 + 0.07 * offers;
+const estimateRunUsd = (offers: number) => 0.1 + 0.05 * offers;
 
 function OffersCostHint({
   offers,

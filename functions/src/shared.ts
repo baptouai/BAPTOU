@@ -126,16 +126,15 @@ type Usage = Pick<
   "input_tokens" | "output_tokens" | "cache_creation_input_tokens" | "cache_read_input_tokens" | "server_tool_use"
 >;
 
-export function estimateCostUsd(model: Model, usage: Usage) {
+/** What a response cost. Batch requests (`batch`) bill every token at half price; web searches keep their fee. */
+export function estimateCostUsd(model: Model, usage: Usage, batch = false) {
   const p = PRICES[model];
   const cacheWrite = usage.cache_creation_input_tokens ?? 0;
   const cacheRead = usage.cache_read_input_tokens ?? 0;
   const searches = usage.server_tool_use?.web_search_requests ?? 0;
-  return (
-    (usage.input_tokens * p.input + cacheWrite * p.input * 1.25 + cacheRead * p.input * 0.1 + usage.output_tokens * p.output) /
-      1_000_000 +
-    searches * WEB_SEARCH_USD
-  );
+  const tokens =
+    (usage.input_tokens * p.input + cacheWrite * p.input * 1.25 + cacheRead * p.input * 0.1 + usage.output_tokens * p.output) / 1_000_000;
+  return tokens * (batch ? 0.5 : 1) + searches * WEB_SEARCH_USD;
 }
 
 const month = () => new Date().toISOString().slice(0, 7); // "2026-10"
@@ -222,8 +221,8 @@ export async function assertBudget(uid: string) {
  * Records token usage and estimated cost per user and month. The details live in the server-only
  * private/{uid} doc; a summary is mirrored on users/{uid} so the app can show it.
  */
-export async function recordUsage(uid: string, model: Model, usage: Usage, task: Task) {
-  const cost = estimateCostUsd(model, usage);
+export async function recordUsage(uid: string, model: Model, usage: Usage, task: Task, batch = false) {
+  const cost = estimateCostUsd(model, usage, batch);
   const m = month();
   await db.doc(`private/${uid}`).set(
     {

@@ -55,11 +55,7 @@ export type ClientTool = {
   run: (input: unknown) => Promise<string>;
 };
 
-/**
- * Runs Claude until it calls the `submit` tool, and returns that tool's validated input.
- * Web search/fetch run on Anthropic's side (we only continue on pause_turn); client tools run here.
- */
-export async function runAgent<T>(opts: {
+type AgentOpts<T> = {
   uid: string;
   system: string;
   prompt: Anthropic.Beta.BetaContentBlockParam[];
@@ -73,18 +69,65 @@ export async function runAgent<T>(opts: {
   maxPageTokens?: number; // size cap for each fetched web page
   stats?: AgentStats; // filled with this run's cost and web use
   effort?: "low" | "medium" | "high";
-}): Promise<T> {
-  await assertBudget(opts.uid);
+  // The first response, already obtained from a batch (half price): it is processed first, and the run
+  // goes on with ordinary requests only if it didn't finish there.
+  first?: Anthropic.Beta.BetaMessage;
+};
+
+/** The tools and the opening message of a run. */
+async function setup<T>(opts: AgentOpts<T>) {
   const lang = (await db.doc(`users/${opts.uid}`).get()).get("lang");
-  const clientTools = opts.clientTools ?? [];
   const tools = [
     ...(opts.web ? webTools(opts.web, opts.maxPageTokens) : []),
-    ...clientTools.map((t) => submitTool(t.name, t.description, t.schema)),
+    ...(opts.clientTools ?? []).map((t) => submitTool(t.name, t.description, t.schema)),
     submitTool(opts.submit.name, opts.submit.description, opts.submit.schema),
   ];
   // Last in the prompt, so the cached beginning (system prompt, profile) is the same in both languages.
   const prompt = lang === "fr" ? [...opts.prompt, { type: "text" as const, text: FRENCH }] : opts.prompt;
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
+  return { tools, messages: [{ role: "user", content: prompt }] as Anthropic.Beta.BetaMessageParam[] };
+}
+
+/** One request of a run, the same whether it is sent now or in a batch (which takes no fallback model). */
+function request<T>(opts: AgentOpts<T>, tools: Anthropic.Beta.BetaToolUnion[], messages: Anthropic.Beta.BetaMessageParam[], batch = false) {
+  return {
+    model: opts.model,
+    max_tokens: 32000,
+    ...(batch ? {} : fallbackFor(opts.model)),
+    output_config: { effort: opts.effort ?? "medium" },
+    // Caching: the system prompt is a fixed breakpoint, and the top-level field caches the growing
+    // tail, so content Claude re-reads during the loop is billed at 10% instead of in full.
+    cache_control: { type: "ephemeral" as const },
+    system: [{ type: "text" as const, text: opts.system, cache_control: { type: "ephemeral" as const } }],
+    tools,
+    messages,
+    // Which end user a request is for (a hash, no personal data), so Anthropic can act on one abusive
+    // user rather than on BAPTOU's whole account.
+    metadata: { user_id: endUser(opts.uid) },
+  };
+}
+
+/**
+ * Sends the first request of a run as a one-request batch, billed at half price and answered within the
+ * hour (at most 24 hours). Its result goes back to `runAgent` as `first`. Returns the batch id.
+ */
+export async function startAgentBatch<T>(opts: AgentOpts<T>, customId: string) {
+  await assertBudget(opts.uid);
+  const { tools, messages } = await setup(opts);
+  const batch = await claude().beta.messages.batches.create({
+    requests: [{ custom_id: customId, params: request(opts, tools, messages, true) }],
+  });
+  return batch.id;
+}
+
+/**
+ * Runs Claude until it calls the `submit` tool, and returns that tool's validated input.
+ * Web search/fetch run on Anthropic's side (we only continue on pause_turn); client tools run here.
+ */
+export async function runAgent<T>(opts: AgentOpts<T>): Promise<T> {
+  // A batch answer is already paid for: it is recorded even if the allowance ran out in the meantime.
+  if (!opts.first) await assertBudget(opts.uid);
+  const clientTools = opts.clientTools ?? [];
+  const { tools, messages } = await setup(opts);
   const maxToolCalls = opts.maxToolCalls ?? 10;
   let toolCalls = 0;
   let nudged = false;
@@ -92,33 +135,35 @@ export async function runAgent<T>(opts: {
   let searches = 0;
   // Tokens over the whole run, to see where a run's cost goes (fresh input, cache writes and reads, output).
   const tokens = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
+  // Each sampling step of each request (the server-side search loop has many), to find where tokens are read in full.
+  const steps: string[] = [];
   let fetches = 0;
   let limited = false;
   const visited: string[] = []; // search queries and opened pages, for the log
   const done = (turns: number) => {
     if (opts.stats) Object.assign(opts.stats, { costUsd: runCost, searches, fetches, limited });
-    logger.info("Agent run", { task: opts.task, turns, costUsd: Math.round(runCost * 1000) / 1000, searches, fetches, limited, tokens, visited: visited.slice(0, 40) });
+    logger.info("Agent run", {
+      task: opts.task,
+      turns,
+      batch: !!opts.first,
+      costUsd: Math.round(runCost * 1000) / 1000,
+      searches,
+      fetches,
+      limited,
+      tokens,
+      steps: steps.slice(0, 60),
+      visited: visited.slice(0, 40),
+    });
   };
 
   for (let i = 0; i < MAX_CONTINUATIONS + maxToolCalls; i++) {
-    const response = await claude()
-      .beta.messages.stream({
-        model: opts.model,
-        max_tokens: 32000,
-        ...fallbackFor(opts.model),
-        output_config: { effort: opts.effort ?? "medium" },
-        // Caching: the system prompt is a fixed breakpoint, and the top-level field caches the growing
-        // tail, so content Claude re-reads during the loop is billed at 10% instead of in full.
-        cache_control: { type: "ephemeral" },
-        system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
-        tools,
-        messages,
-        // Which end user a request is for (a hash, no personal data), so Anthropic can act on one abusive
-        // user rather than on BAPTOU's whole account.
-        metadata: { user_id: endUser(opts.uid) },
-      })
-      .finalMessage();
-    runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task);
+    const fromBatch = i === 0 && !!opts.first;
+    const response = fromBatch ? opts.first! : await claude().beta.messages.stream(request(opts, tools, messages)).finalMessage();
+    runCost += await recordUsage(opts.uid, opts.model, response.usage, opts.task, fromBatch);
+    for (const it of response.usage.iterations ?? []) {
+      const u = it as { type?: string; input_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number; output_tokens?: number };
+      steps.push(`${i}:${u.type ?? "?"} in ${u.input_tokens ?? 0} cw ${u.cache_creation_input_tokens ?? 0} cr ${u.cache_read_input_tokens ?? 0} out ${u.output_tokens ?? 0}`);
+    }
     searches += response.usage.server_tool_use?.web_search_requests ?? 0;
     tokens.input += response.usage.input_tokens ?? 0;
     tokens.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
