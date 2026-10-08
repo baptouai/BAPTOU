@@ -154,6 +154,9 @@ export const ProgrammesSchema = z.object({
       location: z.string().describe("City"),
       country: z.string(),
       url: z.string().describe("The programme's page or its application page on the university's website"),
+      recommendationLetters: z
+        .number()
+        .describe("How many recommendation (reference) letters the application asks for: 0 if none, -1 if the university doesn't say"),
       applicationsOpen: z
         .string()
         .describe("Date applications open for the requested intake (the round the student can still make), YYYY-MM-DD, or empty if not stated"),
@@ -180,6 +183,7 @@ Rules:
 - Only return programmes you actually found during this run, with their official university page. Never invent a programme, university or link.
 - The url must be the programme's own page or its application page on the university's website. Ranking and aggregator sites (Mastersportal, FindAMasters…) are only for finding programmes.
 - The application window for the requested intake must still be open, or open later. Skip programmes whose deadline has passed.
+- Say how many recommendation letters the application asks for (they take students weeks to collect).
 - Give the dates applications open and close for that intake, as the university (or the national platform it uses, such as Mon Master or UCAS) states them. With several rounds, give the next round the student can still make.
 - Respect the criteria (fields, countries, intake, teaching language, tuition budget). Check the student's degree and grades against the admission requirements and say so in matchReason; mention any compromise.
 - Use the student's nationalities (in the profile) for tuition: give the fee that applies to them (home, EU or international) and any visa need.
@@ -210,6 +214,12 @@ const NOUN: Record<Kind, string> = {
   job: "job offers",
   alternance: "alternance offers",
   masters: "master's programmes",
+};
+
+/** How many recommendation letters a master's programme asks for, when the university says (0 = none). */
+const lettersNeeded = (o: object) => {
+  const v = (o as { recommendationLetters?: unknown }).recommendationLetters;
+  return typeof v === "number" && v >= 0 && v <= 10 ? Math.round(v) : null;
 };
 
 /** When applications open, for a master's programme that says so. */
@@ -475,6 +485,7 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
           deadline: parseDate(o.deadline),
           // Master's programmes: when applications open (the deadline is when they close).
           ...(opensAt(o) ? { applicationsOpenAt: opensAt(o) } : {}),
+          ...(lettersNeeded(o) != null ? { recommendationLetters: lettersNeeded(o) } : {}),
           startDate: o.startDate,
           duration: o.duration,
           postingLanguage: o.postingLanguage,

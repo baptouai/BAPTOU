@@ -38,6 +38,7 @@ export type Application = {
   applyUrl?: string;
   deadline?: Timestamp; // for a master's programme: when applications close
   applicationsOpenAt?: Timestamp; // master's programmes: when applications open
+  recommendationLetters?: number; // master's programmes: recommendation letters the application asks for (0 = none)
   matchReason?: string; // why BAPTOU suggests it
   matchScore?: number; // 0-100
   location?: string;

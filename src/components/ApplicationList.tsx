@@ -134,6 +134,22 @@ export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty:
   );
 }
 
+/** Master's programmes: a green dot with the number of recommendation letters the application asks for. */
+function LettersDot({ n }: { n: number }) {
+  const { t } = useI18n();
+  const label = t(n === 0 ? "No recommendation letters needed" : n === 1 ? "1 recommendation letter needed" : "{n} recommendation letters needed", { n });
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      role="img"
+      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 px-1 text-xs font-semibold leading-none text-white"
+    >
+      {n}
+    </span>
+  );
+}
+
 function OfferCard({ app: a }: { app: Item }) {
   const [now] = useState(() => Date.now());
   const { user } = useAuth();
@@ -198,6 +214,7 @@ function OfferCard({ app: a }: { app: Item }) {
                 {t(verdictLabel[a.fitVerdict].text)}
               </span>
             )}
+            {a.recommendationLetters != null && <LettersDot n={a.recommendationLetters} />}
             {a.matchScore != null && (
               <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{t("{n}% match", { n: a.matchScore })}</span>
             )}

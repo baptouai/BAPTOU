@@ -529,6 +529,15 @@ function FactTags({ app }: { app: Application }) {
     app.rhythm,
     app.salary,
     app.school && t("School: {name}", { name: app.school }),
+    app.recommendationLetters != null &&
+      t(
+        app.recommendationLetters === 0
+          ? "No recommendation letters needed"
+          : app.recommendationLetters === 1
+            ? "1 recommendation letter needed"
+            : "{n} recommendation letters needed",
+        { n: app.recommendationLetters },
+      ),
   ].filter(Boolean) as string[];
   if (!facts.length && !deadline && !opens) return null;
   return (
