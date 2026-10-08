@@ -4,7 +4,7 @@ import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
-import { HUMAN_STYLE } from "./style.js";
+import { HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 type Form = z.infer<typeof FormSchema>;
 
@@ -100,13 +100,15 @@ const SYSTEM = `You are BAPTOU. You prepare a student's application in the exact
    - "entries" fields (work experience, education): one entry per relevant item, descriptions ready to paste.
    - Free-text questions (message to the hiring team, why us, ...): tailored, specific answers within the character limit, consistent with the motivation letter if there is one.
    - File fields: say which document to attach.
-   - Cover/motivation letter (text box or file, even optional): set isCoverLetter and put the full letter itself in value, ready to send. Reuse the student's letter for this application if there is one, otherwise write it.
+   - Cover/motivation letter (text box or file, even optional): set isCoverLetter and put the letter itself in value, ready to send, following the cover-letter method below. Reuse the student's letter for this application if there is one, otherwise write it.
    - A value is always the answer itself, never a remark about it (not "see the Questions section", not "use the letter"): remarks go in note.
 4. Answer every question you can, as the student would. Never invent facts about the student.
    - Pay or salary expectations: give a realistic figure or range for this role, level, contract and place (the posting's own figure if it gives one, otherwise typical pay you know or find), in the form's format; set check = true and say in note where the figure comes from.
    - Availability, start date, duration, notice, preferences, motivation and other judgment questions: answer from the profile, what the student is looking for and the offer; set check = true when it's a choice the student should confirm.
    - Work authorization, visa sponsorship and fee status: answer from the student's nationalities when the profile lists them (e.g. a British citizen has the right to work in the UK and needs no sponsorship); otherwise needsUser = true.
    - needsUser = true with an empty value only for what BAPTOU can't know or must not answer for the student: phone, address, ID or passport numbers, references' details, consents, and personal declarations (criminal record, health or disability, diversity and equal-opportunity questions).
+
+${LETTER_METHOD}
 
 ${HUMAN_STYLE}
 When done, call submit_form exactly once.`;

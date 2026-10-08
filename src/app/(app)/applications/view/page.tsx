@@ -10,7 +10,9 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { dismissOffer, statusLabel } from "@/components/ApplicationList";
-import { ApplicationFormView, coverLetterField, printLetter } from "@/components/ApplicationFormView";
+import { ApplicationFormView, coverLetterField } from "@/components/ApplicationFormView";
+import { fitLetter, guessLetterLang, letterBody, type LetterParts, printLetter } from "@/lib/letterLayout";
+import { useLetterSender } from "@/lib/letterSender";
 import { sendApprovedEmail } from "@/components/Contacts";
 import { KnownPeople } from "@/components/MailIndex";
 import { DismissForm } from "@/components/DismissForm";
@@ -24,7 +26,11 @@ import { errorText, useI18n } from "@/lib/i18n";
 const AUTOSAVE_MS = 800;
 
 type AiInput = { applicationId: string; instructions: string };
-const draftLetter = httpsCallable<AiInput, { letter: string }>(functions, "draftLetter", { timeout: 540_000 });
+const draftLetter = httpsCallable<AiInput, { letter: string; recipient: string; subject: string; language: "en" | "fr" | "other" }>(
+  functions,
+  "draftLetter",
+  { timeout: 540_000 },
+);
 const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>>(functions, "draftEmail", {
   timeout: 300_000,
 });
@@ -45,6 +51,10 @@ function ApplicationView() {
   const { user } = useAuth();
   const [app, setApp] = useState<Application | null>(null);
   const [letter, setLetter] = useState("");
+  const [recipient, setRecipient] = useState(""); // the letter's recipient block (one line each)
+  const [subject, setSubject] = useState("");
+  const [fit, setFit] = useState<number | null | undefined>(); // text size at which the letter fits on one page
+  const sender = useLetterSender();
   const [email, setEmail] = useState<Application["emailDraft"]>();
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [versions, setVersions] = useState<(LetterVersion & { id: string })[]>([]);
@@ -72,6 +82,8 @@ function ApplicationView() {
       if (!loaded.current) {
         loaded.current = true;
         setEmail(data.emailDraft);
+        setRecipient(data.letterRecipient ?? "");
+        setSubject(data.letterSubject ?? "");
         // Forms prepared before the letter was unified kept their cover letter inside the form only.
         const field = coverLetterField(data.applicationForm);
         const fromForm = !data.letter && field && (field.isCoverLetter || field.kind !== "file") ? field.value : undefined;
@@ -124,6 +136,8 @@ function ApplicationView() {
     await flushSave();
     const { data } = await draftLetter({ applicationId: id, instructions });
     setLetter(data.letter);
+    setRecipient(data.recipient);
+    setSubject(data.subject);
   }
 
   async function writeEmail(instructions: string) {
@@ -169,6 +183,27 @@ function ApplicationView() {
   }
 
   const sent = app?.status === "applied" || app?.status === "rejected";
+
+  const letterParts: LetterParts | null =
+    app && sender
+      ? {
+          lang: app.letterLang === "fr" || app.letterLang === "en" ? app.letterLang : guessLetterLang(letter, app.postingLanguage),
+          name: sender.name,
+          senderLines: sender.lines,
+          recipientLines: (recipient.trim() ? recipient.split("\n") : [app.organization, app.location ?? ""])
+            .map((l) => l.trim())
+            .filter(Boolean),
+          subject: subject.trim(),
+          body: letterBody(letter, sender.name),
+          signatureUrl: sender.signatureUrl,
+        }
+      : null;
+  const partsKey = letterParts ? JSON.stringify({ ...letterParts, signatureUrl: undefined }) : "";
+  useEffect(() => {
+    if (!partsKey) return;
+    const timer = setTimeout(() => setFit(fitLetter(JSON.parse(partsKey) as LetterParts)), 300);
+    return () => clearTimeout(timer);
+  }, [partsKey]);
 
   // Approval and sending are one click: the approved draft is saved, then the server sends exactly
   // what is stored (not what the browser sends), from the user's Gmail.
@@ -220,6 +255,42 @@ function ApplicationView() {
         busyLabel={t("BAPTOU is researching and writing… (1–3 min)")}
         onRun={writeLetter}
       />
+      {/* The top of the page: the student's own details come from the Profile page, the recipient from here. */}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">{t("Recipient")}</span>
+          <textarea
+            value={recipient}
+            onChange={(e) => {
+              setRecipient(e.target.value);
+              scheduleSave({ letterRecipient: e.target.value });
+            }}
+            rows={3}
+            placeholder={`${t("Hiring team")}\n${app.organization}\n${t("Address")}`}
+            className="rounded-lg border border-border bg-background p-2 text-sm"
+          />
+        </label>
+        <label className="grid content-start gap-1 text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">{t("Subject line (optional)")}</span>
+          <input
+            value={subject}
+            onChange={(e) => {
+              setSubject(e.target.value);
+              scheduleSave({ letterSubject: e.target.value });
+            }}
+            placeholder={t("e.g. Application for the summer internship (ref. 1234)")}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
+          {sender && sender.missing.length > 0 && (
+            <span className="text-xs text-muted">
+              {t(sender.missing.includes("signature") ? "Add your address, phone and signature on the Profile page: they go on the letter." : "Add your address and phone on the Profile page: they go at the top of the letter.")}{" "}
+              <Link href="/profile" className="text-accent">
+                {t("Profile")} →
+              </Link>
+            </span>
+          )}
+        </label>
+      </div>
       <textarea
         value={letter}
         maxLength={field?.charLimit || undefined}
@@ -235,11 +306,30 @@ function ApplicationView() {
           {t("{n} / {max} characters", { n: letter.length, max: field.charLimit })}
         </p>
       )}
+      {!!letter && fit !== undefined && (
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
+          {fit === 12 ? (
+            <span className="text-green-700 dark:text-green-400">✓ {t("Fits on one page")}</span>
+          ) : fit ? (
+            <span className="text-muted">{t("Fits on one page with slightly smaller text ({n} pt).", { n: fit })}</span>
+          ) : (
+            <span className="text-red-600">{t("Too long for one page once exported.")}</span>
+          )}
+          {fit !== 12 && (
+            <button
+              onClick={() => writeLetter("Shorten the letter so that it fits on one A4 page with its header: about 280 words, keeping the structure and the strongest examples.")}
+              className="text-accent underline"
+            >
+              {t("Shorten to one page")}
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <CopyButton text={letter} label={t("Copy letter")} copiedLabel={t("Copied")} />
-        {field?.kind === "file" && letter && (
-          <button onClick={() => printLetter(letter, letterTitle)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
-            {t("Save as PDF to attach")}
+        <CopyButton text={sender?.name ? `${letterBody(letter, sender.name)}\n\n${sender.name}` : letter} label={t("Copy letter")} copiedLabel={t("Copied")} />
+        {letter && letterParts && (
+          <button onClick={() => printLetter(letterParts, letterTitle)} className="rounded-lg border border-border px-3 py-1.5 text-sm">
+            {t(field?.kind === "file" ? "Save as PDF to attach" : "Save as PDF")}
           </button>
         )}
         <button onClick={saveVersion} className="rounded-lg border border-border px-3 py-1.5 text-sm">

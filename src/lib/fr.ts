@@ -507,6 +507,37 @@ export const fr: Record<string, string> = {
   "No recommendation letters needed": "Aucune lettre de recommandation demandée",
   "Estimated chance of admission": "Chance d'admission estimée",
   "Choose a plan to start": "Choisissez une formule pour commencer",
+  "For your letters": "Pour vos lettres",
+  "Shown at the top of every motivation letter, with your name; your signature goes above your name at the bottom.":
+    "Affichés en haut de chaque lettre de motivation, avec votre nom ; votre signature figure au-dessus de votre nom, en bas.",
+  "Postal address": "Adresse postale",
+  "Street\nPostcode and town\nCountry": "Rue\nCode postal et ville\nPays",
+  "Phone": "Téléphone",
+  "Email": "Email",
+  "Signature": "Signature",
+  "Your signature": "Votre signature",
+  "No signature yet.": "Pas encore de signature.",
+  "Replace": "Remplacer",
+  "Upload a signature": "Ajouter une signature",
+  "Sign in black ink on white paper, take a photo, crop it tight. A PNG with a transparent background looks best.":
+    "Signez à l'encre noire sur papier blanc, prenez une photo et recadrez au plus près. Un PNG à fond transparent rend le mieux.",
+  "The signature must be a PNG or JPG image.": "La signature doit être une image PNG ou JPG.",
+  "The signature image must be under 2 MB.": "L'image de la signature doit faire moins de 2 Mo.",
+  "Recipient": "Destinataire",
+  "Hiring team": "Service recrutement",
+  "Address": "Adresse",
+  "Subject line (optional)": "Objet (facultatif)",
+  "e.g. Application for the summer internship (ref. 1234)": "ex. Candidature au stage d'été (réf. 1234)",
+  "Add your address, phone and signature on the Profile page: they go on the letter.":
+    "Ajoutez votre adresse, votre téléphone et votre signature sur la page Profil : ils figurent sur la lettre.",
+  "Add your address and phone on the Profile page: they go at the top of the letter.":
+    "Ajoutez votre adresse et votre téléphone sur la page Profil : ils figurent en haut de la lettre.",
+  "Fits on one page": "Tient sur une page",
+  "Fits on one page with slightly smaller text ({n} pt).": "Tient sur une page avec un texte un peu plus petit ({n} pt).",
+  "Too long for one page once exported.": "Trop long pour une page une fois exporté.",
+  "Shorten to one page": "Raccourcir à une page",
+  "Save as PDF": "Enregistrer en PDF",
+  "Attach the letter saved as PDF from the letter field.": "Joignez la lettre enregistrée en PDF depuis le champ de la lettre.",
   "BAPTOU is available with a subscription: daily searches, applications prepared in each form's format, letters and emails.":
     "BAPTOU est disponible avec un abonnement : recherches quotidiennes, candidatures préparées au format de chaque formulaire, lettres et emails.",
   "Were you given a subscription? It's linked to an email address: you're signed in as {email}. If it was sent to another address, sign out and sign in with that one.":

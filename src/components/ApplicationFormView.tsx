@@ -465,11 +465,7 @@ function FieldView({
       <div>
         {header}
         <div className="mt-2 flex flex-wrap gap-2">
-          {isLetter && letter && (
-            <button onClick={() => printLetter(letter)} className="rounded-lg border border-accent px-3 py-1.5 text-sm text-accent">
-              {t("Save this application's letter as PDF")}
-            </button>
-          )}
+          {isLetter && letter && <p className="text-sm text-muted">{t("Attach the letter saved as PDF from the letter field.")}</p>}
           {matches.map((d) => (
             <button
               key={d.id}
@@ -602,17 +598,4 @@ function CopyButton({ text, className = "" }: { text: string; className?: string
       {t(copied ? "Copied" : "Copy")}
     </button>
   );
-}
-
-/** Opens the letter in a print-ready window; the browser's "Save as PDF" produces the attachment. */
-export function printLetter(letter: string, title = "") {
-  const w = window.open("", "_blank");
-  if (!w) return;
-  const escaped = letter.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  w.document.write(`<!doctype html><title>Motivation letter${title ? ` - ${title.replace(/</g, "")}` : ""}</title>
-<style>body{font:11.5pt/1.5 Georgia,serif;max-width:17cm;margin:2.5cm auto;white-space:pre-wrap}@page{margin:0}</style>
-<body>${escaped}</body>`);
-  w.document.close();
-  w.focus();
-  w.print();
 }

@@ -7,7 +7,7 @@ import { toContentBlock } from "./profile.js";
 import { letterLimit } from "./form.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
-import { HUMAN_STYLE } from "./style.js";
+import { HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -17,7 +17,16 @@ const Input = z.object({
 export const LetterSchema = z.object({
   research: z.string().describe("4-6 facts on the organization: what it does, recent news, values, the team if known. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
   approachNote: z.string().describe("2-4 points for the student: the angle the letter takes and why. Bullet points: one per line, each starting with '- ', max 12 words each, no paragraphs."),
-  letter: z.string().describe("The full motivation letter, ready to send, in plain text"),
+  letter: z.string().describe("The motivation letter's text, from the salutation to the closing formula, following the method"),
+  recipient: z
+    .string()
+    .describe(
+      "Recipient block for the top of the letter, one item per line: the person's name and title if known, the team, the organization, and its postal address (the office for this role, from the posting or the organization's site). No empty lines",
+    ),
+  subject: z
+    .string()
+    .describe("Subject line. French letters: e.g. 'Candidature au stage Ingénieur méthodes (réf. 1234)' (shown after 'Objet :'). Other languages: empty"),
+  language: z.enum(["en", "fr", "other"]).describe("Language the letter is written in"),
   packFields: z
     .array(z.object({ label: z.string(), value: z.string() }))
     .describe("Answers the application form is likely to ask for (why us, why this role, availability, ...), ready to copy"),
@@ -38,6 +47,8 @@ Rules:
 - Write in the language of the posting unless the student asks otherwise.
 - Be concise and concrete: link the student's real achievements to what this organization needs.
 - If the student gives instructions or has edited a draft, follow their instructions and keep their edits unless told otherwise.
+
+${LETTER_METHOD}
 
 ${HUMAN_STYLE}`;
 
@@ -114,6 +125,10 @@ ${instructions ? `Student's instructions: ${instructions}` : current ? "Improve 
     await appRef.collection("letterVersions").add({ text: result.letter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
     await appRef.update({
       letter: result.letter,
+      // The header BAPTOU lays out above the letter (the student's own details come from their profile).
+      letterRecipient: result.recipient,
+      letterSubject: result.subject,
+      letterLang: result.language,
       research: result.research,
       approachNote: result.approachNote,
       packFields: result.packFields,

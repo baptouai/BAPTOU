@@ -45,6 +45,7 @@ export type Application = {
   chanceReason?: string;
   location?: string;
   startDate?: string; // as stated in the posting (or the programme's intake)
+  postingLanguage?: string; // language the posting is written in
   duration?: string;
   contractType?: string; // jobs and alternances
   salary?: string;
@@ -66,7 +67,10 @@ export type Application = {
   applicationFormError?: string;
   research?: string; // company/university research summary
   approachNote?: string; // why the letter takes this angle
-  letter: string; // current editable motivation letter
+  letter: string; // current editable motivation letter (salutation to closing formula)
+  letterRecipient?: string; // recipient block at the top of the letter, one line each
+  letterSubject?: string; // subject line ("Objet :" in French letters)
+  letterLang?: "en" | "fr" | "other"; // the letter's language: picks the page layout
   emailDraft?: { to: string; subject: string; body: string };
   emailApprovedAt?: Timestamp;
   emailSentAt?: Timestamp; // set by the server only
