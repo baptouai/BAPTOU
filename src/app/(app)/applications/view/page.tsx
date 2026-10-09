@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import {
-  addDoc, collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
+  addDoc, collection, deleteField, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
@@ -82,7 +82,19 @@ function ApplicationView() {
       if (!loaded.current) {
         loaded.current = true;
         setEmail(data.emailDraft);
-        setRecipient(data.letterRecipient ?? "");
+        // Never an empty recipient box on a letter: the hiring team, the organization and where it is.
+        setRecipient(
+          data.letterRecipient ||
+            (data.letter
+              ? [
+                  guessLetterLang(data.letter, data.postingLanguage) === "fr" ? "Service recrutement" : "Hiring Manager",
+                  data.organization,
+                  [data.location, data.country].filter(Boolean).join(", "),
+                ]
+                  .filter(Boolean)
+                  .join("\n")
+              : ""),
+        );
         setSubject(data.letterSubject ?? "");
         // Forms prepared before the letter was unified kept their cover letter inside the form only.
         const field = coverLetterField(data.applicationForm);
@@ -406,7 +418,17 @@ function ApplicationView() {
         </section>
       )}
 
-      {sent && <FollowUp applicationId={id} app={app} onDraftFollowUp={draftFollowUp} onSetStatus={(s) => setStatus(s)} />}
+      {sent && (
+        <FollowUp
+          applicationId={id}
+          app={app}
+          onDraftFollowUp={draftFollowUp}
+          onSetStatus={(s) => setStatus(s)}
+          // Marked as applied by mistake: back to Interested (the application work is kept), or delete it.
+          onUndoApplied={() => setStatus("interested", { appliedAt: deleteField() as never })}
+          onDelete={() => dismiss("")}
+        />
+      )}
 
       {(app.matchReason || app.research) && (
         <div className="grid gap-4 md:grid-cols-2">

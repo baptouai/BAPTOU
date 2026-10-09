@@ -750,6 +750,10 @@ export const fr: Record<string, string> = {
     "BAPTOU vérifie votre boîte mail chaque matin et ajoute ici toute réponse à cette candidature (nécessite la lecture de Gmail).",
   "Mark as rejected": "Marquer comme refusée",
   "Mark as still in progress": "Marquer comme toujours en cours",
+  "Not applied after all": "Finalement pas envoyée",
+  "Delete this offer": "Supprimer cette offre",
+  "Delete this offer? It disappears from your lists and won't be suggested again. This can't be undone.":
+    "Supprimer cette offre ? Elle disparaît de vos listes et ne sera plus proposée. C'est définitif.",
   "BAPTOU's suggestion: make sure it's what you want to say": "Suggestion de BAPTOU : vérifiez que c'est bien ce que vous voulez dire",
   "Use {date}": "Utiliser {date}",
   "the offer on the organization's own site is closed": "l'offre est fermée sur le site de l'organisation",

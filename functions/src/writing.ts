@@ -7,7 +7,7 @@ import { toContentBlock } from "./profile.js";
 import { letterLimit } from "./form.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
-import { HUMAN_STYLE, LETTER_METHOD } from "./style.js";
+import { fallbackRecipient, HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -21,7 +21,7 @@ export const LetterSchema = z.object({
   recipient: z
     .string()
     .describe(
-      "Recipient block for the top of the letter, one item per line: the person's name and title if known, the team, the organization, and its postal address (the office for this role, from the posting or the organization's site). No empty lines",
+      "Recipient block for the top of the letter, one item per line, never empty: the person's name and title if known (otherwise 'Hiring Manager' and the team, or 'Service recrutement' in French), the organization, and its postal address (the office for this role, from the posting or the organization's site). No empty lines",
     ),
   subject: z
     .string()
@@ -123,6 +123,8 @@ ${instructions ? `Student's instructions: ${instructions}` : current ? "Improve 
     }
     if (limit) result.letter = (await fitToLimits(uid, [{ label: "Motivation letter", limit, text: result.letter }]))[0];
     await appRef.collection("letterVersions").add({ text: result.letter, author: "baptou", createdAt: FieldValue.serverTimestamp() });
+    // The recipient box is never left empty.
+    if (!result.recipient.trim()) result.recipient = fallbackRecipient(app, result.language);
     await appRef.update({
       letter: result.letter,
       // The header BAPTOU lays out above the letter (the student's own details come from their profile).

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
-import { HUMAN_STYLE, LETTER_METHOD } from "./style.js";
+import { fallbackRecipient, HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 type Form = z.infer<typeof FormSchema>;
 
@@ -240,6 +240,8 @@ export async function prepareAndSave(
       applicationForm: { ...stored, source: resolved, preparedAt: FieldValue.serverTimestamp() },
       applicationFormStatus: "ready",
       ...(adoptLetter ? { letter: coverLetter } : {}),
+      // A letter written for the form gets a recipient too (the form has no contact to address it to).
+      ...(adoptLetter && !app.letterRecipient ? { letterRecipient: fallbackRecipient(app) } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
     return { ...stored, source: resolved };

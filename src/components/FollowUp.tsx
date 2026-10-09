@@ -44,11 +44,15 @@ export function FollowUp({
   app,
   onDraftFollowUp,
   onSetStatus,
+  onUndoApplied,
+  onDelete,
 }: {
   applicationId: string;
   app: Application;
   onDraftFollowUp: (appliedOn: string) => Promise<void>;
   onSetStatus: (status: Application["status"]) => Promise<void>;
+  onUndoApplied: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const { user } = useAuth();
   const { t, date, day } = useI18n();
@@ -174,6 +178,21 @@ export function FollowUp({
         ) : (
           <button onClick={() => act(() => onSetStatus("applied"))} disabled={busy} className="text-muted hover:text-foreground">
             {t("Mark as still in progress")}
+          </button>
+        )}
+        <button onClick={() => act(onUndoApplied)} disabled={busy} className="text-muted hover:text-foreground">
+          {t("Not applied after all")}
+        </button>
+        {/* An offer emailed about from BAPTOU is kept (the server refuses), as a record of what was sent. */}
+        {!app.emailSentAt && (
+          <button
+            onClick={() => {
+              if (confirm(t("Delete this offer? It disappears from your lists and won't be suggested again. This can't be undone."))) act(onDelete);
+            }}
+            disabled={busy}
+            className="text-red-600 hover:underline"
+          >
+            {t("Delete this offer")}
           </button>
         )}
       </div>

@@ -8,6 +8,15 @@ export const HUMAN_STYLE = `Writing style (for every text the student will send)
 - Vary sentence length; some short ones. Paragraphs don't all need the same shape. A sober, direct opening and a simple ending.
 - Natural, correct grammar for the language, without being stiff. Keep it as short as the content allows.`;
 
+/**
+ * The recipient block when no contact was found: the hiring team, the organization and where it is. A letter's
+ * recipient box is never left empty.
+ */
+export function fallbackRecipient(app: { organization?: string; location?: string; country?: string }, lang?: string) {
+  const place = [app.location, app.country].filter(Boolean).join(", ");
+  return [lang === "fr" ? "Service recrutement" : "Hiring Manager", app.organization, place].filter(Boolean).join("\n");
+}
+
 // The cover-letter method the student was taught (Centrale Nantes, "CV & cover letters"). Every motivation
 // letter BAPTOU writes follows it, whether from the letter editor or inside an application form.
 export const LETTER_METHOD = `Cover-letter method (follow it for every motivation letter):
