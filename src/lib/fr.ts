@@ -507,6 +507,9 @@ export const fr: Record<string, string> = {
   "No recommendation letters needed": "Aucune lettre de recommandation demandée",
   "Estimated chance of admission": "Chance d'admission estimée",
   "Choose a plan to start": "Choisissez une formule pour commencer",
+  "Dark mode": "Mode sombre",
+  "Switch to light mode": "Passer en mode clair",
+  "Switch to dark mode": "Passer en mode sombre",
   "For your letters": "Pour vos lettres",
   "Shown at the top of every motivation letter, with your name; your signature goes above your name at the bottom.":
     "Affichés en haut de chaque lettre de motivation, avec votre nom ; votre signature figure au-dessus de votre nom, en bas.",

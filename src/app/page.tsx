@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
 
 export default function Home() {
   const { user, loading, signIn } = useAuth();
@@ -17,6 +18,7 @@ export default function Home() {
 
   return (
     <main className="relative flex flex-1 flex-col items-center justify-center px-4 py-16">
+      <ThemeSwitch className="absolute left-4 top-4" />
       <LanguageSwitch className="absolute right-4 top-4" />
       <div className="w-full max-w-md text-center">
         <Image src="/logo.svg" alt="" width={72} height={72} className="mx-auto mb-6" priority />

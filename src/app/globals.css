@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
+/* Light or dark comes from <html data-theme>: the user's choice (the switch at the top left), otherwise the
+   device's setting. The root layout sets it before the first paint. Tailwind's dark: follows the same. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   /* Native scrollbars and form controls follow the theme (without this they stay white in dark mode). */
-  color-scheme: light dark;
+  color-scheme: light;
   --background: #fafaf9;
   --foreground: #1c1917;
   --muted: #78716c;
@@ -37,26 +41,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0c0a09;
-    --foreground: #f5f5f4;
-    --muted: #a8a29e;
-    --card: #1c1917;
-    --border: #292524;
-    --card-edge: #8f8a85;
-    --card-edge-soft: #57534e;
-    --accent: #818cf8;
-    --task-search: #3987e5;
-    --task-letter: #d95926;
-    --task-form: #199e70;
-    --task-contacts: #c98500;
-    --task-ask: #d55181;
-    --task-email: #008300;
-    --task-profile: #9085e9;
-    --task-replies: #e66767;
-    --task-earlier: #78716c;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0c0a09;
+  --foreground: #f5f5f4;
+  --muted: #a8a29e;
+  --card: #1c1917;
+  --border: #292524;
+  --card-edge: #8f8a85;
+  --card-edge-soft: #57534e;
+  --accent: #818cf8;
+  --task-search: #3987e5;
+  --task-letter: #d95926;
+  --task-form: #199e70;
+  --task-contacts: #c98500;
+  --task-ask: #d55181;
+  --task-email: #008300;
+  --task-profile: #9085e9;
+  --task-replies: #e66767;
+  --task-earlier: #78716c;
 }
 
 body {
