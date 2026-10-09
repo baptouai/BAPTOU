@@ -50,14 +50,19 @@ const addMonths = (ms: number, months: number) => {
   return d.getTime();
 };
 
+// Test and live mode are separate worlds in Stripe: a customer or portal setting made in one doesn't exist in
+// the other. So their ids are stored per mode, and switching the key to live mode starts afresh.
+const live = () => /^[rs]k_live_/.test(stripeKey.value());
+const customerField = () => (live() ? "stripeCustomerIdLive" : "stripeCustomerId");
+
 /** The Stripe customer for this user, created on first checkout. */
 async function customerFor(uid: string) {
   const ref = db.doc(`private/${uid}`);
-  const existing = (await ref.get()).get("stripeCustomerId") as string | undefined;
+  const existing = (await ref.get()).get(customerField()) as string | undefined;
   if (existing) return existing;
   const user = await getAuth().getUser(uid);
   const customer = await stripe("POST", "customers", { email: user.email, name: user.displayName, metadata: { uid } });
-  await ref.set({ stripeCustomerId: customer.id }, { merge: true });
+  await ref.set({ [customerField()]: customer.id }, { merge: true });
   await db.doc(`stripeCustomers/${customer.id}`).set({ uid });
   return customer.id as string;
 }
@@ -103,7 +108,7 @@ export const billingPortal = onCall({ region: REGION, secrets: [stripeKey] }, as
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
   const returnTo = z.string().default("").parse(request.data?.returnTo);
   const priv = await db.doc(`private/${uid}`).get();
-  const customer = priv.get("stripeCustomerId") as string | undefined;
+  const customer = priv.get(customerField()) as string | undefined;
   if (!customer) throw new HttpsError("failed-precondition", "You don't have a paid plan yet.");
 
   const configuration = await portalConfiguration(false);
@@ -119,7 +124,7 @@ export const billingPortal = onCall({ region: REGION, secrets: [stripeKey] }, as
 /** Two portal configurations (with and without cancellation), created once and remembered. */
 async function portalConfiguration(canCancel: boolean) {
   const ref = db.doc("config/stripe");
-  const field = canCancel ? "portalWithCancel" : "portalNoCancel";
+  const field = `${canCancel ? "portalWithCancel" : "portalNoCancel"}${live() ? "Live" : ""}`;
   const existing = (await ref.get()).get(field) as string | undefined;
   if (existing) return existing;
   const config = await stripe("POST", "billing_portal/configurations", {
@@ -302,8 +307,15 @@ export async function endBillingForDeletedAccount(uid: string, priv: FirebaseFir
   const subscriptionId = priv.get("plan.subscriptionId") as string | undefined;
   const status = priv.get("plan.status") as Plan["status"] | undefined;
   if (subscriptionId && (status === "active" || status === "past_due")) {
-    await stripe("DELETE", `subscriptions/${subscriptionId}`);
+    try {
+      await stripe("DELETE", `subscriptions/${subscriptionId}`);
+    } catch (e) {
+      // A subscription from the other Stripe mode (test, after going live) can't be reached: it bills nothing.
+      logger.warn("Couldn't cancel the subscription of a deleted account", { uid, subscriptionId, error: String(e) });
+    }
   }
-  const customerId = priv.get("stripeCustomerId") as string | undefined;
-  if (customerId) await db.doc(`stripeCustomers/${customerId}`).delete();
+  for (const field of ["stripeCustomerId", "stripeCustomerIdLive"]) {
+    const customerId = priv.get(field) as string | undefined;
+    if (customerId) await db.doc(`stripeCustomers/${customerId}`).delete();
+  }
 }
