@@ -48,8 +48,7 @@
       "ignore": [
         "firebase.json",
         "**/.*",
-        "terms.html",
-        "legal.html"
+        "terms.html"
       ]
     },
     {
