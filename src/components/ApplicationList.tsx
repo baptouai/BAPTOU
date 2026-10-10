@@ -164,7 +164,9 @@ function OfferCard({ app: a }: { app: Item }) {
   return (
     <div className="rounded-xl border border-card-edge-soft bg-card p-5">
       <Link href={`/applications/view?id=${a.id}`} className="block hover:text-accent">
-        <div className="flex items-start justify-between gap-4">
+        {/* On a phone the badges go under the title: beside it they squeezed it into a narrow column and
+            pushed the page wider than the screen. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <p className="font-medium">{a.title}</p>
             <p className="text-sm text-muted">
@@ -179,7 +181,7 @@ function OfferCard({ app: a }: { app: Item }) {
                   : ""}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          <div className="flex flex-wrap gap-1.5 sm:max-w-[50%] sm:shrink-0 sm:justify-end">
             {a.lastReply && a.lastReply.kind !== "other" && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${replyKind[a.lastReply.kind].className}`}>
                 {t(replyKind[a.lastReply.kind].label)}
