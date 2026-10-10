@@ -7,7 +7,7 @@ import { db } from "./shared.js";
 // Gmail (baptouai@gmail.com, see senderGmail); before a large launch this should move to a transactional
 // email service with BAPTOU's own domain. Each is written in the user's language (users/{uid}.lang).
 
-export const APP_URL = "https://baptou-app.web.app";
+export const APP_URL = "https://app.baptou.com";
 export const IDEAL_SCORE = 90; // offers at or above this match score get their own email
 
 export type Lang = "en" | "fr";

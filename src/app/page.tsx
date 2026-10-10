@@ -36,9 +36,9 @@ export default function Home() {
           {t("Continue with Google")}
         </button>
         <p className="mt-4 text-sm text-muted">
-          <a href="https://baptou-5041c.web.app" className="hover:underline">{t("About BAPTOU and pricing")}</a>
+          <a href="https://baptou.com" className="hover:underline">{t("About BAPTOU and pricing")}</a>
           {" · "}
-          <a href="https://baptou-5041c.web.app/privacy" className="hover:underline">{t("Privacy policy")}</a>
+          <a href="https://baptou.com/privacy" className="hover:underline">{t("Privacy policy")}</a>
         </p>
       </div>
     </main>

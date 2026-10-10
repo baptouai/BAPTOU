@@ -1,6 +1,11 @@
 // Light or dark: the visitor's choice (kept in this browser), otherwise the device's setting, followed live.
 // Loaded in <head> so the theme is set before the first paint; adds the switch at the top left of the header.
 (function () {
+  // The old Firebase addresses forward to the site's own domain.
+  if (/^baptou-5041c\.(web\.app|firebaseapp\.com)$/.test(location.hostname)) {
+    location.replace("https://baptou.com" + location.pathname + location.search + location.hash);
+    return;
+  }
   var KEY = "theme";
   var root = document.documentElement;
   var mq = window.matchMedia("(prefers-color-scheme: dark)");

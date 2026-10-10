@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Light or dark before the first paint: the choice made with the switch, otherwise the device's. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}`,
+            __html: `if(location.hostname==="baptou-app.web.app"||location.hostname==="baptou-app.firebaseapp.com")location.replace("https://app.baptou.com"+location.pathname+location.search+location.hash);try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}`,
           }}
         />
       </head>

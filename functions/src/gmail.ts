@@ -12,9 +12,10 @@ import { db, REGION, requireAccess } from "./shared.js";
 const clientId = defineString("GOOGLE_OAUTH_CLIENT_ID");
 export const clientSecret = defineSecret("GOOGLE_OAUTH_CLIENT_SECRET");
 export const tokenKey = defineSecret("TOKEN_ENCRYPTION_KEY"); // 32 random bytes, base64
-const appUrl = defineString("APP_URL", { default: "https://baptou-app.web.app" });
-// Where Google may send the user back after consent: the deployed app and local development.
-const RETURN_ORIGINS = ["https://baptou-app.web.app", "http://localhost:3000"];
+const appUrl = defineString("APP_URL", { default: "https://app.baptou.com" });
+// Where Google may send the user back after consent: the app (its own domain, and the Firebase one it moved from)
+// and local development.
+const RETURN_ORIGINS = ["https://app.baptou.com", "https://baptou-app.web.app", "http://localhost:3000"];
 
 // Read to find past conversations; send only for emails the user approved in the app.
 const SCOPES = [

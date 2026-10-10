@@ -11,7 +11,7 @@ import { errorText, useI18n } from "@/lib/i18n";
 const exportMyData = httpsCallable<void, unknown>(functions, "exportMyData", { timeout: 300_000 });
 const deleteMyAccount = httpsCallable<{ confirm: string }, { ok: boolean }>(functions, "deleteMyAccount", { timeout: 300_000 });
 
-const SITE_URL = "https://baptou-5041c.web.app";
+const SITE_URL = "https://baptou.com";
 
 /** Profile page: email notifications, a copy of all your data, and account deletion. */
 export function AccountSettings() {

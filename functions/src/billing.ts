@@ -18,7 +18,7 @@ const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 const LOOKUP_KEYS = { monthly: "baptou_monthly", annual: "baptou_annual", pass: "baptou_pass" } as const;
 type PlanId = keyof typeof LOOKUP_KEYS;
 const COMMITMENT_MONTHS = 12; // the yearly plan is paid monthly but committed for 12 months
-const RETURN_ORIGINS = ["https://baptou-app.web.app", "http://localhost:3000"];
+const RETURN_ORIGINS = ["https://app.baptou.com", "https://baptou-app.web.app", "http://localhost:3000"];
 
 /** Stripe's form encoding: { a: { b: 1 }, c: [{ d: 2 }] } -> a[b]=1&c[0][d]=2 */
 function encode(obj: Record<string, unknown>, prefix = ""): [string, string][] {
