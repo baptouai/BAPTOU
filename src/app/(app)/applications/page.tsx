@@ -107,7 +107,7 @@ function Applications() {
             active={current?.id === s.id}
             dimmed={s.status === "stopped" || s.status === "ended"}
             tag={kindTag(kindOf(s)) && t(kindTag(kindOf(s))!)}
-            badge={offersOf(s.id).filter((a) => a.status === "suggested" && !a.postingClosedAt).length}
+            badge={offersOf(s.id).filter((a) => a.status === "suggested" && !a.postingClosedAt && !a.postingUnverified).length}
             onSelect={() => select(s.id)}
             onRename={(name) => rename(s.id, name)}
           />

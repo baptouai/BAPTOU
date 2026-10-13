@@ -48,8 +48,9 @@ export type ApplicationItem = Item;
 export type LastRun = { at?: Timestamp; batchAt?: Timestamp; summary?: string };
 
 export function ApplicationList({ apps: all, empty, lastRun }: { apps: Item[]; empty: string; lastRun?: LastRun }) {
-  // A suggested offer whose posting has closed leaves the lists (BAPTOU's morning check also removes it).
-  const apps = all.filter((a) => !(a.status === "suggested" && a.postingClosedAt));
+  // Only suggestions whose posting is confirmed open are shown: one that closed, or that BAPTOU couldn't confirm
+  // open, leaves the lists (the morning check removes it, or brings it back once confirmed).
+  const apps = all.filter((a) => !(a.status === "suggested" && (a.postingClosedAt || a.postingUnverified)));
   const [tab, setTab] = useState<Tab>("latest");
   const { t, date, dateTime } = useI18n();
 

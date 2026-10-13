@@ -484,6 +484,12 @@ export const recheckPostings = onSchedule(
       .collectionGroup("applications")
       .where("status", "in", ["suggested", "interested", "editing"])
       .get();
+    // Suggested offers flagged closed earlier (before closed suggestions were removed) leave the lists too.
+    for (const d of live.docs.filter((x) => x.get("status") === "suggested" && x.get("postingClosedAt") && x.get("source") !== "manual")) {
+      await dismissApplication(d.ref.parent.parent!.id, d.ref, d.data(), `Posting closed (checked by BAPTOU): ${d.get("postingClosedReason") ?? ""}`.trim()).catch(
+        (e) => logger.warn(`Couldn't remove closed offer ${d.ref.path}`, e),
+      );
+    }
     const todo = live.docs
       .filter((d) => d.get("applyUrl") && !d.get("postingClosedAt") && d.get("type") !== "masters")
       .sort((a, b) => (a.get("postingCheckedAt")?.toMillis?.() ?? 0) - (b.get("postingCheckedAt")?.toMillis?.() ?? 0))
