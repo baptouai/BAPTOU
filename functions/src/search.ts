@@ -35,6 +35,7 @@ type Search = {
   rhythm?: string; // alternances, e.g. "3 weeks company / 1 week school"
   school?: string; // alternances: the student's school, or empty if they still need one
   nextLeads?: string[]; // what the previous run didn't have time to check
+  explore?: boolean; // let BAPTOU suggest offers beyond the student's industries and places (missing = yes)
   frequencyDays?: number; // 1, 3 or 7; missing = every day
   emptyStreak?: number; // consecutive runs that found nothing
   nextRunAt?: Timestamp | null; // the daily job skips the search until then
@@ -70,7 +71,7 @@ export const OffersSchema = z.object({
   summary: z.string().describe("One short sentence for the student (max 25 words): what this run found, even if it stopped early. Never a placeholder."),
   leadsToCheckNext: z
     .array(z.string())
-    .describe("Up to 8 web searches worth trying next run (organizations or queries you didn't get to), written as search queries, not careers-page links"),
+    .describe("Up to 8 web searches worth trying next run (organizations or queries you didn't get to), written as search queries, not careers-page links. Spread them over different industries and countries, not only the student's favourites"),
 });
 
 // Jobs and alternances add contract details to the same offer fields.
@@ -102,14 +103,14 @@ Rules:
 - Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; every link is checked automatically before the student sees it, and only postings confirmed open on the organization's own site or application system are kept: a job-board link is dropped unless it links to the official posting, and a closed or expired posting is dropped. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). Most searches should be broad (role + season + country or industry, on application-system domains such as site:myworkdayjobs.com or site:smartrecruiters.com, or on job boards) so you discover organizations the student hasn't named; spend at most a third of your searches on specific organizations.
 - Entry-level, junior or graduate roles only, unless the student asks otherwise. Skip internships, alternances and senior roles.
-- Respect the criteria (roles, locations, work mode, contract type, minimum salary, start date, languages). Mention any compromise in matchReason.
+- The request splits the criteria in two. "Must fit" is never relaxed. "Preferences" are where to start: follow the request on how far to go beyond them. Say in matchReason how an offer differs from the preferences.
 - Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
-- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
+- Never relax the "Must fit" criteria to fill the list, nor eligibility (a required university, country of study, nationality or right to work, degree level), nor anything like what the student turned down. Industry, company size, exact role and location are preferences.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- Start with the leads the previous run didn't have time to check, if any.
+- The previous run's leads, if any, are ideas: spend at most a third of your searches on them and keep the run varied.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
@@ -121,14 +122,14 @@ Rules:
 - Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; every link is checked automatically before the student sees it, and only offers confirmed open on the company's own site or application system are kept: a job-board link is dropped unless it links to the company's own posting, and a closed or filled offer is dropped. The url must lead to that specific offer, never to a list of offers (a job board's search results): when a search result is a list, find the offer's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> alternance 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). Most searches should be broad (role + season + country or industry, on application-system domains such as site:myworkdayjobs.com or site:smartrecruiters.com, or on job boards) so you discover organizations the student hasn't named; spend at most a third of your searches on specific organizations.
 - Alternance offers only (not internships or regular jobs). Most start in September; check the start date and the contract length (usually 1 to 3 years).
-- Respect the criteria (roles, locations, contract type, rhythm, start date). Mention any compromise in matchReason.
+- The request splits the criteria in two. "Must fit" is never relaxed. "Preferences" are where to start: follow the request on how far to go beyond them. Say in matchReason how an offer differs from the preferences.
 - The school matters: if the student already has a school, prefer offers compatible with its programme and rhythm; if they still need one, favour offers whose company names a partner school, and say so in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
-- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
+- Never relax the "Must fit" criteria to fill the list, nor eligibility (a required university, country of study, nationality or right to work, degree level), nor anything like what the student turned down. Industry, company size, exact role and location are preferences.
 - Skip any offer in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- Start with the leads the previous run didn't have time to check, if any.
+- The previous run's leads, if any, are ideas: spend at most a third of your searches on them and keep the run varied.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
@@ -140,13 +141,13 @@ Rules:
 - Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; every link is checked automatically before the student sees it, and only postings confirmed open on the organization's own site or application system are kept: a job-board link is dropped unless it links to the official posting, and a closed or expired posting is dropped. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
-- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
-- Respect the search criteria (roles, locations, work mode, duration, start date, languages). Mention any compromise in matchReason.
+- Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. When a search or a page open fails with a limit error (max_uses_exceeded, or any message that you have no searches or opens left), you have none left for this run: never try again, call the submit tool at once with what you have found (even if it is nothing). Most searches should be broad (role + season + country or industry, on application-system domains such as site:myworkdayjobs.com or site:smartrecruiters.com, or on job boards) so you discover organizations the student hasn't named; spend at most a third of your searches on specific organizations.
+- The request splits the criteria in two. "Must fit" is never relaxed. "Preferences" are where to start: follow the request on how far to go beyond them. Say in matchReason how an offer differs from the preferences.
 - Use the student's nationalities (in the profile) for work permits: don't skip postings that require a right to work the student has, and flag visa sponsorship needs in matchReason.
 - Always return the number of offers asked for: returning fewer is a failure unless nothing open exists at all. When strong matches run out, widen the search and fill the list with the best real, open offers you can find, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
-- Never relax the firm requirements to fill the list: the start date window and duration the student gave, eligibility (a required university, country of study, nationality or right to work, degree level), and anything like what they turned down. Only preferences can be relaxed: industry, company size, exact role, locations within what the student accepts.
+- Never relax the "Must fit" criteria to fill the list, nor eligibility (a required university, country of study, nationality or right to work, degree level), nor anything like what the student turned down. Industry, company size, exact role and location are preferences.
 - Skip any posting in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- Start with the leads the previous run didn't have time to check, if any.
+- The previous run's leads, if any, are ideas: spend at most a third of your searches on them and keep the run varied.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
@@ -202,7 +203,7 @@ Rules:
 - Give real figures in the brief when the university publishes them (tuition for the student's situation, requirements, deadlines).
 - Always return the number of programmes asked for. When strong matches run out, fill the list with the best real programmes still open to applications, even if they aren't ideal: give them a lower matchScore and say what doesn't fit in matchReason. Rank by matchScore, highest first.
 - Skip anything in the "already suggested" or "turned down" lists, and anything very similar to what the student turned down.
-- Start with the leads the previous run didn't have time to check, if any.
+- The previous run's leads, if any, are ideas: spend at most a third of your searches on them and keep the run varied.
 - If you run out of searches, return what you found so far rather than nothing, and list what you didn't have time to check in leadsToCheckNext.
 When you are done, call submit_offers exactly once.`;
 
@@ -292,6 +293,7 @@ async function runSearch(uid: string, searchId: string, mode: RunMode = { kind: 
     // No product limit on offers per run; 50 only guards against typos (e.g. 500) and oversized answers.
     const maxPerRun = Math.min(Math.max(Math.round(search.maxPerRun) || 5, 1), 50);
 
+    const explore = search.explore !== false;
     const criteria =
       kind === "masters"
         ? `Search criteria:
@@ -304,25 +306,36 @@ async function runSearch(uid: string, searchId: string, mode: RunMode = { kind: 
 - Notes from the student: ${search.notes || "none"}
 `
         : kind === "alternance"
-          ? `Search criteria:
-- Roles / keywords: ${search.roles}
-- Locations: ${search.locations || "any"}
+          ? `Must fit:
 - Contract type: ${search.contractType || "apprentissage or professionnalisation"}
-- Rhythm: ${search.rhythm || "any"}
-- School: ${search.school ? `already has one: ${search.school}` : "still needs a school"}
 - Start date: ${search.startDate || "any"}
 - Contract length: ${search.duration || "any"}
-- Notes from the student: ${search.notes || "none"}
-`
-          : `Search criteria:
+- Rhythm: ${search.rhythm || "any"}
+- School: ${search.school ? `already has one: ${search.school}` : "still needs a school"}
+- Anything the student rules out in the locations or notes (e.g. "not Paris")
+Preferences:
 - Roles / keywords: ${search.roles}
 - Locations: ${search.locations || "any"}
-- Work mode: ${search.workMode}
-${kind === "job" ? `- Contract type: ${search.contractType || "any"}\n- Minimum salary: ${search.salaryMin || "not stated"}` : `- Duration: ${search.duration || "any"}`}
-- Start date: ${search.startDate || "any"}
-- Industries: ${search.industries || "any"}
-- Languages: ${search.languages || "any"}
 - Notes from the student: ${search.notes || "none"}
+${explore
+  ? `How far to go: the student lets BAPTOU look beyond their preferences. About half of the offers should match the preferences; the rest should be the same kind of work in related industries the student's profile suits, or in other cities within reach of their school. Make the first bullet of their matchReason "- Beyond your criteria: …", saying what differs.`
+  : "How far to go: stay within the preferences; go beyond them only if nothing open is left."}
+`
+          : `Must fit:
+- Start date: ${search.startDate || "any"} (a posting with a flexible start, or a start window that includes it, fits)
+${kind === "job" ? `- Contract type: ${search.contractType || "any"}\n- Minimum salary: ${search.salaryMin || "not stated"}` : `- Duration: ${search.duration || "any"} (a duration range that includes it fits)`}
+- Work mode: ${search.workMode}
+- Languages: the posting may only require languages the student speaks (${search.languages || "see profile"})
+- Right to work: the student's nationalities (in the profile)
+- Anything the student rules out in the locations or notes (e.g. "not France")
+Preferences:
+- Roles / keywords: ${search.roles}
+- Industries: ${search.industries || "any"}
+- Locations: ${search.locations || "any"}
+- Notes from the student: ${search.notes || "none"}
+${explore
+  ? `How far to go: the student lets BAPTOU look beyond their preferences. About half of the offers should match the preferences; the rest should come from related industries where the same skills and interests apply, and from other countries where the student has the right to work or that their notes accept. Choose those industries from the profile (experience, projects, skills), not only from the preferences. Make the first bullet of their matchReason "- Beyond your criteria: …", saying what differs.`
+  : "How far to go: stay within the preferences; go beyond them only if nothing open is left."}
 `;
     const lists = `Already suggested (skip these): ${seen.length ? seen.slice(0, 150).join("\n") : "none"}
 Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slice(0, 150).join("\n") : "none"}`;
@@ -365,7 +378,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       maxPerRun + spare,
       // Searches cost about $0.02 each; an opened page about $0.03 and makes every later step dearer, so few.
       { searches: Math.min(8 + 2 * maxPerRun, 30), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.15 + 0.04 * maxPerRun },
-      `${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches; try them first:\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
+      `${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches (ideas, not the plan; keep the run varied):\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
       firstStats,
     );
 

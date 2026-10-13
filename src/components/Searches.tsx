@@ -263,6 +263,8 @@ export function SearchForm({
     rhythm: existing?.rhythm ?? "",
     school: existing?.school ?? "",
     notes: existing?.notes ?? "",
+    // BAPTOU also suggests offers beyond the industries and places given (about half of each run), unless turned off.
+    explore: existing?.explore ?? true,
     // Fewer, bigger runs cost less per offer (each run has a fixed part): 10 offers every 3 days by default.
     maxPerRun: existing?.maxPerRun ?? RECOMMENDED_OFFERS,
     frequencyDays: existing?.frequencyDays ?? 3,
@@ -443,7 +445,6 @@ export function SearchForm({
             </option>
           ))}
         </select>
-        <span className="text-xs text-muted">{t("Runs that find nothing automatically wait longer before the next one.")}</span>
       </Field>
       <Field label={t(form.kind === "masters" ? "New programmes per run" : "New offers per run")}>
         <input type="number" min={1} max={MAX_OFFERS} value={form.maxPerRun} onChange={set("maxPerRun")} className={input} />
@@ -453,6 +454,26 @@ export function SearchForm({
         <input type="date" value={form.endsOn} onChange={set("endsOn")} className={input} />
         <span className="text-xs text-muted">{t("Leave empty to search until you stop it.")}</span>
       </Field>
+      {form.kind !== "masters" && (
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={form.explore}
+            onChange={(e) => setForm((f) => ({ ...f, explore: e.target.checked }))}
+            className="mt-0.5"
+          />
+          <span>
+            {t("Also suggest offers beyond my industries and places")}
+            <span className="block text-xs text-muted">
+              {t(
+                form.kind === "alternance"
+                  ? "About half of each run explores related industries and other cities within reach of your school. Dates, contract and rhythm are always respected."
+                  : "About half of each run explores related industries and other countries where you can work. Dates, duration, work mode and languages are always respected.",
+              )}
+            </span>
+          </span>
+        </label>
+      )}
       <div className="sm:col-span-2">
         <Field label={t("Anything else BAPTOU should know")}>
           <textarea

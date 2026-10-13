@@ -126,6 +126,7 @@ export type Search = {
   salaryMin?: string; // jobs
   rhythm?: string; // alternances, e.g. "3 weeks company / 1 week school"
   school?: string; // alternances: the student's school, empty if they still need one
+  explore?: boolean; // also suggest offers beyond the industries and places given (missing = yes)
   maxPerRun: number;
   status: SearchStatus;
   endsAt: Timestamp | null; // null = until the user stops it

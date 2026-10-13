@@ -360,8 +360,6 @@ export const fr: Record<string, string> = {
   "e.g. motorsport, aerospace": "ex. : sport automobile, aéronautique",
   "e.g. English, French": "ex. : anglais, français",
   "How often": "Fréquence",
-  "Runs that find nothing automatically wait longer before the next one.":
-    "Quand une recherche ne trouve rien, la suivante attend automatiquement plus longtemps.",
   "New offers per run": "Nouvelles offres par recherche",
   "New programmes per run": "Nouveaux programmes par recherche",
   "Search until": "Chercher jusqu'au",
@@ -448,6 +446,11 @@ export const fr: Record<string, string> = {
   "This offer was removed.": "Cette offre a été supprimée.",
   "Back to applications": "Retour aux candidatures",
   "This posting seems to be closed.": "Cette offre semble fermée.",
+  "Also suggest offers beyond my industries and places": "Proposer aussi des offres au-delà de mes secteurs et lieux",
+  "About half of each run explores related industries and other countries where you can work. Dates, duration, work mode and languages are always respected.":
+    "Environ la moitié de chaque recherche explore des secteurs proches et d'autres pays où vous pouvez travailler. Les dates, la durée, le mode de travail et les langues sont toujours respectés.",
+  "About half of each run explores related industries and other cities within reach of your school. Dates, contract and rhythm are always respected.":
+    "Environ la moitié de chaque recherche explore des secteurs proches et d'autres villes accessibles depuis votre école. Les dates, le contrat et le rythme sont toujours respectés.",
   "Checking that the posting is still online…": "Vérification que l'offre est toujours en ligne…",
   "BAPTOU couldn't confirm that this posting is still open.": "BAPTOU n'a pas pu confirmer que cette offre est toujours ouverte.",
   "Open the offer to check it before you spend time on it.": "Ouvrez l'offre pour vérifier avant d'y consacrer du temps.",
