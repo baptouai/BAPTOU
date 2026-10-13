@@ -3,6 +3,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
+import { applyCheck, checkPosting } from "./postings.js";
 import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
 import { fallbackRecipient, HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
@@ -269,6 +270,18 @@ export const prepareApplication = onCall(
     const app = (await appRef.get()).data();
     if (!app) throw new HttpsError("not-found", "Application not found.");
     if (!app.applyUrl) throw new HttpsError("failed-precondition", "This offer has no link to an application page.");
+
+    // Nothing is prepared (and no AI spent) for a posting that has closed: a quick check first, no AI.
+    const closed = (reason: string) =>
+      new HttpsError("failed-precondition", `This posting has closed: ${reason || "it is no longer online"}.`, { closed: true });
+    if (app.type !== "masters") {
+      if (app.postingClosedAt) throw closed(app.postingClosedReason ?? "");
+      const posting = await checkPosting(app.applyUrl, { organization: app.organization ?? "", title: app.title });
+      if (posting.status === "closed") {
+        await applyCheck(appRef, app, posting, { mayRemove: false });
+        throw closed(posting.reason ?? "");
+      }
+    }
 
     await loadProfile(uid); // fails early with a clear message if there's no profile yet
     if (!(await claimFormRun(appRef))) return null;

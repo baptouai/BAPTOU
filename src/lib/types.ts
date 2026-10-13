@@ -57,6 +57,8 @@ export type Application = {
   fromJobBoard?: boolean; // the link is a job board's copy: the organization doesn't publish it itself
   postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
   postingClosedReason?: string;
+  postingCheckedAt?: Timestamp; // last time BAPTOU checked the posting was still online
+  postingUnverified?: number; // checks in a row that couldn't confirm the posting is open
   appliedAt?: Timestamp; // when the student marked it applied, or when a reply showed it was sent
   lastReply?: { kind: "received" | "interview" | "rejection" | "offer" | "request" | "other"; at: Timestamp; messageId: string };
   dismissReason?: string; // why the user turned it down; future searches learn from it

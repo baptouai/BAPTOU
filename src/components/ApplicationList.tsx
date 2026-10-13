@@ -47,7 +47,9 @@ export type ApplicationItem = Item;
 /** The search's most recent run, so "Latest batch" shows that run, even when it found nothing. */
 export type LastRun = { at?: Timestamp; batchAt?: Timestamp; summary?: string };
 
-export function ApplicationList({ apps, empty, lastRun }: { apps: Item[]; empty: string; lastRun?: LastRun }) {
+export function ApplicationList({ apps: all, empty, lastRun }: { apps: Item[]; empty: string; lastRun?: LastRun }) {
+  // A suggested offer whose posting has closed leaves the lists (BAPTOU's morning check also removes it).
+  const apps = all.filter((a) => !(a.status === "suggested" && a.postingClosedAt));
   const [tab, setTab] = useState<Tab>("latest");
   const { t, date, dateTime } = useI18n();
 

@@ -34,6 +34,11 @@ const draftLetter = httpsCallable<AiInput, { letter: string; recipient: string; 
 const draftEmail = httpsCallable<AiInput, NonNullable<Application["emailDraft"]>>(functions, "draftEmail", {
   timeout: 300_000,
 });
+const checkPostingNow = httpsCallable<{ applicationId: string }, { status: "open" | "closed" | "unknown" | "skipped"; reason?: string }>(
+  functions,
+  "checkPostingNow",
+  { timeout: 120_000 },
+);
 
 // The app is exported as static files, so the offer id travels in the query (?id=...) rather than the path.
 export default function ApplicationPage() {
@@ -50,6 +55,9 @@ function ApplicationView() {
   const [missing, setMissing] = useState(false);
   const { user } = useAuth();
   const [app, setApp] = useState<Application | null>(null);
+  // Whether the posting is still online: checked by BAPTOU each time the offer is opened (at most every few hours).
+  const [postingCheck, setPostingCheck] = useState<{ id: string; status: "open" | "unknown" | null } | null>(null);
+  const postingChecked = useRef("");
   const [letter, setLetter] = useState("");
   const [recipient, setRecipient] = useState(""); // the letter's recipient block (one line each)
   const [subject, setSubject] = useState("");
@@ -111,6 +119,17 @@ function ApplicationView() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, id]);
+
+  const postingDue =
+    !!app && ["suggested", "interested", "editing"].includes(app.status) && app.type !== "masters" && !app.postingClosedAt;
+  const posting = postingCheck?.id === id ? postingCheck.status : postingDue ? "checking" : null;
+  useEffect(() => {
+    if (!postingDue || postingChecked.current === id) return;
+    postingChecked.current = id;
+    checkPostingNow({ applicationId: id })
+      .then(({ data }) => setPostingCheck({ id, status: data.status === "unknown" ? "unknown" : data.status === "open" ? "open" : null }))
+      .catch(() => setPostingCheck({ id, status: null }));
+  }, [postingDue, id]);
 
   useEffect(() => {
     if (!appRef) return;
@@ -406,6 +425,16 @@ function ApplicationView() {
               reason: t(app.postingClosedReason || "the page is no longer available"),
             })}
           </p>
+        </section>
+      )}
+
+      {!app.postingClosedAt && posting === "checking" && (
+        <p className="text-xs text-muted">{t("Checking that the posting is still online…")}</p>
+      )}
+      {!app.postingClosedAt && posting === "unknown" && !looksGeneric(app.applyUrl) && (
+        <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
+          <p className="font-medium">{t("BAPTOU couldn't confirm that this posting is still open.")}</p>
+          <p className="mt-0.5">{t("Open the offer to check it before you spend time on it.")}</p>
         </section>
       )}
 

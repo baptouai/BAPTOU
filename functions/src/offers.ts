@@ -94,7 +94,20 @@ export const dismissOffer = onCall({ region: REGION }, async (request) => {
   const app = (await ref.get()).data();
   if (!app) return { ok: true }; // already gone
   if (app.emailSentAt) throw new HttpsError("failed-precondition", "You already emailed about this offer, so it is kept.");
+  await dismissApplication(uid, ref, app, reason);
+  return { ok: true };
+});
 
+/**
+ * Removes an offer from the student's lists and remembers it, so no search suggests it again. Used when the
+ * student turns an offer down, and when BAPTOU finds that a suggested offer's posting has closed.
+ */
+export async function dismissApplication(
+  uid: string,
+  ref: FirebaseFirestore.DocumentReference,
+  app: FirebaseFirestore.DocumentData,
+  reason: string,
+) {
   const search = app.searchId ? (await db.doc(`users/${uid}/searches/${app.searchId}`).get()).data() : undefined;
   const record: DismissedOffer = {
     url: app.applyUrl ?? "",
@@ -120,7 +133,6 @@ export const dismissOffer = onCall({ region: REGION }, async (request) => {
       }).filter(([, v]) => v !== undefined && v !== null && v !== ""),
     ),
   };
-  await db.doc(`users/${uid}/dismissedOffers/${app.applyUrl ? urlId(app.applyUrl) : applicationId}`).set(record);
+  await db.doc(`users/${uid}/dismissedOffers/${app.applyUrl ? urlId(app.applyUrl) : ref.id}`).set(record);
   await db.recursiveDelete(ref); // letter versions and the "is this for me?" chat go too
-  return { ok: true };
-});
+}

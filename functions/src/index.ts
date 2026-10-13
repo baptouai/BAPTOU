@@ -8,7 +8,7 @@ export { draftContactEmail, draftFromIndex, findContacts, sendApprovedEmail } fr
 export { dismissOffer } from "./offers.js";
 export { dailyMailIndex, indexMailboxTask, refreshMailIndex } from "./mailIndex.js";
 export { addApplicationFromUrl } from "./manual.js";
-export { recheckPostings } from "./postings.js";
+export { checkPostingNow, recheckPostings } from "./postings.js";
 export { myPlan } from "./access.js";
 export { billingPortal, cancelSubscription, createCheckout, stripeWebhook } from "./billing.js";
 export { dailyReplies, scanRepliesNow, scanRepliesTask } from "./replies.js";

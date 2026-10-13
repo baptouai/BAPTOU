@@ -8,7 +8,7 @@ import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { z } from "zod";
 import { type AgentStats, loadProfile, runAgent, startAgentBatch, today } from "./agent.js";
 import { loadDismissed, looseOfferKey, offerKey, urlId } from "./offers.js";
-import { checkPostings, isOfficial, looksGeneric } from "./postings.js";
+import { checkPostings, isOfficial, looksGeneric, PageReader } from "./postings.js";
 import { type NewOffer, notifyNewOffers } from "./notify.js";
 import { GMAIL_SECRETS } from "./gmail.js";
 import { anthropicKey, claude, db, entitlementFor, type Kind, MODELS, REGION, requireAccess } from "./shared.js";
@@ -99,7 +99,7 @@ const JOB_SYSTEM = `You are BAPTOU's job scout. You search the web for real, cur
 Rules:
 - Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. Search results keep postings long after they close, so prefer recent ones (this year's recruitment cycle) and skip any whose dates show a past cycle, e.g. "2025-26" or posted over 6 months ago.
-- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
+- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; every link is checked automatically before the student sees it, and only postings confirmed open on the organization's own site or application system are kept: a job-board link is dropped unless it links to the official posting, and a closed or expired posting is dropped. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -118,7 +118,7 @@ const ALTERNANCE_SYSTEM = `You are BAPTOU's alternance scout. You search the web
 Rules:
 - Only return offers you actually found during this run (in search results or pages you opened). Never invent an offer, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. When a search result doesn't make this clear, open the posting to check.
-- Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; give their link only when the company doesn't publish the offer itself. The url must lead to that specific offer, never to a list of offers (a job board's search results): when a search result is a list, find the offer's own page.
+- Official sources first: the url should be the offer on the company's own careers site or its application system. La bonne alternance, France Travail, HelloWork, Welcome to the Jungle, JobTeaser and Indeed France are good for finding offers; every link is checked automatically before the student sees it, and only offers confirmed open on the company's own site or application system are kept: a job-board link is dropped unless it links to the company's own posting, and a closed or filled offer is dropped. The url must lead to that specific offer, never to a list of offers (a job board's search results): when a search result is a list, find the offer's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> alternance 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -137,7 +137,7 @@ const SYSTEM = `You are BAPTOU's internship scout. You search the web for real, 
 Rules:
 - Only return postings you actually found during this run (in search results or pages you opened). Never invent a posting, company or link.
 - Only offers that are open now: skip anything closed, filled, expired or past its deadline. When a search result doesn't make this clear, open the posting to check.
-- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; give a job-board link only when the organization doesn't publish the offer itself. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
+- Official sources first: the url must be the posting on the organization's own careers site or its official application system (Workday, Greenhouse, Lever, SuccessFactors, Taleo, Teamtailor, SmartRecruiters, iCIMS…). Use job boards (LinkedIn, Indeed, Glassdoor, JobTeaser, Welcome to the Jungle…) to discover offers, then find the same posting on the official site; every link is checked automatically before the student sees it, and only postings confirmed open on the organization's own site or application system are kept: a job-board link is dropped unless it links to the official posting, and a closed or expired posting is dropped. The url must lead to that specific posting, never to a general careers page or to a list of offers (a job board's search results, such as indeed.com/q-…-jobs.html or ziprecruiter.com/Jobs/…/-in-…): when a search result is a list, find the posting's own page.
 - Find postings with web searches, not by browsing careers sites: those are often empty without JavaScript and waste your limits. Use targeted queries such as site:myworkdayjobs.com, site:greenhouse.io, site:lever.co, site:smartrecruiters.com or site:successfactors.com with role, place and year keywords, and "<company> internship 2027" style queries for specific organizations.
 - A posting seen in search results (its title, organization and own link) is enough: you don't need to open it to confirm it's open, BAPTOU checks every link afterwards. Open a posting only for details the result doesn't show.
 - Spread your searches over many organizations: at most 2 searches per organization, and favour queries that return several postings at once. Never run the same query twice: each search must differ from the ones before. If your first searches give too few, widen: related industries and roles, other locations the student accepts (read their notes). Say so in matchReason.
@@ -393,7 +393,9 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     type Offer = (typeof first.offers)[number];
     const taken = new Set<string>(); // urls and organization+title of the offers kept this run
     const rejected: string[] = []; // links dropped this run, so a second pass doesn't return them
+    const droppedWhy: string[] = []; // for the logs: which offers the posting checks dropped, and why
     let dropped = 0;
+    const reader = new PageReader(); // headless Chrome for pages a plain request can't read, closed after picking
 
     /** The best `n` offers that pass the checks: open, a specific posting, new, official postings first. */
     async function choose(offers: Offer[], n: number) {
@@ -422,18 +424,28 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
         }
         return true;
       });
-      // Dead links (removed, filled or expired postings) and links to a careers section never reach the student.
-      // Plain HTTP checks, no AI.
-      const links = await checkPostings(candidates.map((o) => ({ url: o.url, organization: o.organization })));
-      const usable = candidates.filter((o) => {
-        if (links.get(o.url)?.status !== "closed" && !looksGeneric(o.url)) return true;
+      // Only postings confirmed open reach the student: closed or expired ones, links to a list of offers, pages
+      // that can't be read and job-board copies whose official posting can't be found are all dropped (a second
+      // pass looks for replacements). A job-board copy is replaced by the organization's own posting when the
+      // check found it open. No AI: application systems' APIs, then the page itself, in a real browser if needed.
+      const links = await checkPostings(
+        candidates.map((o) => ({ url: o.url, organization: o.organization, title: o.title })),
+        reader,
+      );
+      const usable: Offer[] = [];
+      for (const o of candidates) {
+        const check = links.get(o.url);
+        const url = check?.officialUrl ?? o.url;
+        if (check?.status === "open" && !looksGeneric(url) && !dismissed.urlIds.has(urlId(url)) && !taken.has(urlId(url))) {
+          usable.push(url === o.url ? o : { ...o, url });
+          continue;
+        }
         dropped++;
         rejected.push(o.url);
-        return false;
-      });
-      // Official postings rank above job-board copies, and verified-open links above unverifiable ones.
-      const rank = (o: Offer) =>
-        o.matchScore + (isOfficial(o.url, o.organization) ? 10 : 0) + (links.get(o.url)?.status === "open" ? 5 : 0);
+        droppedWhy.push(`${o.organization} | ${o.title} | ${o.url} | ${check?.status ?? "?"}: ${check?.reason ?? ""}`);
+      }
+      // Official postings rank above the rest.
+      const rank = (o: Offer) => o.matchScore + (isOfficial(o.url, o.organization) ? 10 : 0);
       // Best first; the same offer found twice in this answer is kept once (its best-ranked copy).
       const best: Offer[] = [];
       for (const o of usable.sort((a, b) => rank(b) - rank(a))) {
@@ -446,7 +458,13 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
       return best;
     }
 
-    const picked = await choose(first.offers, maxPerRun);
+    let picked: Offer[] = [];
+    try {
+      picked = await choose(first.offers, maxPerRun);
+    } catch (e) {
+      await reader.close();
+      throw e;
+    }
     let summary = real(first.summary);
     let leads = first.leadsToCheckNext;
     const secondStats: AgentStats = { costUsd: 0 };
@@ -461,7 +479,7 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
           { searches: Math.min(3 + 2 * missing, 10), fetches: Math.min(1 + Math.ceil(missing / 2), 4), usd: 0.05 + 0.03 * missing },
           `This is a second pass: the first one this run came up short.
 Found earlier this run (skip them): ${picked.map((o) => o.url).join("\n") || "none"}
-Closed, expired or not a specific posting (skip them): ${rejected.join("\n") || "none"}
+Dropped by the checks: closed or expired, not a specific posting, or a job-board copy whose organization's own posting couldn't be found (skip them, and give official postings instead): ${rejected.join("\n") || "none"}
 ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join("\n")}\n` : ""}
 `,
           secondStats,
@@ -475,6 +493,8 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
         logger.warn("Search top-up failed", { uid, searchId, error: String(e) });
       }
     }
+    await reader.close();
+    if (droppedWhy.length) logger.info("Offers dropped by the posting checks", { uid, searchId, dropped: droppedWhy });
 
     let created = 0;
     const fresh: NewOffer[] = []; // this run's new offers, for the email to the user
@@ -601,7 +621,7 @@ export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string; b
     region: REGION,
     secrets: [anthropicKey, ...GMAIL_SECRETS], // Gmail: the new-offer email
     timeoutSeconds: 900,
-    memory: "512MiB",
+    memory: "2GiB", // headless Chrome for the posting checks
     retryConfig: { maxAttempts: 1 },
     rateLimits: { maxConcurrentDispatches: 5 },
   },
