@@ -211,9 +211,9 @@ When you are done, call submit_offers exactly once.`;
  * something, and backing off (2x, 4x… up to a week) after runs that found nothing.
  */
 function nextRunAfter(search: Search, created: number) {
-  const base = search.frequencyDays ?? 1;
+  // The rhythm the student chose, even after a run that found nothing (the next one searches again normally).
+  const days = search.frequencyDays ?? 1;
   const emptyStreak = created > 0 ? 0 : (search.emptyStreak ?? 0) + 1;
-  const days = Math.min(base * 2 ** emptyStreak, Math.max(7, base));
   // At 03:00 UTC on that day (before the 06:00 Paris job), so an evening run doesn't skip the next morning.
   const target = new Date(Date.now() + days * 86_400_000);
   target.setUTCHours(3, 0, 0, 0);
@@ -637,7 +637,8 @@ export const runSearchTask = onTaskDispatched<{ uid: string; searchId: string; b
  * batches, mostly answered within the hour, so offers still arrive by about 7:00.
  */
 export const dailySearches = onSchedule(
-  { region: REGION, schedule: "every day 06:00", timeZone: "Europe/Paris" },
+  // Retried when the morning call fails before it runs (e.g. Cloud Run had no instance ready on 12 October).
+  { region: REGION, schedule: "every day 06:00", timeZone: "Europe/Paris", retryCount: 3, minBackoffSeconds: 300 },
   async () => {
     const active = await db.collectionGroup("searches").where("status", "==", "active").get();
     const now = Timestamp.now();
@@ -653,6 +654,9 @@ export const dailySearches = onSchedule(
       }
       const nextRunAt = doc.get("nextRunAt") as Timestamp | null | undefined;
       if (nextRunAt && nextRunAt.toMillis() > now.toMillis()) continue; // not due yet
+      // Already queued this morning (a retried call): not twice. A run stuck for hours is queued again.
+      const queuedAt = doc.get("runQueuedAt") as Timestamp | undefined;
+      if (["queued", "running"].includes(doc.get("runState")) && queuedAt && now.toMillis() - queuedAt.toMillis() < 5 * 3600_000) continue;
       // No subscription or gift (any more): nothing runs until the student subscribes.
       if (!(await entitlementFor(uid))) {
         noAccess++;
@@ -678,7 +682,7 @@ export const dailySearches = onSchedule(
         skipped++;
         continue;
       }
-      await doc.ref.update({ runState: "queued", waitingForReview: FieldValue.delete() });
+      await doc.ref.update({ runState: "queued", runQueuedAt: now, waitingForReview: FieldValue.delete() });
       await queue().enqueue({ uid, searchId: doc.id, batch: true });
       queued++;
     }
@@ -697,7 +701,7 @@ export const runSearchNow = onCall({ region: REGION }, async (request) => {
   if (!search) throw new HttpsError("not-found", "Search not found.");
   if (search.status !== "active") throw new HttpsError("failed-precondition", "Resume this search first.");
   if (search.runState === "queued" || search.runState === "running") return { queued: false };
-  await ref.update({ runState: "queued" });
+  await ref.update({ runState: "queued", runQueuedAt: Timestamp.now() });
   await queue().enqueue({ uid, searchId });
   return { queued: true };
 });

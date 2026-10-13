@@ -478,7 +478,7 @@ export async function applyCheck(
  * checked first.
  */
 export const recheckPostings = onSchedule(
-  { region: REGION, schedule: "every day 05:15", timeZone: "Europe/Paris", timeoutSeconds: 1800, memory: "2GiB" },
+  { region: REGION, schedule: "every day 05:15", timeZone: "Europe/Paris", timeoutSeconds: 1800, memory: "2GiB", retryCount: 2, minBackoffSeconds: 300 },
   async () => {
     const live = await db
       .collectionGroup("applications")
