@@ -6,6 +6,8 @@ SITE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 HERE = os.path.join(SITE, "guides")
 os.makedirs(HERE, exist_ok=True)
 ORIGIN = "https://baptou.com"
+# Visit counts, cookie-free (Cloudflare Web Analytics); the token is public.
+ANALYTICS = """<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "4e70e6c042d6456e8888a5d2bf21542c"}'></script><!-- End Cloudflare Web Analytics -->"""
 CHECKED = {"fr": "13 octobre 2026", "en": "13 October 2026"}
 
 T = {
@@ -58,6 +60,7 @@ def page(lang, slug, other_slug, title, description, body, sources, cta):
     <ul class="sources">{src}</ul>''' if sources else ''}
     <footer><a href="/">{t['home']}</a> · <a href="/guides">{t['guides']}</a> · <a href="/privacy">{t['privacy']}</a> · <a href="/legal">{t['legal']}</a> · <a href="mailto:baptouai@gmail.com">baptouai@gmail.com</a></footer>
   </main>
+  {ANALYTICS}
 </body>
 </html>
 """
@@ -438,6 +441,7 @@ def index_page():
     <ul class="guide-list">{items("en")}</ul>
     <footer><a href="/">Accueil / Home</a> · <a href="/privacy">Privacy policy</a> · <a href="/legal">Mentions légales</a> · <a href="mailto:baptouai@gmail.com">baptouai@gmail.com</a></footer>
   </main>
+  {ANALYTICS}
 </body>
 </html>
 """
