@@ -76,7 +76,11 @@ Organization: ${app.organization}${app.location ? `, ${app.location}` : ""}${app
 Link: ${app.applyUrl ?? "none"}
 Posting language: ${app.postingLanguage ?? "unknown"}
 Why it was suggested: ${app.matchReason ?? ""}
-Current research notes: ${app.research ?? "none"}`;
+Current research notes: ${app.research ?? "none"}${app.postingText ? `
+The posting, as the student pasted it:
+\"\"\"
+${String(app.postingText).slice(0, 8_000)}
+\"\"\"` : ""}`;
 }
 
 /** Writes (or rewrites, following the student's instructions) the motivation letter for one application. */

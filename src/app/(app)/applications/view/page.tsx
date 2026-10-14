@@ -476,6 +476,13 @@ function ApplicationView() {
         </div>
       )}
 
+      {app.postingText && (
+        <details className="rounded-xl border border-card-edge bg-card p-5 text-sm">
+          <summary className="cursor-pointer font-medium">{t("The offer, as you pasted it")}</summary>
+          <p className="mt-3 whitespace-pre-line text-muted">{app.postingText}</p>
+        </details>
+      )}
+
       {app.status === "suggested" && (
         <section className="flex flex-wrap items-start gap-3 rounded-xl border border-card-edge bg-card p-5">
           <p className="w-full text-sm text-muted">{t("Is this offer for you?")}</p>

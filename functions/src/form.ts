@@ -174,8 +174,12 @@ async function readForm(
         type: "text",
         text: `Today is ${today()}.
 ${kindLabel(app.type)}: ${app.title} at ${app.organization}
-Posting link: ${app.applyUrl}
+Posting link: ${app.applyUrl || "none"}
 ${posting ? `Posting details: ${posting}
+` : ""}${app.postingText ? `The posting, as the student pasted it (its page needs a login):
+\"\"\"
+${String(app.postingText).slice(0, 12_000)}
+\"\"\"
 ` : ""}${wants ? `What the student is looking for: ${wants}
 ` : ""}
 Student's uploaded documents:
@@ -269,12 +273,12 @@ export const prepareApplication = onCall(
     const appRef = db.doc(`users/${uid}/applications/${applicationId}`);
     const app = (await appRef.get()).data();
     if (!app) throw new HttpsError("not-found", "Application not found.");
-    if (!app.applyUrl) throw new HttpsError("failed-precondition", "This offer has no link to an application page.");
+    if (!app.applyUrl && !app.postingText) throw new HttpsError("failed-precondition", "This offer has no link to an application page.");
 
     // Nothing is prepared (and no AI spent) for a posting that has closed: a quick check first, no AI.
     const closed = (reason: string) =>
       new HttpsError("failed-precondition", `This posting has closed: ${reason || "it is no longer online"}.`, { closed: true });
-    if (app.type !== "masters") {
+    if (app.type !== "masters" && app.applyUrl) {
       if (app.postingClosedAt) throw closed(app.postingClosedReason ?? "");
       const posting = await checkPosting(app.applyUrl, { organization: app.organization ?? "", title: app.title });
       if (posting.status === "closed") {

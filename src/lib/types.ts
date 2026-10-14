@@ -57,6 +57,8 @@ export type Application = {
   fromJobBoard?: boolean; // the link is a job board's copy: the organization doesn't publish it itself
   postingClosedAt?: Timestamp; // the posting's page is gone or says it's closed (checked daily)
   postingClosedReason?: string;
+  postingText?: string; // the offer as the student pasted it (its page needs a login, e.g. a school's JobTeaser)
+  seenAtUrl?: string; // where the student saw a pasted offer, when BAPTOU found the official posting elsewhere
   postingCheckedAt?: Timestamp; // last time BAPTOU checked the posting was still online
   postingUnverified?: number; // checks in a row that couldn't confirm the posting is open
   appliedAt?: Timestamp; // when the student marked it applied, or when a reply showed it was sent

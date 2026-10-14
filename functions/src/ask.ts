@@ -65,7 +65,7 @@ ${kindLabel(app.type)}: ${app.title} at ${app.organization}${app.location ? `, $
 Link: ${app.applyUrl ?? "none"}
 Why BAPTOU suggested it: ${app.matchReason ?? ""}
 Research notes: ${app.research ?? "none"}
-
+${app.postingText ? `The posting, as the student pasted it:\n\"\"\"\n${String(app.postingText).slice(0, 8_000)}\n\"\"\"\n` : ""}
 ${transcript ? `Conversation so far:\n${transcript}\n\n` : ""}Student: ${question}`,
         },
       ],

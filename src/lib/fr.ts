@@ -446,6 +446,16 @@ export const fr: Record<string, string> = {
   "This offer was removed.": "Cette offre a été supprimée.",
   "Back to applications": "Retour aux candidatures",
   "This posting seems to be closed.": "Cette offre semble fermée.",
+  "Paste a link": "Coller un lien",
+  "Paste the offer text": "Coller le texte de l'offre",
+  "Paste the whole offer": "Collez l'offre en entier",
+  "For offers BAPTOU can't open, like those on your school's JobTeaser: select the whole offer page, copy it and paste it here. BAPTOU looks for the same posting on the company's own site and prepares it as usual (about 1% of your monthly allowance).":
+    "Pour les offres que BAPTOU ne peut pas ouvrir, comme celles du JobTeaser de votre école : sélectionnez toute la page de l'offre, copiez-la et collez-la ici. BAPTOU cherche la même offre sur le site de l'entreprise et la prépare comme d'habitude (environ 1 % de votre enveloppe mensuelle).",
+  "Title, company, place, dates, description, profile sought…": "Intitulé, entreprise, lieu, dates, description, profil recherché…",
+  "Link to the offer (optional)": "Lien vers l'offre (facultatif)",
+  "The offer, as you pasted it": "L'offre, telle que vous l'avez collée",
+  "This text doesn't look like a specific posting.": "Ce texte ne ressemble pas à une offre précise.",
+  "Paste a link or the offer's text.": "Collez un lien ou le texte de l'offre.",
   "Also suggest offers beyond my industries and places": "Proposer aussi des offres au-delà de mes secteurs et lieux",
   "About half of each run explores related industries and other countries where you can work. Dates, duration, work mode and languages are always respected.":
     "Environ la moitié de chaque recherche explore des secteurs proches et d'autres pays où vous pouvez travailler. Les dates, la durée, le mode de travail et les langues sont toujours respectés.",
