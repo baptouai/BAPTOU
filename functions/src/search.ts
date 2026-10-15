@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getFunctions } from "firebase-admin/functions";
@@ -9,9 +10,10 @@ import { z } from "zod";
 import { type AgentStats, loadProfile, runAgent, startAgentBatch, today } from "./agent.js";
 import { loadDismissed, looseOfferKey, offerKey, urlId } from "./offers.js";
 import { checkPostings, isOfficial, looksGeneric, PageReader } from "./postings.js";
+import { type Board, collectPostings, resolveBoards } from "./boards.js";
 import { type NewOffer, notifyNewOffers } from "./notify.js";
 import { GMAIL_SECRETS } from "./gmail.js";
-import { anthropicKey, claude, db, entitlementFor, type Kind, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, claude, db, entitlementFor, type Kind, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 // Calibrated so that 90+ ("almost ideal") is rare: the user gets a dedicated email for those.
@@ -36,6 +38,7 @@ type Search = {
   school?: string; // alternances: the student's school, or empty if they still need one
   nextLeads?: string[]; // what the previous run didn't have time to check
   explore?: boolean; // let BAPTOU suggest offers beyond the student's industries and places (missing = yes)
+  boardPlan?: BoardPlan; // where BAPTOU reads postings directly (organizations' application systems), refreshed weekly
   frequencyDays?: number; // 1, 3 or 7; missing = every day
   emptyStreak?: number; // consecutive runs that found nothing
   nextRunAt?: Timestamp | null; // the daily job skips the search until then
@@ -211,6 +214,41 @@ When you are done, call submit_offers exactly once.`;
  * When the daily job should run this search next: after its normal interval when the run found
  * something, and backing off (2x, 4x… up to a week) after runs that found nothing.
  */
+// Where to read postings directly: organizations likely to have fitting offers, and how to filter titles. Planned
+// by the AI from what it knows (no web search, a few cents), refreshed weekly or when the criteria change.
+type BoardPlan = { at: Timestamp; key: string; boards: Board[]; include: string[]; exclude: string[]; excludePlaces: string[]; preferPlaces?: string[] };
+
+const BoardPlanSchema = z.object({
+  organizations: z
+    .array(
+      z.object({
+        name: z.string(),
+        careersUrl: z.string().describe("Its careers site, or empty"),
+        ats: z.enum(["workday", "greenhouse", "lever", "smartrecruiters", "ashby", "other", "unknown"]).describe("The application system it uses, if you know"),
+        atsId: z
+          .string()
+          .describe("Its identifier on that system if you know it (Workday: tenant.wdN/site, e.g. ag.wd3/Airbus; Greenhouse board token; Lever company; SmartRecruiters company id; Ashby organization), else empty"),
+      }),
+    )
+    .describe("30 to 40 organizations likely to post offers that fit in the coming months"),
+  titleKeywords: z
+    .array(z.string())
+    .describe("15 to 40 words or word stems that titles of fitting offers contain, in the languages of the countries searched (e.g. mechanical, vehicle, chassis, test, Fahrwerk, mécanique)"),
+  excludeTitleKeywords: z.array(z.string()).describe("Words that rule a title out for this student (e.g. finance, marketing, sales, HR, legal)"),
+  excludePlaces: z
+    .array(z.string())
+    .describe("Countries and their main cities that the student rules out, in English and in the local language (e.g. France, Paris, Toulouse); empty if none"),
+  preferPlaces: z
+    .array(z.string())
+    .describe("Countries and main cities the student prefers or accepts, as they appear in job locations (e.g. United Kingdom, UK, England, London, Germany, Deutschland, München); empty if anywhere"),
+});
+
+const PLAN_SYSTEM = `You plan where BAPTOU looks for offers for a student, before its search runs. BAPTOU reads organizations' application systems directly (Workday, Greenhouse, Lever, SmartRecruiters, Ashby), so list organizations, not postings.
+- From the profile and the criteria, list organizations likely to have offers that fit in the coming months: in the student's preferred industries and places and, when the criteria say BAPTOU may go beyond them, in related industries where the same skills apply and in other countries the student can work in. Favour organizations that hire many students or graduates.
+- For each, give its careers site and, when you know them, its application system and identifier. Don't guess identifiers you don't know: leave them empty.
+- Answer from what you know; you have no web access.
+Call submit_plan once.`;
+
 function nextRunAfter(search: Search, created: number) {
   // The rhythm the student chose, even after a run that found nothing (the next one searches again normally).
   const days = search.frequencyDays ?? 1;
@@ -370,15 +408,58 @@ Turned down (never suggest again): ${dismissed.urls.length ? dismissed.urls.slic
     const scout = (count: number, limits: { searches: number; fetches: number; usd: number }, extra: string, stats: AgentStats) =>
       runAgent(scoutOpts(count, limits, extra, stats));
 
+    // Open postings read straight from organizations' application systems (free): the scout picks from them first
+    // and uses web search only for what they don't cover, which is much cheaper than discovering everything by search.
+    let boardBlock = "";
+    let boardCount = 0;
+    const planStats: AgentStats = { costUsd: 0 };
+    if (kind !== "masters" && mode.kind !== "result") {
+      try {
+        const plan = await ensureBoardPlan(uid, searchRef, search, profile, kind, criteria, planStats);
+        if (plan?.boards.length) {
+          // The year the offer should start (e.g. "April 2027"), when the criteria give one.
+          const year = Number(/20[2-3]\d/.exec(search.startDate ?? "")?.[0]) || undefined;
+          const { postings } = await collectPostings(plan.boards, {
+            kind,
+            include: plan.include,
+            exclude: plan.exclude,
+            excludePlaces: plan.excludePlaces,
+            preferPlaces: plan.preferPlaces,
+            year,
+          });
+          const fresh = postings.filter((p) => {
+            const key = offerKey(p.company, p.title);
+            const loose = looseOfferKey(p.company, p.title);
+            return !seen.includes(p.url) && !dismissed.urlIds.has(urlId(p.url)) && !dismissed.offerKeys.has(key) && !dismissed.looseKeys.has(loose) && !existingKeys.has(key) && !existingKeys.has(loose);
+          });
+          boardCount = fresh.length;
+          if (fresh.length) {
+            boardBlock = `Open postings collected today from organizations' own application systems: they are live, and every link is checked again afterwards. Use them first: pick those that fit the criteria and the profile, with their link exactly as given. Use web search only for the places still empty, mainly for organizations with their own careers sites, which this list doesn't cover. For companyBrief, use what you know; don't spend searches on it.
+${fresh.map((p, i) => `[${i + 1}] ${p.company} | ${p.title} | ${p.place} | ${p.url}\n    ${p.details}`).join("\n")}
+
+`;
+          }
+        }
+        await searchRef.update({ lastRunBoardPostings: boardCount });
+      } catch (e) {
+        if (e instanceof HttpsError) throw e; // e.g. allowance used up
+        logger.warn("Board postings unavailable; searching the web only", { uid, searchId, error: String(e) });
+      }
+    }
+
     // The student asked for `maxPerRun` offers. BAPTOU asks for a few spares, since some links turn out to be
     // closed or to be a careers page, and keeps the best ones that pass the checks.
     const spare = Math.min(6, Math.ceil(maxPerRun / 2) + 2);
     const firstStats: AgentStats = { costUsd: 0 };
+    const enoughFromBoards = boardCount >= maxPerRun;
     const firstOpts = scoutOpts(
       maxPerRun + spare,
-      // Searches cost about $0.02 each; an opened page about $0.03 and makes every later step dearer, so few.
-      { searches: Math.min(8 + 2 * maxPerRun, 30), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.15 + 0.04 * maxPerRun },
-      `${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches (ideas, not the plan; keep the run varied):\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
+      // Searches cost about $0.02 each; an opened page about $0.03 and makes every later step dearer, so few. With
+      // enough postings from application systems, web search only completes the list.
+      enoughFromBoards
+        ? { searches: Math.min(4 + Math.ceil(maxPerRun / 2), 10), fetches: 2, usd: 0.1 + 0.02 * maxPerRun }
+        : { searches: Math.min(8 + 2 * maxPerRun, 30), fetches: Math.min(2 + Math.ceil(maxPerRun / 3), 8), usd: 0.15 + 0.04 * maxPerRun },
+      `${boardBlock}${dismissed.reasons.length ? `The student turned down these earlier suggestions. Learn from their reasons and avoid similar offers:\n${dismissed.reasons.join("\n")}\n\n` : ""}${search.nextLeads?.length ? `The previous run suggested these searches (ideas, not the plan; keep the run varied):\n${search.nextLeads.map((l) => `- ${l}`).join("\n")}\n\n` : ""}`,
       firstStats,
     );
 
@@ -560,7 +641,7 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
       lastBatchAt: batchAt,
       lastRunCreated: created,
       lastRunDropped: dropped, // offers whose posting turned out to be closed, expired or not a posting
-      lastRunCostUsd: Math.round((firstStats.costUsd + secondStats.costUsd) * 100) / 100,
+      lastRunCostUsd: Math.round((planStats.costUsd + firstStats.costUsd + secondStats.costUsd) * 100) / 100,
       ...nextRunAfter(search, created),
       nextLeads: leads.slice(0, 8),
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${summary}`,
@@ -574,6 +655,53 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
       lastError: e instanceof HttpsError ? e.message : "The search failed. It will try again tomorrow.",
     });
   }
+}
+
+/** The search's board plan: reused for a week while the criteria stay the same, otherwise planned again. */
+async function ensureBoardPlan(
+  uid: string,
+  searchRef: FirebaseFirestore.DocumentReference,
+  search: Search,
+  profile: unknown,
+  kind: Exclude<Kind, "masters">,
+  criteria: string,
+  stats: AgentStats,
+): Promise<BoardPlan | null> {
+  const key = createHash("sha1")
+    .update(JSON.stringify([kind, search.roles, search.locations, search.industries, search.languages, search.startDate, search.duration, search.workMode, search.notes, search.explore !== false, search.contractType ?? "", search.rhythm ?? ""]))
+    .digest("hex")
+    .slice(0, 16);
+  const current = search.boardPlan;
+  if (current && current.key === key && Date.now() - current.at.toMillis() < 7 * 86_400_000) return current;
+
+  const result = await runAgent({
+    uid,
+    system: PLAN_SYSTEM,
+    model: MODELS.search,
+    task: "search",
+    web: null,
+    effort: "low",
+    maxRunUsd: 0.1,
+    stats,
+    submit: { name: "submit_plan", description: "Return where BAPTOU should look.", schema: BoardPlanSchema },
+    prompt: [
+      { type: "text", text: `Student profile:\n${JSON.stringify(profile, null, 2)}` },
+      { type: "text", text: `Today is ${today()}. Kind of offers: ${kindLabel(kind)}.\n${criteria}` },
+    ],
+  });
+  const boards = await resolveBoards(result.organizations.slice(0, 45));
+  const plan: BoardPlan = {
+    at: Timestamp.now(),
+    key,
+    boards,
+    include: result.titleKeywords.slice(0, 60),
+    exclude: result.excludeTitleKeywords.slice(0, 40),
+    excludePlaces: result.excludePlaces.slice(0, 40),
+    preferPlaces: result.preferPlaces.slice(0, 40),
+  };
+  await searchRef.update({ boardPlan: plan });
+  logger.info("Board plan", { uid, searchId: searchRef.id, organizations: result.organizations.length, boards: boards.map((b) => `${b.company} (${b.kind})`) });
+  return plan;
 }
 
 const queue = () => getFunctions().taskQueue(`locations/${REGION}/functions/runSearchTask`);
