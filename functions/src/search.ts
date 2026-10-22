@@ -11,9 +11,9 @@ import { type AgentStats, loadProfile, runAgent, startAgentBatch, today } from "
 import { loadDismissed, looseOfferKey, offerKey, urlId } from "./offers.js";
 import { checkPostings, isOfficial, looksGeneric, PageReader } from "./postings.js";
 import { type Board, collectPostings, resolveBoards } from "./boards.js";
-import { type NewOffer, notifyNewOffers } from "./notify.js";
+import { alertFreeSearch, type NewOffer, notifyNewOffers } from "./notify.js";
 import { GMAIL_SECRETS } from "./gmail.js";
-import { anthropicKey, claude, db, entitlementFor, type Kind, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, claude, db, entitlementFor, type Kind, kindLabel, MODELS, REGION, requireAccess, requireUser, TRIAL_USED, trialFrom } from "./shared.js";
 
 // users/{uid}/searches/{searchId}, created by the user in the app. BAPTOU never searches without one.
 // Calibrated so that 90+ ("almost ideal") is rare: the user gets a dedicated email for those.
@@ -310,6 +310,17 @@ async function runSearch(uid: string, searchId: string, mode: RunMode = { kind: 
   const searchRef = db.doc(`users/${uid}/searches/${searchId}`);
   const search = (await searchRef.get()).data() as Search | undefined;
   if (!search || search.status !== "active") return;
+
+  // Without a plan, only the free first search runs, and only until one of its runs completes.
+  const priv = await db.doc(`private/${uid}`).get();
+  const trialRun = !(await entitlementFor(uid, priv));
+  if (trialRun) {
+    const trial = trialFrom(priv);
+    if (!trial.available || trial.searchId !== searchId) {
+      await searchRef.update({ runState: "error", lastError: TRIAL_USED });
+      return;
+    }
+  }
 
   await searchRef.update({ runState: "running", lastError: FieldValue.delete() });
   try {
@@ -648,6 +659,7 @@ ${leads.length ? `Leads you could start with:\n${leads.map((l) => `- ${l}`).join
       lastRunSummary: `${created} new offer${created === 1 ? "" : "s"}. ${summary}`,
       totalFound: FieldValue.increment(created),
     });
+    if (trialRun) await db.doc(`private/${uid}`).set({ trial: { usedAt: FieldValue.serverTimestamp() } }, { merge: true });
     await notifyNewOffers(uid, searchId, search.name, fresh);
   } catch (e) {
     logger.error("runSearch failed", { uid, searchId, error: String(e) });
@@ -833,17 +845,30 @@ export const dailySearches = onSchedule(
 );
 
 /** Runs a search immediately (e.g. right after the user creates it). */
-export const runSearchNow = onCall({ region: REGION }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
-  await requireAccess(uid);
+export const runSearchNow = onCall({ region: REGION, secrets: GMAIL_SECRETS }, async (request) => {
+  const uid = requireUser(request);
+  await requireAccess(uid, { trial: true });
   const searchId = z.string().min(1).parse(request.data?.searchId);
   const ref = db.doc(`users/${uid}/searches/${searchId}`);
   const search = (await ref.get()).data() as Search | undefined;
   if (!search) throw new HttpsError("not-found", "Search not found.");
   if (search.status !== "active") throw new HttpsError("failed-precondition", "Resume this search first.");
   if (search.runState === "queued" || search.runState === "running") return { queued: false };
+  // Free first search: the first search run without a plan becomes the free one; no other runs after it.
+  let freeSearchStarts = false;
+  if (!(await entitlementFor(uid))) {
+    freeSearchStarts = await db.runTransaction(async (tx) => {
+      const privRef = db.doc(`private/${uid}`);
+      const trial = trialFrom(await tx.get(privRef));
+      if (!trial.available || (trial.searchId && trial.searchId !== searchId)) throw new HttpsError("permission-denied", TRIAL_USED);
+      if (trial.searchId) return false;
+      tx.set(privRef, { trial: { searchId, startedAt: FieldValue.serverTimestamp() } }, { merge: true });
+      return true;
+    });
+  }
   await ref.update({ runState: "queued", runQueuedAt: Timestamp.now() });
   await queue().enqueue({ uid, searchId });
+  // The owner gets an email for each free search launched (once per person).
+  if (freeSearchStarts) await alertFreeSearch(String(request.auth?.token.email ?? uid), search);
   return { queued: true };
 });

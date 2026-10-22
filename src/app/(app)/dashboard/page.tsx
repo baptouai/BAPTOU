@@ -11,7 +11,7 @@ export default function Dashboard() {
   const { t } = useI18n();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">{t("Hi {name}", { name: user?.displayName?.split(" ")[0] ?? "" })} 👋</h1>
+      <h1 className="text-2xl font-semibold">{t("Hi {name}", { name: user?.displayName?.split(" ")[0] ?? "" })} <span className="emoji">👋</span></h1>
       <GettingStarted />
       <RepliesPanel />
       <div className="mt-6">

@@ -6,7 +6,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
 import { GMAIL_SECRETS, type Gmail, gmailFor, requireGmailRead } from "./gmail.js";
-import { db, entitlementFor, REGION, requireAccess } from "./shared.js";
+import { db, entitlementFor, rateLimit, REGION, requireAccess, requireUser } from "./shared.js";
 
 // users/{uid}/mailIndex/{id}: one entry per person the user exchanged email with, built from message
 // headers only (From/To/Cc/Date/Subject) through the Gmail API. No AI is involved, so it costs no credit.
@@ -252,9 +252,9 @@ export const indexMailboxTask = onTaskDispatched<{ uid: string }>(
 
 /** "Update now" in the app. Free: header-only indexing, no AI. */
 export const refreshMailIndex = onCall({ region: REGION }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await requireAccess(uid);
+  await rateLimit(uid, "mailIndex", 10, 3600);
   const user = await db.doc(`users/${uid}`).get();
   if (!user.get("gmail.email")) throw new HttpsError("failed-precondition", "Connect your Gmail first (Profile page).");
   await requireGmailRead(uid);

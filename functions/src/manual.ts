@@ -5,7 +5,7 @@ import { loadProfile, runAgent, today } from "./agent.js";
 import { urlId } from "./offers.js";
 import { checkPosting, looksGeneric } from "./postings.js";
 import { offerItem } from "./search.js";
-import { anthropicKey, db, type Kind, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, type Kind, kindLabel, MODELS, rateLimit, REGION, requireAccess, requireUser } from "./shared.js";
 
 // "Add an offer you found": the student pastes a link, or the offer's text when the page is behind a login (e.g.
 // their school's JobTeaser). BAPTOU reads it and creates the application in the same format as its own suggestions.
@@ -52,9 +52,9 @@ const Input = z
 export const addApplicationFromUrl = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
+    await rateLimit(uid, "addOffer", 30, 3600);
     const { url, text, searchId, force } = Input.parse(request.data);
     if (text) return addFromText(uid, text, url, searchId, force);
     if (!url) throw new HttpsError("invalid-argument", "Paste a link or the offer's text.");

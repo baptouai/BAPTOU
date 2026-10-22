@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { addDoc, collection, doc, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -100,7 +101,10 @@ export const kindNoun = (kind: SearchKind) => KINDS[kind].noun;
 /** The selected search, at the top of its tab: what it looks for, its last run, and its controls. */
 export function SearchCard({ search: s }: { search: SearchItem }) {
   const { user } = useAuth();
-  const { pctOf } = usePlan();
+  const { pctOf, plan } = usePlan();
+  // On the free first search, only that search may run, and only until its run completes.
+  const trial = plan && !plan.entitlement ? plan.trial : null;
+  const canRun = !trial || (trial.available && (!trial.searchId || trial.searchId === s.id));
   const { t, date, dateTime } = useI18n();
   const [editing, setEditing] = useState(false);
 
@@ -187,13 +191,15 @@ export function SearchCard({ search: s }: { search: SearchItem }) {
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
         {s.status === "active" && (
           <>
-            <button
-              onClick={() => runSearchNow({ searchId: s.id })}
-              disabled={s.runState === "queued" || s.runState === "running"}
-              className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-50"
-            >
-              {t("Search now")}
-            </button>
+            {canRun && (
+              <button
+                onClick={() => runSearchNow({ searchId: s.id })}
+                disabled={s.runState === "queued" || s.runState === "running"}
+                className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-50"
+              >
+                {t("Search now")}
+              </button>
+            )}
             <button onClick={() => setStatus("paused")} className="rounded-lg border border-border px-3 py-1.5">
               {t("Pause")}
             </button>
@@ -274,9 +280,21 @@ export function SearchForm({
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: k === "maxPerRun" || k === "frequencyDays" ? Number(e.target.value) : e.target.value }));
   const k = KINDS[form.kind];
-  const { pctOf } = usePlan();
+  const { pctOf, plan } = usePlan();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
+  // Without a plan, one free search: once it has been started (or has run), new searches need a plan.
+  const trial = plan && !plan.entitlement ? plan.trial : null;
+  if (!existing && trial && (trial.used || trial.searchId)) {
+    return (
+      <div className="rounded-xl border border-accent bg-accent/10 p-5 text-sm">
+        <p>{t("Your free search is used. With a plan, BAPTOU searches every morning, for as many searches as you like, and prepares each application.")}</p>
+        <Link href="/plans" className="mt-3 inline-block rounded-lg bg-accent px-4 py-2 font-medium text-white">
+          {t("See plans")}
+        </Link>
+      </div>
+    );
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

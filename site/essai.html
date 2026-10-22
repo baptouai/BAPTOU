@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BAPTOU – l'agent IA qui prépare tes candidatures</title>
+  <meta name="description" content="BAPTOU trouve tes stages, emplois, alternances et masters, prépare chaque candidature au format du vrai formulaire et écrit tes lettres. Rien n'est envoyé sans ton accord. Ta première recherche est offerte.">
+  <!-- The landing page for Instagram and TikTok ads: French, "tu" like the ads, one message, one button.
+       Kept out of search results (the full pages are / and /fr). Only true features: check src/lib/fr.ts. -->
+  <meta name="robots" content="noindex">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BAPTOU">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="Tu cherches encore ton stage à la main ?">
+  <meta property="og:description" content="BAPTOU, l'agent IA qui trouve tes stages, emplois, alternances et masters et prépare tes candidatures. Ta première recherche est offerte.">
+  <meta property="og:url" content="https://baptou.com/essai">
+  <meta property="og:image" content="https://baptou.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#3730a3">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <!-- Versioned: the stylesheet is cached for an hour, and this page needs its newest rules (video, FAQ, button). -->
+  <link rel="stylesheet" href="style.css?v=2026-10-20">
+  <script src="theme.js"></script>
+</head>
+<body class="home has-sticky">
+  <header class="topbar">
+    <div class="bar">
+      <a class="brand" href="/fr"><img src="logo-white.svg" alt="">BAPTOU</a>
+      <nav>
+        <a class="pill-link" href="https://app.baptou.com">Connexion</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="home">
+    <!-- Hero: the reel's hook, what BAPTOU is in one sentence, the button. Shows on the first frame (no reveal). -->
+    <section class="hero">
+      <div class="hero-text">
+        <p class="kicker reveal">Stages · Emplois · Alternances · Masters</p>
+        <h1 class="reveal">Tu cherches encore ton stage <em>à la main</em>&nbsp;?</h1>
+        <p class="lead reveal">
+          BAPTOU est un agent IA qui trouve tes stages, emplois, alternances et masters, prépare chaque candidature au
+          format du vrai formulaire et écrit tes lettres. Rien n'est envoyé sans ton accord.
+        </p>
+        <p class="actions reveal">
+          <a class="button" href="https://app.baptou.com">Essayer gratuitement <span aria-hidden="true">→</span></a>
+          <a class="ghost" href="#video">Voir en 30 secondes</a>
+        </p>
+        <p class="small reveal">Ta première recherche est offerte, sans carte bancaire. Tes premières offres arrivent en quelques minutes.</p>
+      </div>
+      <div class="hero-video" id="video">
+        <video controls playsinline preload="none" poster="media/baptou-en-30-secondes.jpg" aria-label="BAPTOU expliqué en 30 secondes">
+          <source src="media/baptou-en-30-secondes.mp4" type="video/mp4">
+        </video>
+        <p>Vidéo et voix générées par IA.</p>
+      </div>
+    </section>
+
+    <section id="how" class="section">
+      <p class="kicker reveal">Comment ça marche</p>
+      <h2 class="reveal">Trois étapes. <em>C'est tout.</em></h2>
+      <ol class="steps" data-stagger>
+        <li><span class="num">1</span><div><strong>Ajoute ton CV</strong><span>Et, si tu veux, tes relevés de notes et une ancienne lettre de motivation : BAPTOU écrit ensuite dans ton style.</span></div></li>
+        <li><span class="num">2</span><div><strong>Dis ce que tu cherches</strong><span>Stage, emploi, alternance ou master : le poste, les lieux, les dates. Chaque recherche a son onglet.</span></div></li>
+        <li><span class="num">3</span><div><strong>Choisis tes offres</strong><span>Les offres qui te correspondent, avec la raison. Pour celles qui te plaisent, BAPTOU prépare les réponses du formulaire et ta lettre. Tu relis, tu valides.</span></div></li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <p class="kicker reveal">Ce que tu obtiens</p>
+      <h2 class="reveal">La partie pénible des candidatures, <em>faite pour toi</em>.</h2>
+      <div class="features" data-stagger>
+        <article class="panel">
+          <h3>Des offres <em>qui te correspondent</em></h3>
+          <p>Avec la raison. Les offres fermées ou retirées sont enlevées, vérifiées chaque jour.</p>
+          <div class="mini">
+            <div class="card"><div class="row"><div><div class="t">Stage ingénieur systèmes</div><div class="m">Entreprise industrielle · Lyon · 6 mois</div></div><span class="score">94&nbsp;%</span></div>
+              <div class="why">Ton projet de simulation de fin d'études correspond au poste.</div></div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Le formulaire, <em>déjà rempli</em></h3>
+          <p>BAPTOU lit le vrai formulaire de candidature : chaque réponse à la bonne longueur, avec la liste des fichiers à joindre.</p>
+          <div class="mini">
+            <div class="card">
+              <div class="q">Pourquoi ce poste ? (500 caractères max)</div>
+              <div class="a">Votre équipe conçoit les systèmes que j'ai étudiés pendant mon projet de fin d'études…</div>
+              <div class="n">487 / 500 ✓</div>
+              <div class="files"><span>✓ CV</span><span>✓ Lettre</span><span>✓ Relevés de notes</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Une lettre <em>pour chaque offre</em></h3>
+          <p>Sur une page, dans ton style et dans la langue de l'offre. Pas tout à fait ça ? Dis ce que tu veux changer, elle est réécrite.</p>
+          <div class="mini">
+            <div class="card letter"><span class="chip ok">1 page</span><div class="t">Madame Martin,</div><div class="m">Responsable du recrutement</div>
+              <i style="width:96%"></i><i style="width:88%"></i><i style="width:92%"></i><i style="width:64%"></i></div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Les nouvelles offres <em>chaque matin</em></h3>
+          <p>Avec une formule, BAPTOU cherche chaque matin et t'envoie un email quand il trouve de nouvelles offres.</p>
+          <div class="mini">
+            <div class="card mail"><span class="dot"></span><div><div class="t">3 nouvelles offres pour « Stage ingénieur »</div><div class="m">L'une d'elles est presque idéale : 96&nbsp;%</div></div></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section statement">
+      <p class="kicker reveal">Tu gardes la main</p>
+      <h2 class="big reveal">Rien n'est envoyé <em>sans ton accord</em>.</h2>
+      <p class="lead reveal">
+        BAPTOU prépare, toi tu décides. Il n'envoie jamais de candidature à ta place, et un email ne part de ton Gmail
+        que si tu cliques sur « Valider et envoyer ».
+      </p>
+    </section>
+
+    <section class="section">
+      <p class="kicker reveal">Questions</p>
+      <h2 class="reveal">Ce qu'on nous <em>demande</em>.</h2>
+      <div class="faq" data-stagger>
+        <details>
+          <summary>C'est gratuit ?</summary>
+          <p>Ta première recherche est offerte, sans carte bancaire : ajoute ton CV et découvre les offres que BAPTOU trouve pour toi. Pour préparer tes candidatures (lettres, formulaires) et recevoir de nouvelles offres chaque matin, une formule coûte 12,49&nbsp;€ par mois sans engagement, ou 11,49&nbsp;€ par mois avec l'annuel. <a href="/fr#pricing">Voir les tarifs</a></p>
+        </details>
+        <details>
+          <summary>BAPTOU postule à ma place ?</summary>
+          <p>Non. Il prépare la lettre, les réponses du formulaire et la liste des fichiers. Toi, tu relis, tu modifies si tu veux, et c'est toi qui postules.</p>
+        </details>
+        <details>
+          <summary>Ça marche pour l'alternance et les masters ?</summary>
+          <p>Oui : stage, emploi, alternance ou master. Pour un master, BAPTOU indique la date limite et les lettres de recommandation demandées.</p>
+        </details>
+        <details>
+          <summary>Et mes données ?</summary>
+          <p>Ton CV et tes fichiers servent à trouver tes offres et à écrire tes candidatures. Gmail est facultatif. Tu peux exporter tes données ou supprimer ton compte à tout moment. <a href="privacy.html" hreflang="en">Politique de confidentialité (en anglais)</a></p>
+        </details>
+        <details>
+          <summary>Je suis sur Instagram ou TikTok, comment je me connecte ?</summary>
+          <p>Crée ton compte avec ton adresse email : la connexion avec Google ne fonctionne pas dans le navigateur d'Instagram ou de TikTok. Tu peux aussi ouvrir la page dans Safari ou Chrome (menu ⋯ en haut à droite).</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="section final reveal">
+      <h2 class="big">Ta première recherche est <em>offerte</em>.</h2>
+      <p class="lead">Ajoute ton CV, dis ce que tu cherches, et découvre ce que BAPTOU trouve pour toi.</p>
+      <p class="actions"><a class="button" href="https://app.baptou.com">Commencer <span aria-hidden="true">→</span></a></p>
+    </section>
+
+    <footer>
+      <a href="/fr">Découvrir BAPTOU</a> · <a href="/guides">Guides</a> · <a href="privacy.html" hreflang="en">Confidentialité</a> · <a href="legal.html">Mentions légales</a> · Contact : <a href="mailto:baptouai@gmail.com">baptouai@gmail.com</a>
+    </footer>
+  </main>
+
+  <!-- On phones, the button stays in reach at the bottom of the screen. -->
+  <div class="sticky-cta"><a class="button" href="https://app.baptou.com">Essayer gratuitement <span aria-hidden="true">→</span></a></div>
+  <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "4e70e6c042d6456e8888a5d2bf21542c"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

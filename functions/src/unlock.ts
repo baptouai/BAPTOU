@@ -7,7 +7,7 @@ import { type ClientTool, runAgent } from "./agent.js";
 import type { BrowserSession, Snapshot } from "./browser.js";
 import { claimFormRun, prepareAndSave } from "./form.js";
 import { GMAIL_SECRETS, gmailFor, recentMessages, requireGmailRead } from "./gmail.js";
-import { anthropicKey, db, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, MODELS, rateLimit, REGION, requireAccess, requireUser } from "./shared.js";
 
 // "Unlock the form": many careers sites show the application form only after the student confirms their
 // email (a code or a link sent by email). With the student's approval (one click in the app), BAPTOU opens
@@ -69,9 +69,9 @@ async function openBrowser(url: string) {
 export const unlockForm = onCall(
   { region: REGION, secrets: [anthropicKey, ...GMAIL_SECRETS], memory: "2GiB", timeoutSeconds: 540 },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
+    await rateLimit(uid, "unlockForm", 15, 3600); // up to 9 minutes of headless Chrome each
     const { applicationId } = z.object({ applicationId: z.string().min(1) }).parse(request.data);
     const appRef = db.doc(`users/${uid}/applications/${applicationId}`);
     const app = (await appRef.get()).data();

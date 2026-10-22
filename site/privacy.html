@@ -13,7 +13,7 @@
     <header><img src="logo.svg" alt=""><a href="index.html" style="color:inherit;text-decoration:none">BAPTOU</a></header>
 
     <h1>Privacy policy</h1>
-    <p>Last updated: 13 October 2026</p>
+    <p>Last updated: 20 October 2026</p>
     <p>
       This policy explains what data BAPTOU collects, why, where it is stored and what rights you have.
       BAPTOU is operated by Baptiste Petit, who is the data controller.
@@ -22,14 +22,14 @@
 
     <h2>Data we collect</h2>
     <ul>
-      <li><strong>Google account basics</strong>: your name and email address, used to sign you in and to email you about new offers (you can turn these emails off in your Profile).</li>
+      <li><strong>Account basics</strong>: your name and email address (from your Google account, or the address you sign up with), used to sign you in and to email you about new offers (you can turn these emails off in your Profile). If you sign up with an email address and a password, the password is handled by Google Firebase Authentication, which stores it only in a hashed form: BAPTOU never sees it.</li>
       <li><strong>Documents you upload</strong>: CVs, transcripts, diplomas and past motivation letters, and the profile BAPTOU builds from them.</li>
       <li><strong>What you create in the app</strong>: searches (internships, jobs, alternances, master's programmes), suggested offers, letters, application answers, email drafts and your questions to BAPTOU.</li>
       <li><strong>Your nationalities</strong>, if you enter them, to answer work permit and visa questions and estimate tuition fees.</li>
       <li><strong>Subscription data</strong>: your plan, its status and renewal date. Payments are handled by Stripe: BAPTOU never sees or stores your card number.</li>
       <li><strong>Gmail data, only if you connect Gmail</strong> (see below).</li>
       <li><strong>Usage counters</strong>: how much AI processing your account uses, to enforce monthly limits.</li>
-      <li><strong>Visits to baptou.com</strong> (this website, not the app): counted in aggregate with Cloudflare Web Analytics, without cookies and without identifying you: pages viewed, the site you came from, country and type of device.</li>
+      <li><strong>Visits to baptou.com</strong> (this website, not the app): counted without cookies and without identifying you, by BAPTOU itself and with Cloudflare Web Analytics: the page viewed, the website or app you came from, whether you use a phone or a computer (Cloudflare also sees the country), and how many seconds the page stayed on your screen (added to a daily total only, with whether the visit started as a new visitor, kept for that browser tab in its session storage). BAPTOU's own count stores no IP address or identifier; each page view is kept 30 days, then only daily totals remain. To count new visitors separately from returning ones, your first visit leaves the date of that visit in your browser's storage (not a cookie, and no identifier); it is only read by baptou.com, never renewed, ignored after 13 months, and you can clear it with your browser data or stop all counting by opening baptou.com/?notrack.</li>
     </ul>
 
     <h2>Gmail data</h2>
@@ -83,7 +83,9 @@
       on the basis of your consent, which you can withdraw at any time by disconnecting Gmail. Your data is kept
       while your account exists. When you delete your account, it is deleted straight away, including your
       uploaded files. Billing records (invoices and payments) are kept for 10 years, as French accounting law
-      requires.
+      requires. To offer the free first search only once per person, BAPTOU keeps a one-way hash of the email
+      address that used it (not the address itself), also after the account is deleted (legitimate interest:
+      preventing abuse of the free offer).
     </p>
 
     <h2>Your rights</h2>

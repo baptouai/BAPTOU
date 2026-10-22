@@ -5,7 +5,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import type { Browser } from "puppeteer-core";
 import { offerTokens } from "./mailIndex.js";
 import { dismissApplication } from "./offers.js";
-import { db, REGION, requireAccess } from "./shared.js";
+import { db, REGION, requireAccess, requireUser, withinRate } from "./shared.js";
 
 // Whether a posting is still open, checked without AI (no cost): the application system's own API when it has
 // one, otherwise the page itself, read in a real browser when a plain request can't see it. An offer counts as
@@ -263,8 +263,11 @@ async function fetchPage(url: string): Promise<Fetched | null> {
       signal: AbortSignal.timeout(10000),
       headers: { "User-Agent": UA, "Accept-Language": "en,fr;q=0.8", Accept: "text/html,application/xhtml+xml" },
     });
+    // A redirect to a private address is treated like a page that can't be read.
+    const landed = res.url || url;
+    if (PRIVATE_HOST.test(new URL(landed).hostname)) return null;
     const html = res.ok ? (await res.text()).slice(0, 600_000) : "";
-    return { status: res.status, url: res.url || url, html, text: pageText(html) };
+    return { status: res.status, url: landed, html, text: pageText(html) };
   } catch {
     return null;
   }
@@ -369,6 +372,10 @@ export async function checkPosting(url: string, opts: CheckOptions = {}): Promis
   try {
     u = new URL(url);
   } catch {
+    return { status: "unknown", reason: "not a valid link" };
+  }
+  // Links come from students and from the web: never let them point the server at itself or its network.
+  if ((u.protocol !== "https:" && u.protocol !== "http:") || PRIVATE_HOST.test(u.hostname)) {
     return { status: "unknown", reason: "not a valid link" };
   }
   if (looksGeneric(url)) return { status: "unknown", reason: "the link leads to a list of offers, not to one posting" };
@@ -519,8 +526,7 @@ export const recheckPostings = onSchedule(
 
 /** When the student opens an offer: a fresh check if the last one is more than a few hours old. */
 export const checkPostingNow = onCall({ region: REGION, memory: "2GiB", timeoutSeconds: 120 }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await requireAccess(uid);
   const applicationId = String(request.data?.applicationId ?? "");
   if (!applicationId) throw new HttpsError("invalid-argument", "Missing applicationId.");
@@ -530,6 +536,8 @@ export const checkPostingNow = onCall({ region: REGION, memory: "2GiB", timeoutS
   if (app.postingClosedAt) return { status: "closed", reason: app.postingClosedReason ?? "" };
   const checkedAt = app.postingCheckedAt?.toMillis?.() ?? 0;
   if (Date.now() - checkedAt < 6 * 3600_000) return { status: app.postingUnverified ? "unknown" : "open" };
+  // Each check opens a headless Chrome: a few dozen an hour is plenty for someone reading offers.
+  if (!(await withinRate(uid, "checkPosting", 40, 3600))) return { status: "skipped" };
 
   const reader = new PageReader();
   try {

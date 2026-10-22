@@ -5,7 +5,7 @@ import { defineSecret, defineString } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { claimGmailRead, gmailReadAvailable } from "./access.js";
-import { db, REGION, requireAccess } from "./shared.js";
+import { db, REGION, requireAccess, requireUser } from "./shared.js";
 
 // OAuth client from Google Cloud console (APIs & Services > Credentials). The ID is public and set in
 // functions/.env; the secret and the token encryption key live in Secret Manager.
@@ -47,8 +47,7 @@ function decrypt(blob: string) {
 
 /** Returns the Google consent URL. `state` ties the callback to this user and expires after 10 minutes. */
 export const gmailAuthUrl = onCall({ region: REGION }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await requireAccess(uid);
   const state = randomBytes(24).toString("hex");
   const origin = String(request.data?.returnTo ?? "");
@@ -218,8 +217,7 @@ export async function revokeGmail(uid: string) {
  * match against it) unless `clearIndex` is set.
  */
 export const gmailDisconnect = onCall({ region: REGION, secrets: GMAIL_SECRETS }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await revokeGmail(uid);
   const clearIndex = request.data?.clearIndex === true;
   await db.doc(`private/${uid}`).update({ gmail: FieldValue.delete() });

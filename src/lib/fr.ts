@@ -20,9 +20,100 @@ export const fr: Record<string, string> = {
   "(optional)": "(facultatif)",
 
   // --- Sign-in page, menu
-  "Your AI agent for internships, jobs, alternances and master's applications. It finds offers that fit you, prepares each application and writes your letters. Nothing is sent without your approval.":
-    "Votre agent IA pour les stages, les emplois, les alternances et les masters. Il trouve les offres qui vous correspondent, prépare chaque candidature et rédige vos lettres. Rien n'est envoyé sans votre accord.",
+  "It finds offers that fit you, prepares each application and writes your letters. Nothing is sent without your approval.":
+    "Il trouve les offres qui vous correspondent, prépare chaque candidature et rédige vos lettres. Rien n'est envoyé sans votre accord.",
+  "Internships · Jobs · Alternances · Master's": "Stages · Emplois · Alternances · Masters",
+  "Your AI agent for": "Votre agent IA pour",
+  "applications.": "vos candidatures.",
   "Continue with Google": "Continuer avec Google",
+  // Inside Instagram's or TikTok's own browser, where Google can't sign in
+  "You're in {app}'s browser": "Vous êtes dans le navigateur intégré à {app}",
+  "Google sign-in doesn't work here. Create your account with your email address below, or open BAPTOU in your phone's browser.":
+    "La connexion avec Google n'y fonctionne pas. Créez votre compte avec votre adresse email ci-dessous, ou ouvrez BAPTOU dans le navigateur de votre téléphone.",
+  "Open in Chrome": "Ouvrir dans Chrome",
+  "Copy the link": "Copier le lien",
+  "Link copied: paste it in Safari or Chrome": "Lien copié : collez-le dans Safari ou Chrome",
+  "Or tap ⋯ at the top right, then open in your browser.": "Ou touchez ⋯ en haut à droite, puis ouvrez dans votre navigateur.",
+  "Copy this link:": "Copiez ce lien :",
+
+  // --- Signing in with an email address (sign-in page, links from the emails, account settings)
+  "or": "ou",
+  "Continue with an email address": "Continuer avec une adresse email",
+  "Sign in": "Se connecter",
+  "Create an account": "Créer un compte",
+  "Email address": "Adresse email",
+  "Password": "Mot de passe",
+  "New password": "Nouveau mot de passe",
+  "Show": "Afficher",
+  "Hide": "Masquer",
+  "At least 10 characters, with a letter and a digit.": "Au moins 10 caractères, dont une lettre et un chiffre.",
+  "One moment…": "Un instant…",
+  "Create my account": "Créer mon compte",
+  "Send the link": "Envoyer le lien",
+  "Forgot your password?": "Mot de passe oublié ?",
+  "← Back to sign in": "← Retour à la connexion",
+  "We'll send a link to this address to confirm it's yours.": "Nous enverrons un lien à cette adresse pour vérifier qu'elle est bien à vous.",
+  "Choose a new password": "Choisir un nouveau mot de passe",
+  "Enter your account's email address: we'll send you a link to choose a new password.":
+    "Indiquez l'adresse email de votre compte : nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+  "If an account uses this address, we've sent it a link to choose a new password. Check your spam folder too.":
+    "Si un compte utilise cette adresse, nous lui avons envoyé un lien pour choisir un nouveau mot de passe. Pensez à regarder dans vos spams.",
+  "An account with a password already uses this address. Sign in with your password once: Google will then be added to it.":
+    "Un compte avec mot de passe utilise déjà cette adresse. Connectez-vous une fois avec votre mot de passe : Google y sera ensuite associé.",
+  "Check your inbox": "Vérifiez votre boîte mail",
+  "We've sent a link to {email}. Open it to confirm your address: BAPTOU opens right after.":
+    "Nous avons envoyé un lien à {email}. Ouvrez-le pour confirmer votre adresse : BAPTOU s'ouvre juste après.",
+  "Nothing after a few minutes? Look in your spam folder, or send it again.":
+    "Rien après quelques minutes ? Regardez dans vos spams, ou renvoyez-le.",
+  "I've confirmed my address": "J'ai confirmé mon adresse",
+  "Not confirmed yet. Open the link in the email first.": "Pas encore confirmée. Ouvrez d'abord le lien reçu par email.",
+  "Send the email again": "Renvoyer l'email",
+  "Send again in {n} s": "Renvoyer dans {n} s",
+  "Sent again. It can take a minute to arrive.": "Email renvoyé. Il peut mettre une minute à arriver.",
+  "Use another address": "Utiliser une autre adresse",
+  "Use at least 10 characters.": "Utilisez au moins 10 caractères.",
+  "Use at least one letter and one digit.": "Utilisez au moins une lettre et un chiffre.",
+  "Use at least 10 characters, with at least one letter and one digit.": "Utilisez au moins 10 caractères, dont au moins une lettre et un chiffre.",
+  "Wrong email address or password.": "Adresse email ou mot de passe incorrect.",
+  "This email address isn't valid.": "Cette adresse email n'est pas valide.",
+  "Enter your password.": "Saisissez votre mot de passe.",
+  "An account already uses this address. Sign in (with Google if you created it that way), or choose “Forgot your password?” to set one.":
+    "Un compte utilise déjà cette adresse. Connectez-vous (avec Google si vous l'avez créé ainsi), ou choisissez « Mot de passe oublié ? » pour en définir un.",
+  "Too many attempts. Wait a few minutes, or reset your password.":
+    "Trop de tentatives. Patientez quelques minutes, ou réinitialisez votre mot de passe.",
+  "This account has been disabled. Write to baptouai@gmail.com.": "Ce compte a été désactivé. Écrivez à baptouai@gmail.com.",
+  "No connection. Check your network and try again.": "Pas de connexion. Vérifiez votre réseau et réessayez.",
+  "Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.":
+    "Votre navigateur a bloqué la fenêtre de connexion Google. Autorisez les fenêtres pop-up pour ce site et réessayez.",
+  "This link has expired or was already used.": "Ce lien a expiré ou a déjà été utilisé.",
+  "This Google account is already linked to another BAPTOU account.": "Ce compte Google est déjà associé à un autre compte BAPTOU.",
+  "Signing in with an email address isn't available right now. Use Google, or try again later.":
+    "La connexion par adresse email n'est pas disponible pour le moment. Utilisez Google, ou réessayez plus tard.",
+  "This link isn't valid.": "Ce lien n'est pas valide.",
+  "This link can't be used": "Ce lien ne peut pas être utilisé",
+  "Continue to BAPTOU": "Continuer vers BAPTOU",
+  "Back to BAPTOU": "Retour à BAPTOU",
+  "Open BAPTOU": "Ouvrir BAPTOU",
+  "Your address is confirmed": "Votre adresse est confirmée",
+  "Welcome to BAPTOU! Opening the app…": "Bienvenue sur BAPTOU ! Ouverture de l'application…",
+  "You can now sign in with your email address and password.": "Vous pouvez maintenant vous connecter avec votre adresse email et votre mot de passe.",
+  "For {email}.": "Pour {email}.",
+  "Save my new password": "Enregistrer mon nouveau mot de passe",
+  "Your new password is saved": "Votre nouveau mot de passe est enregistré",
+  "You're signed in with it.": "Vous êtes connecté avec celui-ci.",
+  "Your address is restored": "Votre adresse est rétablie",
+  "Your account uses {email} again. If you didn't ask for the change, choose a new password from the sign-in page (“Forgot your password?”).":
+    "Votre compte utilise de nouveau {email}. Si vous n'aviez pas demandé ce changement, choisissez un nouveau mot de passe depuis la page de connexion (« Mot de passe oublié ? »).",
+  "Your new address is confirmed": "Votre nouvelle adresse est confirmée",
+  "Sign in with it from now on.": "Connectez-vous désormais avec celle-ci.",
+  "Sign-in": "Connexion",
+  "{email}, with Google or with your password.": "{email}, avec Google ou avec votre mot de passe.",
+  "{email}, with your password.": "{email}, avec votre mot de passe.",
+  "{email}, with Google.": "{email}, avec Google.",
+  "Change my password": "Changer mon mot de passe",
+  "Add a password": "Ajouter un mot de passe",
+  "We've sent a link to {email} to choose a password.": "Nous avons envoyé un lien à {email} pour choisir un mot de passe.",
+  "We've sent a link to {email} to choose a new password.": "Nous avons envoyé un lien à {email} pour choisir un nouveau mot de passe.",
   "About BAPTOU and pricing": "Découvrir BAPTOU et ses tarifs",
   "Privacy policy": "Politique de confidentialité",
   "Dashboard": "Accueil",
@@ -59,6 +150,17 @@ export const fr: Record<string, string> = {
   "Connect": "Connecter",
   "Choose a plan to keep using BAPTOU's searches, letters and application forms.":
     "Choisissez une formule pour continuer à utiliser les recherches, les lettres et les formulaires de BAPTOU.",
+  // Free first search
+  "Your first search is free. A plan then prepares your applications and searches every morning.":
+    "Votre première recherche est offerte. Une formule prépare ensuite vos candidatures et cherche chaque matin.",
+  "Your first search is free: add your CV, build your profile and start a search. BAPTOU finds offers that fit you.":
+    "Votre première recherche est offerte : ajoutez votre CV, créez votre profil et lancez une recherche. BAPTOU vous trouve des offres qui vous correspondent.",
+  "Your free search is done. To prepare your applications (letters, forms) and get new offers every morning, choose a plan, from €11.49 a month.":
+    "Votre recherche offerte est terminée. Pour préparer vos candidatures (lettres, formulaires) et recevoir de nouvelles offres chaque matin, choisissez une formule, dès 11,49 € par mois.",
+  "Your free search is used. With a plan, BAPTOU searches every morning, for as many searches as you like, and prepares each application.":
+    "Votre recherche offerte est utilisée. Avec une formule, BAPTOU cherche chaque matin, pour autant de recherches que vous voulez, et prépare chaque candidature.",
+  "Your free search is done. Choose a plan to prepare your applications and get new offers every morning.":
+    "Votre recherche offerte est terminée. Choisissez une formule pour préparer vos candidatures et recevoir de nouvelles offres chaque matin.",
 
   // --- Profile: documents
   "Your documents": "Vos documents",
@@ -745,6 +847,15 @@ export const fr: Record<string, string> = {
     "Il vous faut un abonnement BAPTOU actif pour cela. Voir la page Formules.",
   "You've used 100% of this month's allowance. It renews on the 1st of next month.":
     "Vous avez utilisé 100 % du crédit de ce mois. Il se renouvelle le 1er du mois prochain.",
+  "Confirm your email address first: open the link BAPTOU sent you.":
+    "Confirmez d'abord votre adresse email : ouvrez le lien que BAPTOU vous a envoyé.",
+  "A free search was already used with this email address. Choose a plan to continue.":
+    "Une recherche gratuite a déjà été utilisée avec cette adresse email. Choisissez une formule pour continuer.",
+  "The free search isn't available with a temporary email address. Sign up with your usual address, or choose a plan.":
+    "La recherche gratuite n'est pas disponible avec une adresse email temporaire. Inscrivez-vous avec votre adresse habituelle, ou choisissez une formule.",
+  "Today's free searches are all taken. Try again tomorrow, or choose a plan.":
+    "Les recherches gratuites du jour sont toutes prises. Réessayez demain, ou choisissez une formule.",
+  "Too many requests. Wait a few minutes and try again.": "Trop de demandes. Patientez quelques minutes et réessayez.",
   "BAPTOU couldn't read this application form.": "BAPTOU n'a pas pu lire ce formulaire de candidature.",
   "The search failed. It will try again tomorrow.": "La recherche a échoué. Elle réessaiera demain.",
 

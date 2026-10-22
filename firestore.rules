@@ -1,13 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Signed in, with a confirmed email address. Accounts made with an email and a password stay locked out
+    // until their address is confirmed (Google accounts always are): gifts and the free search are tied to it.
     function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return request.auth != null && request.auth.uid == uid && request.auth.token.email_verified == true;
     }
 
     // Whether the user may use BAPTOU: the owner's own limit, a live paid subscription, or a live gift
     // (keep in sync with entitlementFor in functions/src/shared.ts). Without it, the app is read-only:
-    // nothing can be created or changed, only deleted or exported.
+    // nothing can be created or changed, only deleted or exported (except the free first search, below).
     function hasAccess(uid) {
       let priv = /databases/$(database)/documents/private/$(uid);
       let gift = /databases/$(database)/documents/access/$(request.auth.token.get('email', '').lower());
@@ -18,19 +20,30 @@ service cloud.firestore {
         || (exists(gift) && get(gift).data.get('expiresAt', request.time + duration.value(1, 'd')) > request.time);
     }
 
+    // The free first search (keep in sync with trialFrom in functions/src/shared.ts): until a search run
+    // completes, a user without a plan may add documents and set up searches. Only one ever runs.
+    function hasTrial(uid) {
+      let priv = /databases/$(database)/documents/private/$(uid);
+      return !exists(priv) || get(priv).data.get('trial', {}).get('usedAt', null) == null;
+    }
+
     match /users/{uid} {
       // The app may only write these fields. Subscription, usage, Gmail and mail-index state are written
       // by the server (so nobody can grant themselves a plan from the browser).
       function appFields() {
         return ['email', 'displayName', 'lastSeenAt', 'nationalities', 'linkedinUrl', 'letterContact', 'signaturePath', 'favouriteContacts', 'notifyOffers', 'lang'];
       }
+      // `email` can only be the account's own address (BAPTOU Admin matches gifts by it).
+      function ownEmail() {
+        return request.resource.data.get('email', null) in [null, request.auth.token.get('email', null)];
+      }
       allow read: if isOwner(uid);
-      allow create: if isOwner(uid) && request.resource.data.keys().hasOnly(appFields());
-      allow update: if isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(appFields());
+      allow create: if isOwner(uid) && request.resource.data.keys().hasOnly(appFields()) && ownEmail();
+      allow update: if isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(appFields()) && ownEmail();
 
       match /documents/{docId} {
         allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && hasAccess(uid);
+        allow create, update: if isOwner(uid) && (hasAccess(uid) || hasTrial(uid));
       }
 
       // People from the mailbox to contact, with draft emails. Created by findContacts; the user can
@@ -61,7 +74,7 @@ service cloud.firestore {
       // Internship searches: BAPTOU only searches while one is "active".
       match /searches/{searchId} {
         allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && hasAccess(uid);
+        allow create, update: if isOwner(uid) && (hasAccess(uid) || hasTrial(uid));
       }
 
       match /applications/{appId} {

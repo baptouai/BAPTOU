@@ -49,3 +49,6 @@ API.txt
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# BAPTOU Admin (Electron) dependencies
+/admin/node_modules

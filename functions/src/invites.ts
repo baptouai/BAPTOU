@@ -20,7 +20,7 @@ ${ownerName} t'offre un abonnement à BAPTOU, ${fr}.
 BAPTOU est un assistant IA qui trouve des stages, emplois, alternances et masters qui te correspondent, prépare tes candidatures dans le format de chaque formulaire et rédige tes lettres. Rien n'est envoyé sans ton accord.
 
 Pour commencer :
-1. Ouvre ${APP_URL} et connecte-toi avec Google, avec cette adresse : ${email}
+1. Ouvre ${APP_URL} et connecte-toi avec cette adresse : ${email} (avec Google, ou crée un mot de passe avec cette même adresse)
 2. Dans « Profile », ajoute ton CV (et si tu veux tes relevés de notes et une ancienne lettre), puis clique sur « Build my profile ».
 3. Dans « Applications », crée ta première recherche.
 
@@ -35,7 +35,7 @@ ${ownerName} is giving you a BAPTOU subscription, ${en}.
 BAPTOU is an AI assistant that finds internships, jobs, alternances and master's programmes that fit you, prepares each application in the format of its form and writes your letters. Nothing is sent without your approval.
 
 To get started:
-1. Open ${APP_URL} and sign in with Google using this address: ${email}
+1. Open ${APP_URL} and sign in with this address: ${email} (with Google, or create a password with this same address)
 2. In "Profile", add your CV (and, if you like, your transcripts and an old letter), then click "Build my profile".
 3. In "Applications", create your first search.
 

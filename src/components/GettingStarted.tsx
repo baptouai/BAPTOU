@@ -37,6 +37,19 @@ export function GettingStarted() {
   const ready = !loading && Object.keys(state).length === 4;
   if (!ready) return null;
   const hasPlan = !!plan?.entitlement;
+  // On the free first search the plan comes last, and isn't needed to finish setting up.
+  const onTrial = !hasPlan && !!plan?.trial?.available;
+  const planStep: Step = {
+    id: "plan",
+    title: t("Choose a plan"),
+    text: onTrial
+      ? t("Your first search is free. A plan then prepares your applications and searches every morning.")
+      : t("BAPTOU's AI work (profile, searches, letters) needs a subscription."),
+    href: "/plans",
+    action: t("See plans"),
+    done: hasPlan,
+    optional: onTrial,
+  };
 
   const steps: Step[] = [
     {
@@ -47,14 +60,7 @@ export function GettingStarted() {
       action: t("Add documents"),
       done: !!state.docs,
     },
-    {
-      id: "plan",
-      title: t("Choose a plan"),
-      text: t("BAPTOU's AI work (profile, searches, letters) needs a subscription."),
-      href: "/plans",
-      action: t("See plans"),
-      done: hasPlan,
-    },
+    ...(onTrial ? [] : [planStep]),
     {
       id: "profile",
       title: t("Build your profile"),
@@ -71,6 +77,7 @@ export function GettingStarted() {
       action: t("Start a search"),
       done: !!state.search,
     },
+    ...(onTrial ? [planStep] : []),
     {
       id: "gmail",
       title: t("Connect Gmail"),

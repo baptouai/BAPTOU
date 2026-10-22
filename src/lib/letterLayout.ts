@@ -36,7 +36,7 @@ export const LETTER_CSS = `
 .bl-sign.bl-right img{margin-left:auto}
 `;
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** Language of a letter written before BAPTOU recorded it. */
 export function guessLetterLang(body: string, postingLanguage?: string): LetterLang {

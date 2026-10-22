@@ -204,15 +204,13 @@ function Plans() {
         <>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {PLANS.map((p) => (
-              <section
-                key={p.id}
-                className={`flex flex-col rounded-xl border bg-card p-5 ${p.id === "annual" ? "border-accent" : "border-card-edge"}`}
-              >
+              <section key={p.id} className={`plan-card plan-${p.id} flex flex-col rounded-xl p-5`}>
                 {p.id === "annual" && (
-                  <span className="mb-2 w-fit rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{t("Best price")}</span>
+                  <span className="plan-badge mb-2 w-fit rounded-full px-2 py-0.5 text-xs font-semibold">{t("Best price")}</span>
                 )}
-                <h2 className="font-medium">{t(p.name)}</h2>
+                <h2 className="plan-name w-fit font-semibold">{t(p.name)}</h2>
                 <p className="mt-2">
+                  <s className="block text-sm text-muted">{p.was}</s>
                   <span className="text-3xl font-semibold">{p.price}</span> <span className="text-sm text-muted">{t(p.per)}</span>
                 </p>
                 <p className="mt-2 flex-1 text-sm text-muted">{t(p.detail)}</p>

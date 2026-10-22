@@ -3,61 +3,134 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src 'self' file: data:; style-src 'self' file: 'unsafe-inline'; script-src 'self' file: 'unsafe-inline'">
   <title>BAPTOU Admin</title>
-  <link rel="icon" href="/logo.svg" type="image/svg+xml">
   <style>
+    /* The posters' look: an indigo-violet gradient header, white cards with soft shadows, heavy numbers. */
     :root {
-      --bg: #fafaf9; --card: #ffffff; --fg: #1c1917; --muted: #78716c; --border: #e7e5e4;
-      --accent: #4f46e5; --danger: #dc2626; --warn: #b45309; --card-edge: #a8a29e;
+      --bg: #f5f4ff; --card: #ffffff; --fg: #1c1917; --muted: #6b6880; --border: #e7e5f4;
+      --accent: #4f46e5; --danger: #dc2626; --warn: #b45309; --ok: #059669; --edge: #d4cff2;
+      --shadow: 0 18px 40px -28px rgba(49, 46, 129, .55);
+      --poster: radial-gradient(700px 300px at 100% 0%, #6366f1 0%, transparent 60%), radial-gradient(500px 400px at 0% 100%, #7c3aed 0%, transparent 55%), linear-gradient(165deg, #312e81 0%, #4338ca 50%, #3b0764 100%);
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #0c0a09; --card: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --border: #292524;
-        --accent: #818cf8; --danger: #f87171; --warn: #fbbf24; --card-edge: #8f8a85; }
+      :root { --bg: #0d0b1f; --card: #17152e; --fg: #f5f5f4; --muted: #a9a5c4; --border: #2a2650; --edge: #3b3670;
+        --accent: #a5b4fc; --danger: #f87171; --warn: #fbbf24; --ok: #34d399; --shadow: 0 18px 40px -26px rgba(0,0,0,.8);
+        --poster: radial-gradient(700px 300px at 100% 0%, #3730a3 0%, transparent 60%), radial-gradient(500px 400px at 0% 100%, #4c1d95 0%, transparent 55%), linear-gradient(165deg, #0b0a1f 0%, #17134a 50%, #1e0b3a 100%); }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
-    main { max-width: 940px; margin: 0 auto; padding: 20px 16px 40px; }
-    header { display: flex; align-items: center; gap: 10px; }
-    header img { width: 28px; height: 28px; }
-    header h1 { font-size: 18px; margin: 0; flex: 1; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+    .top { background: var(--poster); color: #fff; position: sticky; top: 0; z-index: 5; box-shadow: 0 10px 30px -20px rgba(15,10,60,.8); }
+    .top .in { max-width: 1100px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+    .top img { width: 34px; height: 34px; }
+    .top h1 { font-size: 19px; font-weight: 900; margin: 0; letter-spacing: .3px; }
+    .top .sub { color: #c7d2fe; font-size: 13px; margin-left: auto; }
+    .top button { background: #fff; color: #1e1b4b; border: 0; font-weight: 800; border-radius: 999px; padding: 7px 16px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 18px 20px 48px; }
     .muted { color: var(--muted); }
-    .card { background: var(--card); border: 1px solid var(--card-edge); border-radius: 12px; padding: 16px; margin-top: 16px; }
-    h2 { font-size: 14px; margin: 0 0 10px; }
+    .card { background: var(--card); border: 1px solid var(--edge); border-radius: 22px; padding: 18px 20px; margin-top: 18px; box-shadow: var(--shadow); }
+    h2 { font-size: 15px; font-weight: 800; margin: 0 0 12px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 4px; }
+    .tile { background: var(--card); border: 1px solid var(--edge); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .tile .k { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .tile .v { font-size: 34px; font-weight: 900; line-height: 1.1; margin-top: 4px; }
+    .tile .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .tile.hero { background: var(--poster); color: #fff; border: 0; }
+    .tile.hero .k, .tile.hero .d { color: #c7d2fe; }
+    .live { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent); }
+    .grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; }
+    .chart { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding-top: 8px; }
+    .chart .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
+    .chart .bar2 { width: 100%; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, #6366f1, #38bdf8); min-height: 2px; position: relative; }
+    .chart .bar2 span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; color: var(--fg); }
+    .chart .lab { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+    .lists { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 14px; }
+    .lists h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; }
+    .lists div.item { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .lists div.item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     form { display: flex; flex-wrap: wrap; gap: 8px; }
-    input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; }
+    input, select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; font: inherit; }
     input[type=email] { flex: 1; min-width: 220px; }
     input.limit { width: 90px; }
-    select { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font: inherit; }
-    #invite input.limit { width: 120px; }
-    button { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; }
-    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    button { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 999px; padding: 7px 14px; font: inherit; cursor: pointer;
+      transition: transform .15s ease, background-position .4s ease; }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: scale(.97); }
+    button.primary { background: linear-gradient(120deg, #4f46e5, #a855f7, #4f46e5); background-size: 200% 100%; border: 0; color: #fff; font-weight: 700; }
+    button.primary:hover { background-position: 100% 0; }
     button.danger { color: var(--danger); border-color: transparent; }
-    button:disabled { opacity: .5; cursor: default; }
+    button:disabled { opacity: .5; cursor: default; transform: none; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 8px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
-    th { font-weight: 600; color: var(--muted); font-size: 12px; border-top: 0; }
+    th { font-weight: 700; color: var(--muted); font-size: 12px; border-top: 0; }
     td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
     .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 3px; width: 110px; }
-    .bar > div { height: 100%; background: var(--accent); }
+    .bar > div { height: 100%; background: linear-gradient(90deg, #6366f1, #a855f7); }
     .bar.full > div { background: var(--danger); }
-    .tag { font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; color: var(--muted); }
+    .tag { font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; color: var(--muted); white-space: nowrap; }
+    .tag.pay { color: #fff; border: 0; background: linear-gradient(120deg, #6366f1, #38bdf8); }
     .row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
-    #status { min-height: 20px; margin-top: 10px; }
+    #status { min-height: 20px; margin-top: 8px; }
     .error { color: var(--danger); }
-    .ok { color: var(--accent); }
+    .ok { color: var(--ok); }
     .scroll { overflow-x: auto; }
+    a { color: var(--accent); }
+    @media (max-width: 900px) { .grid2, .lists { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <img src="/logo.svg" alt="">
+  <header class="top">
+    <div class="in">
+      <img src="../public/logo-white.svg" alt="">
       <h1>BAPTOU Admin</h1>
-      <span class="muted" id="totals"></span>
-      <button id="refresh" title="Refresh">Refresh</button>
-    </header>
+      <span class="sub" id="updated">Loading…</span>
+      <button id="refresh" title="Refresh now">Refresh</button>
+    </div>
+  </header>
+  <main>
     <div id="status"></div>
 
+    <!-- Subscribers -->
+    <div class="tiles">
+      <div class="tile hero"><div class="k">Paying subscribers</div><div class="v" id="tPaying">–</div><div class="d" id="tPayingBy"></div></div>
+      <div class="tile"><div class="k">Revenue / month</div><div class="v" id="tRevenue">–</div><div class="d">estimate at current prices</div></div>
+      <div class="tile"><div class="k">Gifted</div><div class="v" id="tGifted">–</div><div class="d">active gift subscriptions</div></div>
+      <div class="tile"><div class="k">Free searches</div><div class="v" id="tTrial">–</div><div class="d" id="tTrialD"></div></div>
+      <div class="tile"><div class="k">Accounts</div><div class="v" id="tAccounts">–</div><div class="d" id="tAccountsD"></div></div>
+    </div>
+
+    <!-- Website visits -->
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">Website visits <span class="muted">· baptou.com</span></h2>
+        <span class="live muted" id="vNow"></span>
+      </div>
+      <div class="tiles" style="margin-top:12px">
+        <div class="tile"><div class="k">Today</div><div class="v" id="vToday">–</div><div class="d" id="vTodayD"></div></div>
+        <div class="tile"><div class="k">Last 7 days</div><div class="v" id="vWeek">–</div><div class="d" id="vWeekD"></div></div>
+        <div class="tile"><div class="k">Last 30 days</div><div class="v" id="vMonth">–</div><div class="d" id="vMonthD"></div></div>
+        <div class="tile" title="Average time the site's pages stayed on screen per new person, all their pages added up (measured since 20 Oct 2026)"><div class="k">Time per new person · 7 days</div><div class="v" id="vTime">–</div><div class="d" id="vTimeD"></div></div>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <div>
+          <h3 class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px">Visits per day, last 14 days</h3>
+          <div class="chart" id="vChart"></div>
+        </div>
+        <div>
+          <h3 class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px">Latest page views</h3>
+          <div class="scroll" style="max-height:170px;overflow-y:auto"><table><tbody id="vRecent"></tbody></table></div>
+        </div>
+      </div>
+      <div class="lists">
+        <div><h3>Pages (30 days)</h3><div id="vPages"></div></div>
+        <div><h3>Came from (30 days)</h3><div id="vSources"></div></div>
+        <div><h3>Devices (30 days)</h3><div id="vDevices"></div></div>
+      </div>
+      <p class="muted" style="margin:12px 0 0">Counted without cookies or IP addresses. A visit starts when someone arrives from outside the site; page views count every page. To stop counting your own visits, open <a href="https://baptou.com/?notrack" data-ext>baptou.com/?notrack</a> once in each browser you use.</p>
+    </section>
+
+    <!-- Gifts -->
     <section class="card">
       <h2>Gift a subscription</h2>
       <form id="gift">
@@ -72,7 +145,7 @@
         <label class="muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="notify" checked> Send invitation email</label>
         <button class="primary">Gift</button>
       </form>
-      <p class="muted" style="margin:8px 0 0">Same access and monthly allowance as a paid plan. They sign in at baptou-app.web.app with this Google address. Gifting again replaces the duration.</p>
+      <p class="muted" style="margin:8px 0 0">Same access and monthly allowance as a paid plan. They sign in at app.baptou.com with this Google address. Gifting again replaces the duration.</p>
       <p class="muted" style="margin:4px 0 0" id="gmailSlots"></p>
     </section>
 
@@ -116,21 +189,12 @@
   </main>
 
   <script>
-    const TOKEN = "__TOKEN__";
     const $ = (id) => document.getElementById(id);
+    const api = (name, body) => window.baptou.api(name, body);
     const money = (n) => "$" + Number(n).toFixed(2);
+    const euros = (n) => "€" + Number(n).toFixed(2).replace(/\.00$/, "");
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-
-    async function api(name, body) {
-      const res = await fetch("/api/" + name, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-token": TOKEN },
-        body: JSON.stringify(body ?? {}),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Request failed");
-      return data;
-    }
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
     function status(text, kind = "") {
       $("status").innerHTML = text ? `<span class="${kind}">${esc(text)}</span>` : "";
@@ -140,7 +204,7 @@
       status(label + "…", "muted");
       try {
         await fn();
-        await load();
+        await refresh();
         status(label + " done.", "ok");
       } catch (e) {
         status(e.message, "error");
@@ -148,32 +212,50 @@
     }
 
     const date = (ts) => (ts ? new Date(ts).toLocaleDateString() : "");
+    const time = (ts) => (ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
+    const ago = (ts) => {
+      const s = (Date.now() - Date.parse(ts)) / 1000;
+      if (s < 60) return "just now";
+      if (s < 3600) return `${Math.round(s / 60)} min ago`;
+      if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+      return date(ts) + " " + time(ts);
+    };
     const planLabel = (a) =>
       ({ owner: "owner", monthly: "monthly", annual: "yearly", pass: "1-month pass", gift: "gift", "gift expired": "gift expired", none: "no plan" })[a.kind] ?? a.kind;
 
-    async function load() {
-      const d = await api("overview");
+    function renderOverview(d) {
+      const s = d.subscribers;
+      $("tPaying").textContent = s.paying;
+      $("tPayingBy").textContent = `${s.byPlan.monthly} monthly · ${s.byPlan.annual} yearly · ${s.byPlan.pass} pass${s.cancelling ? ` · ${s.cancelling} cancelling` : ""}`;
+      $("tRevenue").textContent = euros(s.revenueEur);
+      $("tGifted").textContent = s.gifted;
+      // People who took the free search, all time (deleted accounts included); then the current accounts.
+      $("tTrial").textContent = s.trialAllTime;
+      $("tTrialD").textContent = `people · ${s.trialStarted - s.trialUsed} in progress · ${s.trialUsed} finished · ${s.trialThenPaid} then paid · today ${s.trialToday}/${s.trialDailyCap}`;
+      $("tAccounts").textContent = s.accounts;
+      $("tAccountsD").textContent = `${s.newThisWeek} new · ${s.activeThisWeek} active this week`;
+
       $("month").textContent = "· " + d.month;
       $("gmailSlots").textContent = `Gmail reading places used: ${d.gmailRead.granted} / ${d.gmailRead.cap} (Google's limit until its audit).`;
-      const s = d.sender;
+      const snd = d.sender;
       $("sender").innerHTML =
-        s.email && !s.error
-          ? `<span class="ok">Connected:</span> ${esc(s.email)} <span class="muted">since ${esc(date(s.connectedAt))}</span>`
-          : s.email
-            ? `<span class="error">${esc(s.email)}: ${esc(s.error)} Reconnect it.</span>`
-            : `<span class="error">Not connected: BAPTOU can't send emails until you connect ${esc(s.expected)}.</span>`;
-      $("connectSender").textContent = s.email && !s.error ? "Reconnect" : `Connect ${s.expected}`;
-      const spent = d.users.reduce((s, u) => s + u.spentUsd, 0);
-      const active = d.users.filter((u) => !["none", "gift expired"].includes(u.access.kind)).length;
-      $("totals").textContent = `${active} with access · ${money(spent)} spent this month`;
+        snd.email && !snd.error
+          ? `<span class="ok">Connected:</span> ${esc(snd.email)} <span class="muted">since ${esc(date(snd.connectedAt))}</span>`
+          : snd.email
+            ? `<span class="error">${esc(snd.email)}: ${esc(snd.error)} Reconnect it.</span>`
+            : `<span class="error">Not connected: BAPTOU can't send emails until you connect ${esc(snd.expected)}.</span>`;
+      $("connectSender").textContent = snd.email && !snd.error ? "Reconnect" : `Connect ${snd.expected}`;
 
       $("users").innerHTML = d.users
         .sort((a, b) => b.spentUsd - a.spentUsd)
         .map((u) => {
           const pct = u.limitUsd ? (u.spentUsd / u.limitUsd) * 100 : 0;
+          const paid = ["monthly", "annual", "pass"].includes(u.access.kind);
           return `<tr data-email="${esc(u.email)}" data-uid="${esc(u.uid)}">
-            <td><div>${esc(u.name || u.email)}</div><div class="muted">${esc(u.email)}</div></td>
-            <td><span class="tag">${esc(planLabel(u.access))}</span>${u.access.until ? ` <span class="muted">until ${esc(date(u.access.until))}</span>` : ""}
+            <td><div>${esc(u.name || u.email)}</div><div class="muted">${esc(u.email)}${u.lastSeenAt ? ` · seen ${esc(ago(u.lastSeenAt))}` : ""}</div></td>
+            <td><span class="tag ${paid ? "pay" : ""}">${esc(planLabel(u.access))}</span>${u.access.until ? ` <span class="muted">until ${esc(date(u.access.until))}</span>` : ""}
+                ${u.access.cancelling ? ` <span class="tag">cancelling</span>` : ""}
+                ${u.trial ? ` <span class="tag">${u.trial.used ? "free search used" : "on free search"}</span>` : u.trialRefused ? ` <span class="tag">free search refused: address already used</span>` : ""}
                 ${u.gmailRead ? ` <span class="tag">Gmail reading</span>` : u.gmail ? ` <span class="tag">Gmail send</span>` : ""}</td>
             <td class="num">${u.limitUsd ? `${Math.round(pct)}% · ` : ""}${money(u.spentUsd)}${u.limitUsd ? `<div class="bar ${pct >= 100 ? "full" : ""}"><div style="width:${Math.min(100, pct)}%"></div></div>` : ""}</td>
             <td class="num">${u.isOwner ? `<input class="limit" type="number" min="0" max="1000" step="0.5" value="${u.limitUsd}">` : u.limitUsd ? money(u.limitUsd) : "–"}</td>
@@ -194,6 +276,67 @@
         .join("");
     }
 
+    function renderVisits(v) {
+      // Visits, then how many were new people (a browser's first visit, counted since 19 Oct 2026).
+      const detail = (p) => `${plural(p.fresh, "new person", "new people")} · ${plural(p.views, "page view", "page views")}`;
+      $("vToday").textContent = v.today.visits;
+      $("vTodayD").textContent = detail(v.today);
+      $("vWeek").textContent = v.week.visits;
+      $("vWeekD").textContent = detail(v.week);
+      $("vMonth").textContent = v.month.visits;
+      $("vMonthD").textContent = detail(v.month);
+      // Time on the site: how long the pages stayed on screen, per new person (all their pages added up).
+      const dur = (s) => (s === null ? "–" : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`);
+      $("vTime").textContent = dur(v.week.perNew);
+      $("vTimeD").textContent =
+        v.month.perNew === null && v.month.perVisit === null
+          ? "measured since 20 Oct 2026"
+          : `today ${dur(v.today.perNew)} · 30 days ${dur(v.month.perNew)} · per visit (everyone, 7 days) ${dur(v.week.perVisit)}`;
+      $("vNow").innerHTML = v.now ? `<span class="dot"></span> ${plural(v.now, "page view", "page views")} in the last 5 minutes` : "No one on the site right now";
+      const max = Math.max(1, ...v.series.map((d) => d.visits));
+      $("vChart").innerHTML = v.series
+        .map((d) => {
+          const day = new Date(d.date + "T12:00:00Z");
+          const label = day.toLocaleDateString([], { weekday: "short" }).slice(0, 2) + " " + day.getUTCDate();
+          return `<div class="col" title="${esc(d.date)}: ${d.visits} visits (${d.fresh} new people), ${d.views} page views">
+            <div class="bar2" style="height:${Math.round((d.visits / max) * 100)}%">${d.visits ? `<span>${d.visits}</span>` : ""}</div>
+            <div class="lab">${esc(label)}</div></div>`;
+        })
+        .join("");
+      const listOf = (items, empty) =>
+        items.length ? items.map((i) => `<div class="item"><span title="${esc(i.name)}">${esc(i.name)}</span><span>${i.n}</span></div>`).join("") : `<div class="muted">${empty}</div>`;
+      $("vPages").innerHTML = listOf(v.pages, "No page views yet.");
+      $("vSources").innerHTML = listOf(v.sources, "No visits yet.");
+      $("vDevices").innerHTML = listOf(v.devices, "No visits yet.");
+      $("vRecent").innerHTML =
+        v.recent
+          .map((r) => `<tr><td class="num muted">${esc(ago(r.at))}</td><td>${esc(r.path)}</td><td class="muted">${r.from ? "from " + esc(r.from) : "next page"}${r.fresh ? ` <span class="tag">new</span>` : ""}</td><td class="muted">${esc(r.device)}</td></tr>`)
+          .join("") || `<tr><td class="muted">No page views yet.</td></tr>`;
+    }
+
+    // Everything reloads by itself every 30 seconds and when the window comes back to the front,
+    // except while you are typing in a field (so what you type is never wiped).
+    let busy = false;
+    async function refresh() {
+      if (busy) return;
+      busy = true;
+      try {
+        const [overview, visits] = await Promise.all([api("overview"), api("visits")]);
+        renderOverview(overview);
+        renderVisits(visits);
+        $("updated").textContent = "Updated " + new Date().toLocaleTimeString() + " · refreshes by itself";
+        if ($("status").querySelector(".error")) status("");
+      } finally {
+        busy = false;
+      }
+    }
+    const typing = () => document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    const auto = () => {
+      if (!document.hidden && !typing()) refresh().catch((e) => status(e.message, "error"));
+    };
+    setInterval(auto, 30_000);
+    window.addEventListener("focus", auto);
+
     $("gift").addEventListener("submit", (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -204,6 +347,12 @@
     });
 
     document.addEventListener("click", (e) => {
+      const link = e.target.closest("a[data-ext], a[target=_blank]");
+      if (link) {
+        e.preventDefault();
+        window.baptou.open(link.href);
+        return;
+      }
       const btn = e.target.closest("button[data-act]");
       if (!btn) return;
       const row = btn.closest("tr");
@@ -223,10 +372,10 @@
     });
 
     $("connectSender").addEventListener("click", () =>
-      run("Opening Google", async () => {
+      run("Opening Google in your browser", async () => {
         const { url } = await api("connectSender");
-        // Sign in there with BAPTOU's address. The page says when it's done; then click Refresh here.
-        window.open(url, "_blank", "width=520,height=720");
+        // Sign in there with BAPTOU's address. The page says when it's done; this window updates by itself.
+        await window.baptou.open(url);
       }),
     );
 
@@ -241,7 +390,7 @@
               (r) => `<tr>
                 <td class="num muted">${esc(date(r.at))}</td>
                 <td><div>${esc(r.email)}</div><div class="muted">${esc([r.kind, r.search].filter(Boolean).join(" · "))}</div></td>
-                <td><div>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a>` : esc(r.title)}</div>
+                <td><div>${/^https?:\/\//i.test(r.url ?? "") ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title || r.url)}</a>` : esc(r.title)}</div>
                     <div class="muted">${esc(r.organization)}${r.jobBoard ? " · job board" : ""}${r.manual ? " · added by user" : ""}</div></td>
                 <td class="num">${r.score == null ? "–" : `${r.score}%`}</td>
                 <td>${esc(r.reason || "–")}</td>
@@ -252,9 +401,7 @@
     );
 
     $("refresh").addEventListener("click", () => run("Refreshing", async () => {}));
-    // Keeps the local server alive while this window is open.
-    setInterval(() => api("ping").catch(() => {}), 5000);
-    load().catch((e) => status(e.message, "error"));
+    refresh().catch((e) => status(e.message, "error"));
   </script>
 </body>
 </html>

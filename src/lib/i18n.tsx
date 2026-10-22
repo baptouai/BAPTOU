@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import { useAuth } from "./auth-context";
 import { fr, frPatterns } from "./fr";
 
@@ -73,6 +73,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    auth.languageCode = lang; // Firebase's own emails (address confirmation, new password) in the same language
   }, [lang]);
 
   const setLang = useCallback(

@@ -221,7 +221,7 @@ function OfferCard({ app: a }: { app: Item }) {
             )}
             {a.recommendationLetters != null && <LettersDot n={a.recommendationLetters} />}
             {a.matchScore != null && (
-              <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">{t("{n}% match", { n: a.matchScore })}</span>
+              <span className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 px-2.5 py-0.5 text-xs font-bold text-white">{t("{n}% match", { n: a.matchScore })}</span>
             )}
             <span className="rounded-full border border-border px-2 py-0.5 text-xs text-foreground">{t(statusLabel[a.status])}</span>
           </div>

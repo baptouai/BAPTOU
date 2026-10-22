@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { db, entitlementFor, PLAN_BUDGET_USD, REGION } from "./shared.js";
+import { db, entitlementFor, PLAN_BUDGET_USD, REGION, requireUser, TRIAL_BUDGET_USD, trialFrom } from "./shared.js";
 
 // Reading Gmail needs a restricted Google permission. Until Google's paid security audit is done, Google
 // allows it for 100 users over the app's lifetime, so the first 100 users who connect get it; the others
@@ -29,12 +29,14 @@ export async function claimGmailRead(uid: string) {
 
 /** What the app shows on the Plans page and the usage meter. */
 export const myPlan = onCall({ region: REGION }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
-  const [entitlement, gmailRead] = await Promise.all([entitlementFor(uid), gmailReadAvailable(uid)]);
+  const uid = requireUser(request);
+  const [entitlement, gmailRead, priv] = await Promise.all([entitlementFor(uid), gmailReadAvailable(uid), db.doc(`private/${uid}`).get()]);
+  // Without a plan: the free first search (available until a search run completes, then used).
+  const trial = entitlement ? null : trialFrom(priv);
   return {
     entitlement,
+    trial,
     gmailRead,
-    budgetUsd: entitlement?.budgetUsd ?? PLAN_BUDGET_USD,
+    budgetUsd: entitlement?.budgetUsd ?? (trial?.available ? TRIAL_BUDGET_USD : PLAN_BUDGET_USD),
   };
 });

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions } from "@/lib/firebase";
-import { useAuth } from "@/lib/auth-context";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db, functions } from "@/lib/firebase";
+import { authErrorText, useAuth } from "@/lib/auth-context";
 import { usePlan } from "@/lib/plan";
 import { errorText, useI18n } from "@/lib/i18n";
 
@@ -13,12 +14,13 @@ const deleteMyAccount = httpsCallable<{ confirm: string }, { ok: boolean }>(func
 
 const SITE_URL = "https://baptou.com";
 
-/** Profile page: email notifications, a copy of all your data, and account deletion. */
+/** Profile page: how you sign in, language, email notifications, a copy of all your data, and account deletion. */
 export function AccountSettings() {
   const { t } = useI18n();
   return (
     <section className="mt-8 rounded-xl border border-card-edge bg-card p-5">
       <h2 className="text-xl font-semibold">{t("Account")}</h2>
+      <SignInMethod />
       <Language />
       <Notifications />
       <ExportData />
@@ -27,10 +29,55 @@ export function AccountSettings() {
   );
 }
 
+/** How the student signs in, and a link by email to choose a (new) password. */
+function SignInMethod() {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const providers = user?.providerData.map((p) => p.providerId) ?? [];
+  const google = providers.includes("google.com");
+  const password = providers.includes("password");
+
+  async function newPassword() {
+    if (!user?.email) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await sendPasswordResetEmail(auth, user.email, { url: `${window.location.origin}/` });
+      setMessage({ ok: true, text: t(password ? "We've sent a link to {email} to choose a new password." : "We've sent a link to {email} to choose a password.", { email: user.email }) });
+    } catch (e) {
+      setMessage({ ok: false, text: t(authErrorText(e) || "Something went wrong") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex items-start justify-between gap-4">
+      <div>
+        <p className="font-medium">{t("Sign-in")}</p>
+        <p className="mt-0.5 text-sm text-muted">
+          {google && password
+            ? t("{email}, with Google or with your password.", { email: user?.email ?? "" })
+            : password
+              ? t("{email}, with your password.", { email: user?.email ?? "" })
+              : t("{email}, with Google.", { email: user?.email ?? "" })}
+        </p>
+        {message && <p className={`mt-1 text-sm ${message.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>{message.text}</p>}
+      </div>
+      {/* The same email link sets a first password on a Google account, so it can also sign in without Google. */}
+      <button onClick={newPassword} disabled={busy} className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">
+        {t(password ? "Change my password" : "Add a password")}
+      </button>
+    </div>
+  );
+}
+
 function Language() {
   const { t, lang, setLang } = useI18n();
   return (
-    <div className="mt-4 flex items-start justify-between gap-4">
+    <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
       <div>
         <p className="font-medium">{t("Language")}</p>
         <p className="mt-0.5 text-sm text-muted">

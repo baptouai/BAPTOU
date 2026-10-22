@@ -1,0 +1,16 @@
+{
+  "name": "baptou-admin",
+  "productName": "BAPTOU Admin",
+  "version": "2.0.0",
+  "private": true,
+  "description": "BAPTOU's admin desktop app: subscribers, website visits, gifts, allowances, feedback.",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "shortcuts": "powershell -ExecutionPolicy Bypass -File install-shortcuts.ps1"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0"
+  }
+}

@@ -16,80 +16,170 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="BAPTOU, your AI agent for internships, jobs and master's applications">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#3730a3">
+  <!-- The same page in French at /fr (theme.js sends French browsers there; the EN / FR switch remembers a choice). -->
+  <link rel="canonical" href="https://baptou.com/">
+  <link rel="alternate" hreflang="en" href="https://baptou.com/">
+  <link rel="alternate" hreflang="fr" href="https://baptou.com/fr">
+  <link rel="alternate" hreflang="x-default" href="https://baptou.com/">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme.js"></script>
 </head>
-<body>
-  <main class="wide">
-    <header>
-      <img src="logo.svg" alt="">BAPTOU
-      <a class="header-link" href="/guides">Guides</a>
-      <a class="header-link" href="https://app.baptou.com">Sign in</a>
-    </header>
+<body class="home">
+  <header class="topbar">
+    <div class="bar">
+      <a class="brand" href="/"><img src="logo-white.svg" alt="">BAPTOU</a>
+      <nav>
+        <div class="lang-switch" role="group" aria-label="Language / Langue">
+          <a href="/" data-lang="en" hreflang="en" aria-current="page">EN</a>
+          <a href="/fr" data-lang="fr" hreflang="fr" lang="fr">FR</a>
+        </div>
+        <a class="header-link" href="#pricing">Pricing</a>
+        <a class="header-link" href="/guides">Guides</a>
+        <a class="pill-link" href="https://app.baptou.com">Sign in</a>
+      </nav>
+    </div>
+  </header>
 
+  <main class="home">
+    <!-- Hero: the poster look, with offer cards floating on the right. -->
     <section class="hero">
-      <h1>Your AI agent for internships, jobs and master's applications</h1>
-      <p class="lead">
-        BAPTOU reads your CV, finds the offers that fit you, prepares each application in the format of the
-        organization's own form and writes your letters. Nothing is sent without your approval.
-      </p>
-      <p><a class="button" href="https://app.baptou.com">Get started</a></p>
-      <p class="small">Sign in with Google. Works for internships, jobs, alternances and master's programmes.</p>
+      <div class="hero-text">
+        <p class="kicker reveal">Internships · Jobs · Alternances · Master's</p>
+        <h1 class="reveal" style="--d:80ms">Your AI agent for <em>internships, jobs and master's</em> applications</h1>
+        <p class="lead reveal" style="--d:160ms">
+          BAPTOU reads your CV, finds the offers that fit you, prepares each application in the format of the
+          organization's own form and writes your letters. Nothing is sent without your approval.
+        </p>
+        <p class="actions reveal" style="--d:240ms">
+          <a class="button" href="https://app.baptou.com">Try your free search <span aria-hidden="true">→</span></a>
+          <a class="ghost" href="#how">How it works</a>
+        </p>
+        <p class="small reveal" style="--d:300ms">Your first search is free, no card needed. Sign in with Google or your email address.</p>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="float f1 card">
+          <div class="row"><div><div class="t">Systems engineering internship</div><div class="m">Industrial company · Lyon · 6 months</div></div><span class="score">94%</span></div>
+          <div class="why">Your final-year simulation project fits the role.</div>
+        </div>
+        <div class="float f2 card">
+          <div class="row"><div><div class="t">Data analyst apprenticeship</div><div class="m">Energy start-up · Paris · 2 years</div></div><span class="score">88%</span></div>
+        </div>
+        <div class="float f3 chip-card"><span class="tick">✓</span> Letter ready · 1 page</div>
+        <div class="float f4 chip-card"><span class="tick">✓</span> Form answers · 487/500</div>
+      </div>
     </section>
 
-    <h2>How it works</h2>
-    <ol class="steps">
-      <li><strong>Add your CV</strong><span>And, if you like, your transcripts and an old motivation letter. BAPTOU builds your profile from them.</span></li>
-      <li><strong>Start a search</strong><span>Say what you're looking for: role, places, dates. BAPTOU searches every morning until you stop it.</span></li>
-      <li><strong>Pick what interests you</strong><span>For each offer you like, BAPTOU prepares the application and drafts the letter. You check, edit and apply.</span></li>
-    </ol>
+    <section id="how" class="section">
+      <p class="kicker reveal">How it works</p>
+      <h2 class="reveal">Three steps. <em>That's it.</em></h2>
+      <ol class="steps" data-stagger>
+        <li><span class="num">1</span><div><strong>Add your CV</strong><span>And, if you like, your transcripts and an old motivation letter. BAPTOU builds your profile from them.</span></div></li>
+        <li><span class="num">2</span><div><strong>Start a search</strong><span>Say what you're looking for: role, places, dates. BAPTOU searches every morning until you stop it.</span></div></li>
+        <li><span class="num">3</span><div><strong>Pick what interests you</strong><span>For each offer you like, BAPTOU prepares the application and drafts the letter. You check, edit and apply.</span></div></li>
+      </ol>
+    </section>
 
-    <h2>What BAPTOU does</h2>
-    <ul class="features">
-      <li><strong>Finds offers that fit you</strong>, with the reasons why, and removes postings that are closed or no longer online.</li>
-      <li><strong>Prepares each application in the format of its form</strong>: the questions it asks, the files it needs, its character limits.</li>
-      <li><strong>Writes and rewrites your letters and emails</strong> on request, researched for each organization and in your own style.</li>
-      <li><strong>Emails you when it finds new offers</strong>, with a separate email when one is almost ideal.</li>
-      <li><strong>Works with your Gmail, if you want</strong>: it recognises people you already know at each organization, drafts emails that follow on from your past conversations, and spots replies to your applications every morning. Some mailbox features are open to a limited number of users for now.</li>
-    </ul>
-
-    <h2>You stay in control</h2>
-    <p>
-      BAPTOU only suggests. It never submits an application, and an email is sent from your Gmail only after you
-      click “Approve &amp; send”. You can disconnect Gmail, export your data or delete your account at any time.
-    </p>
-
-    <h2 id="pricing">Pricing</h2>
-    <p>Every plan includes all of BAPTOU and the same monthly allowance for its AI work.</p>
-    <div class="plans">
-      <div class="plan">
-        <h3>Monthly</h3>
-        <p class="price">€18.99 <span>/ month</span></p>
-        <p>Cancel anytime.</p>
+    <section class="section">
+      <p class="kicker reveal">What BAPTOU does</p>
+      <h2 class="reveal">The boring part of applying, <em>done for you</em>.</h2>
+      <div class="features" data-stagger>
+        <article class="panel">
+          <h3>Finds offers that <em>fit you</em></h3>
+          <p>With the reasons why. Postings that are closed or no longer online are removed, checked every day.</p>
+          <div class="mini">
+            <div class="card"><div class="row"><div><div class="t">Project manager internship</div><div class="m">Industrial group · Nantes</div></div><span class="chip ok">Online ✓</span></div></div>
+            <div class="card strike"><div class="row"><div><div class="t">Digital marketing internship</div><div class="m">Agency · Bordeaux</div></div><span class="chip no">Closed</span></div></div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Each application in <em>its form's format</em></h3>
+          <p>The questions the form asks, the files it needs, its character limits. You check, then paste.</p>
+          <div class="mini">
+            <div class="card">
+              <div class="q">Why this role? (500 characters max)</div>
+              <div class="a">Your team designs the systems I studied during my final-year project…</div>
+              <div class="n">487 / 500 ✓</div>
+              <div class="files"><span>✓ CV</span><span>✓ Letter</span><span>✓ Transcripts</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Letters that <em>get read</em></h3>
+          <p>Written and rewritten on request, researched for each organization, on one page and in your own style.</p>
+          <div class="mini">
+            <div class="card letter"><span class="chip ok">1 page</span><div class="t">Dear Ms Martin,</div><div class="m">Head of recruitment</div>
+              <i style="width:96%"></i><i style="width:88%"></i><i style="width:92%"></i><i style="width:64%"></i></div>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>New offers <em>in your inbox</em></h3>
+          <p>An email when BAPTOU finds new offers, and a separate one when an offer is almost ideal.</p>
+          <div class="mini">
+            <div class="card mail"><span class="dot"></span><div><div class="t">3 new offers for “Engineering internship”</div><div class="m">One of them is almost ideal: 96%</div></div></div>
+          </div>
+        </article>
+        <article class="panel wide">
+          <h3>Works with <em>your Gmail</em>, if you want</h3>
+          <p>It recognises people you already know at each organization, drafts emails that follow on from your past conversations, and spots replies to your applications every morning. Some mailbox features are open to a limited number of users for now.</p>
+          <div class="mini">
+            <div class="card"><div class="row"><div><div class="t">Reply from the recruiter</div><div class="m">“We received your application…”</div></div><span class="chip ok">Application received</span></div></div>
+          </div>
+        </article>
       </div>
-      <div class="plan best">
-        <span class="badge">Best price</span>
-        <h3>Yearly</h3>
-        <p class="price">€16.49 <span>/ month</span></p>
-        <p>Paid monthly, 12-month commitment.</p>
-      </div>
-      <div class="plan">
-        <h3>One-month pass</h3>
-        <p class="price">€18.99 <span>once</span></p>
-        <p>One month, no renewal.</p>
-      </div>
-    </div>
-    <p class="small">Prices in euros, all taxes included. Payments by card through Stripe.</p>
-    <p><a class="button" href="https://app.baptou.com">Get started</a></p>
+    </section>
 
-    <h2>Free guides</h2>
-    <ul class="guide-list">
-      <li><a href="/guides/masters-2027-application-dates">Master's 2027: application dates and recommendation letters</a><span>ETH Zurich, EPFL, TU Delft, KTH, TUM, Imperial, Cranfield, Politecnico di Milano.</span></li>
-      <li><a href="/guides/engineering-internship-cover-letter">Cover letter for an engineering internship</a><span>A four-part method that fits on one page, in English or French.</span></li>
-      <li><a href="/guides/internships-abroad-2027">Internships abroad in 2027</a><span>When companies post, how long internships last, which language they ask for.</span></li>
-    </ul>
-    <p class="small"><a href="/guides">All guides, in English and French</a></p>
+    <section class="section statement">
+      <p class="kicker reveal">You stay in control</p>
+      <h2 class="big reveal">Nothing is sent <em>without your approval</em>.</h2>
+      <p class="lead reveal">
+        BAPTOU only suggests. It never submits an application, and an email is sent from your Gmail only after you
+        click “Approve &amp; send”. You can disconnect Gmail, export your data or delete your account at any time.
+      </p>
+    </section>
+
+    <section id="pricing" class="section">
+      <p class="kicker reveal">Pricing</p>
+      <h2 class="reveal">All of BAPTOU from <em>€11.49</em> a month.</h2>
+      <p class="lead reveal">Your first search is free: add your CV and see the offers BAPTOU finds for you, without a card. Every plan then includes all of BAPTOU and the same monthly allowance for its AI work.</p>
+      <div class="plans" data-stagger>
+        <div class="plan monthly">
+          <h3>Monthly</h3>
+          <p class="price"><s class="was">€18.99</s>€12.49 <span>/ month</span></p>
+          <p>Cancel anytime.</p>
+        </div>
+        <div class="plan annual best">
+          <span class="badge">Best price</span>
+          <h3>Yearly</h3>
+          <p class="price"><s class="was">€16.49</s>€11.49 <span>/ month</span></p>
+          <p>Paid monthly, 12-month commitment.</p>
+        </div>
+        <div class="plan pass">
+          <h3>One-month pass</h3>
+          <p class="price"><s class="was">€18.99</s>€12.49 <span>once</span></p>
+          <p>One month, no renewal.</p>
+        </div>
+      </div>
+      <p class="small reveal">New prices since 17 October 2026 (crossed out: the price until then). Prices in euros, all taxes included. Payments by card through Stripe.</p>
+    </section>
+
+    <section class="section">
+      <p class="kicker reveal">Free guides</p>
+      <h2 class="reveal">Apply <em>smarter</em>.</h2>
+      <ul class="guide-list" data-stagger>
+        <li><a href="/guides/masters-2027-application-dates">Master's 2027: application dates and recommendation letters</a><span>ETH Zurich, EPFL, TU Delft, KTH, TUM, Imperial, Cranfield, Politecnico di Milano.</span></li>
+        <li><a href="/guides/engineering-internship-cover-letter">Cover letter for an engineering internship</a><span>A four-part method that fits on one page, in English or French.</span></li>
+        <li><a href="/guides/internships-abroad-2027">Internships abroad in 2027</a><span>When companies post, how long internships last, which language they ask for.</span></li>
+      </ul>
+      <p class="small reveal"><a href="/guides">All guides, in English and French</a></p>
+    </section>
+
+    <section class="section final reveal">
+      <h2 class="big">Your first search is <em>free</em>.</h2>
+      <p class="lead">Add your CV, say what you're looking for, and see what BAPTOU finds.</p>
+      <p class="actions"><a class="button" href="https://app.baptou.com">Get started <span aria-hidden="true">→</span></a></p>
+    </section>
 
     <footer>
       <a href="/guides">Guides</a> · <a href="privacy.html">Privacy policy</a> · <a href="legal.html">Legal notice</a> · Contact: <a href="mailto:baptouai@gmail.com">baptouai@gmail.com</a>

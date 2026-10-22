@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/lib/auth-context";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
@@ -25,9 +26,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const { plan } = usePlan();
-  // BAPTOU is for subscribers (paid or gifted): without either, only the Plans page and account settings.
+  // BAPTOU is for subscribers (paid or gifted). Without a plan: the free first search (profile + one search,
+  // whose offers stay readable afterwards), else only the Plans page and account settings.
   // The server and the database rules enforce the same; this only spares the student dead ends.
-  const locked = !!plan && !plan.entitlement && !plan.failed;
+  const trial = plan && !plan.entitlement && !plan.failed ? (plan.trial ?? null) : null;
+  const locked = !!plan && !plan.entitlement && !plan.failed && !trial;
+  const items = locked ? nav.filter((item) => item.href === "/plans") : trial ? nav.filter((item) => item.href !== "/contacts") : nav;
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/");
@@ -39,37 +44,59 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-border bg-card">
+      {/* The poster gradient, with white pills for the menu. */}
+      <header className="poster sticky top-0 z-20 shadow-[0_10px_30px_-20px_rgba(15,10,60,0.8)]">
         {/* On a phone the menu gets its own row under the logo, so every item stays visible. */}
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <ThemeSwitch />
-          <Link href="/dashboard" className="-ml-3 flex items-center gap-2 font-bold tracking-tight">
-            <Image src="/logo.svg" alt="" width={24} height={24} />
+          <Link href="/dashboard" className="-ml-3 flex items-center gap-2 font-black tracking-wide">
+            <Image src="/logo-white.svg" alt="" width={28} height={28} />
             BAPTOU
           </Link>
-          <nav className="order-last flex w-full justify-between gap-2.5 scroll-row text-sm sm:order-none sm:w-auto sm:flex-1 sm:justify-start sm:gap-4">
-            {(locked ? nav.filter((item) => item.href === "/plans") : nav).map((item) => (
+          <nav className="order-last flex w-full justify-between gap-1 scroll-row text-sm sm:order-none sm:w-auto sm:flex-1 sm:justify-start sm:gap-1.5">
+            {items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={
-                  pathname.startsWith(item.href) ? "font-medium text-accent" : "text-muted"
-                }
+                className={`rounded-full px-3 py-1 transition-colors ${
+                  pathname.startsWith(item.href) ? "bg-white font-bold text-[#312e81]" : "text-indigo-100 hover:bg-white/10 hover:text-white"
+                }`}
               >
                 {t(item.label)}
               </Link>
             ))}
           </nav>
           <LanguageSwitch className="ml-auto sm:ml-0" />
-          <button onClick={logOut} className="text-sm text-muted">
+          <button onClick={logOut} className="text-sm text-indigo-100 hover:text-white">
             {t("Sign out")}
           </button>
         </div>
       </header>
-      {!locked && <GmailReconnectBanner />}
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      {!locked && !trial && <GmailReconnectBanner />}
+      {trial && !pathname.startsWith("/plans") && <TrialBanner used={trial.used} />}
+      <main ref={mainRef} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         {locked && !pathname.startsWith("/plans") ? <ChoosePlan email={user.email ?? ""} /> : children}
       </main>
+      <ScrollReveal root={mainRef} />
+    </div>
+  );
+}
+
+/** Above every page while on the free first search, and after it. */
+function TrialBanner({ used }: { used: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="poster border-t border-white/10">
+      <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-indigo-100">
+          {used
+            ? t("Your free search is done. To prepare your applications (letters, forms) and get new offers every morning, choose a plan, from €11.49 a month.")
+            : t("Your first search is free: add your CV, build your profile and start a search. BAPTOU finds offers that fit you.")}
+        </p>
+        <Link href="/plans" className={`w-fit shrink-0 rounded-full px-4 py-1.5 ${used ? "poster-cta" : "border border-white/40 font-semibold text-white hover:bg-white/10"}`}>
+          {t("See plans")}
+        </Link>
+      </div>
     </div>
   );
 }

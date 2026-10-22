@@ -4,7 +4,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { type ClientTool, loadProfile, runAgent, today } from "./agent.js";
 import { GMAIL_SECRETS, type Gmail, gmailFor, readThread, requireGmailRead, searchMail, sendMail } from "./gmail.js";
-import { anthropicKey, db, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, MODELS, REGION, requireAccess, requireUser } from "./shared.js";
 import { HUMAN_STYLE } from "./style.js";
 
 export const ContactsSchema = z.object({
@@ -74,8 +74,7 @@ function mailboxTools(gmail: Gmail, since: number | null): ClientTool[] {
 export const findContacts = onCall(
   { region: REGION, secrets: [anthropicKey, ...GMAIL_SECRETS], timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     await requireGmailRead(uid);
     const { applicationId, full } = z
@@ -187,8 +186,7 @@ const RewriteSchema = z.object({ subject: z.string(), body: z.string() });
 export const draftContactEmail = onCall(
   { region: REGION, secrets: [anthropicKey, ...GMAIL_SECRETS], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     await requireGmailRead(uid);
     const { contactId: id, instructions } = z
@@ -242,8 +240,7 @@ const MAX_SENDS_PER_DAY = 20;
  * "Approve & send". Kind "application" sends an application's approved email draft.
  */
 export const sendApprovedEmail = onCall({ region: REGION, secrets: GMAIL_SECRETS }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await requireAccess(uid);
   const { kind, id } = z.object({ kind: z.enum(["contact", "application"]), id: z.string().min(1) }).parse(request.data);
 
@@ -313,8 +310,7 @@ export const IndexDraftSchema = z.object({
 export const draftFromIndex = onCall(
   { region: REGION, secrets: [anthropicKey, ...GMAIL_SECRETS], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     await requireGmailRead(uid);
     const { indexId, applicationId } = z

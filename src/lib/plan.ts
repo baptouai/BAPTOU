@@ -6,27 +6,32 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 
-// Prices (VAT included) for the three contracts: €10 of AI per month + margin + payment fees + 20% VAT.
-// Shown on the Plans page; the amounts actually charged are set on the Stripe prices.
+// Prices for the three contracts (no VAT: franchise en base): €10 of AI per month + payment fees + a margin of
+// about €2 (€1 on the yearly plan). Shown on the Plans page; the amounts charged come from AMOUNTS in
+// functions/src/billing.ts, which must match. `was` (crossed out) may only be shown for 30 days after a
+// price cut (French rule on price reductions): remove it after 16 November 2026.
 export const PLANS = [
   {
     id: "monthly",
+    was: "€18.99", // price until 17 October 2026, shown crossed out
     name: "Monthly",
-    price: "€18.99",
+    price: "€12.49",
     per: "per month",
     detail: "Renews every month. Cancel anytime.",
   },
   {
     id: "annual",
+    was: "€16.49", // price until 17 October 2026, shown crossed out
     name: "Yearly",
-    price: "€16.49",
+    price: "€11.49",
     per: "per month, for 12 months",
     detail: "The best price, paid monthly. 12-month commitment.",
   },
   {
     id: "pass",
+    was: "€18.99", // price until 17 October 2026, shown crossed out
     name: "One month",
-    price: "€18.99",
+    price: "€12.49",
     per: "once",
     detail: "One month of BAPTOU, no renewal.",
   },
@@ -41,8 +46,11 @@ export type Entitlement = {
   commitmentEnd?: number | null; // yearly plan
 };
 
+/** The free first search, for users without a plan: `available` until a search run completes, then `used`. */
+export type Trial = { available: boolean; used: boolean; searchId: string | null };
+
 // `failed`: the server couldn't be asked (offline…). That is not "no plan": the app isn't locked for it.
-type PlanInfo = { entitlement: Entitlement | null; gmailRead: boolean; budgetUsd: number; failed?: boolean };
+type PlanInfo = { entitlement: Entitlement | null; trial?: Trial | null; gmailRead: boolean; budgetUsd: number; failed?: boolean };
 
 const myPlan = httpsCallable<void, PlanInfo>(functions, "myPlan");
 

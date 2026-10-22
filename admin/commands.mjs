@@ -1,11 +1,9 @@
-// BAPTOU Admin: a small local tool to manage testers and limits.
-// Runs on 127.0.0.1 only, uses the Firebase CLI login (`npx firebase login`) to call Firestore,
-// and stops by itself when its window is closed.
-import { createServer } from "node:http";
+// BAPTOU Admin's commands: everything the window can ask for, read and written in Firestore with the
+// Firebase CLI login (`npx firebase login`). Loaded by main.mjs, and reloaded when this file changes, so
+// a new version takes effect without restarting the app.
 import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
-import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,13 +12,15 @@ const require = createRequire(import.meta.url);
 const auth = require(join(here, "..", "node_modules", "firebase-tools", "lib", "auth.js"));
 
 const PROJECT = "baptou-5041c";
-const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/baptou/documents`;
+const DB = `projects/${PROJECT}/databases/baptou`;
+const BASE = `https://firestore.googleapis.com/v1/${DB}/documents`;
 const DEFAULT_LIMIT = 11; // €10 allowance; keep in sync with PLAN_BUDGET_USD in functions/src/shared.ts
+const TRIAL_DAILY_CAP = 30; // new free searches per day unless config/app.trialDailyCap; keep in sync with functions/src/shared.ts
 const GMAIL_READ_CAP = 100; // keep in sync with functions/src/access.ts
-const PORT = 4545;
 const SENDER = "baptouai@gmail.com"; // BAPTOU's own mailbox, which sends its emails to users
 const REGION = "europe-west1";
-const TOKEN = randomBytes(16).toString("hex"); // the page gets it; other websites can't
+// Current prices (src/lib/plan.ts), for the revenue estimate only.
+const PRICE_EUR = { monthly: 12.49, annual: 11.49, pass: 12.49 };
 const month = () => new Date().toISOString().slice(0, 7);
 
 // --- Firestore REST with the Firebase CLI's credentials
@@ -45,6 +45,16 @@ async function fs(path, init = {}) {
   return res.status === 204 ? {} : res.json();
 }
 
+async function query(structuredQuery) {
+  const res = await fetch(`${BASE}:runQuery`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery }),
+  });
+  if (!res.ok) throw new Error(`Firestore ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()).filter((r) => r.document).map((r) => r.document);
+}
+
 async function list(collection) {
   const docs = [];
   let pageToken = "";
@@ -59,16 +69,20 @@ async function list(collection) {
 const id = (doc) => doc.name.split("/").pop();
 const num = (v) => (v ? Number(v.doubleValue ?? v.integerValue ?? 0) : undefined);
 const str = (v) => v?.stringValue;
+const counts = (map) => Object.fromEntries(Object.entries(map?.mapValue?.fields ?? {}).map(([k, v]) => [k, num(v) ?? 0]));
 
-// --- Commands
+// --- Users, subscribers, allowances
 
 async function overview() {
-  const [users, priv, access, slots, mailer] = await Promise.all([
+  const [users, priv, access, slots, mailer, trialEmails, trialToday, appConfig] = await Promise.all([
     list("users"),
     list("private"),
     list("access"),
     fs("config/gmailRead"),
     fs("config/mailer"),
+    list("trialEmails"), // one per address that took the free search, kept after account deletion
+    fs(`trialDays/${new Date().toISOString().slice(0, 10)}`),
+    fs("config/app"),
   ]);
   const privById = Object.fromEntries(priv.map((d) => [id(d), d.fields ?? {}]));
   const gifts = Object.fromEntries(access.map((d) => [decodeURIComponent(id(d)), d.fields ?? {}]));
@@ -86,12 +100,13 @@ async function overview() {
     const planActive = plan && ["active", "past_due"].includes(str(plan.status)) && live(planEnd);
     const gift = gifts[email];
     const giftEnd = gift?.expiresAt?.timestampValue ?? null;
+    const trial = p.trial?.mapValue?.fields;
     // Same order as the server (functions/src/shared.ts entitlementFor): owner, paid plan, gift.
     const access =
       personal != null
         ? { kind: "owner", until: null }
         : planActive
-          ? { kind: str(plan.type), until: planEnd ?? null }
+          ? { kind: str(plan.type), until: planEnd ?? null, cancelling: plan.cancelAtPeriodEnd?.booleanValue === true }
           : gift && live(giftEnd)
             ? { kind: "gift", until: giftEnd }
             : gift
@@ -102,7 +117,14 @@ async function overview() {
       uid: id(u),
       email,
       name: str(f.displayName) ?? "",
+      createdAt: u.createTime ?? null,
+      lastSeenAt: f.lastSeenAt?.timestampValue ?? null,
       access,
+      // A free search refused because the address already had one (sameEmail) isn't a free search.
+      trial: trial && trial.sameEmail?.booleanValue !== true ? { started: true, used: !!trial.usedAt?.timestampValue } : null,
+      trialRefused: trial?.sameEmail?.booleanValue === true,
+      // Free searches from before 19 Oct 2026 have no per-address record (trialEmails).
+      trialLegacy: !!trial && trial.sameEmail?.booleanValue !== true && !trial.emailKey,
       hasGift: !!gift,
       isOwner: personal != null,
       limitUsd,
@@ -111,6 +133,29 @@ async function overview() {
       gmailRead: p.gmailRead?.booleanValue === true,
     };
   });
+
+  // Subscribers: paying plans by type, gifts, free searches, accounts.
+  const kinds = (k) => rows.filter((r) => r.access.kind === k).length;
+  const paying = { monthly: kinds("monthly"), annual: kinds("annual"), pass: kinds("pass") };
+  const day = 86_400_000;
+  const subscribers = {
+    paying: paying.monthly + paying.annual + paying.pass,
+    byPlan: paying,
+    cancelling: rows.filter((r) => r.access.cancelling).length,
+    gifted: kinds("gift"),
+    trialStarted: rows.filter((r) => r.trial).length,
+    trialUsed: rows.filter((r) => r.trial?.used).length,
+    // Everyone who ever took the free search, deleted accounts included.
+    trialAllTime: trialEmails.length + rows.filter((r) => r.trialLegacy).length,
+    trialThenPaid: rows.filter((r) => r.trial && ["monthly", "annual", "pass"].includes(r.access.kind)).length,
+    trialToday: num(trialToday?.fields?.started) ?? 0,
+    trialDailyCap: num(appConfig?.fields?.trialDailyCap) ?? TRIAL_DAILY_CAP,
+    accounts: rows.filter((r) => !r.isOwner).length,
+    newThisWeek: rows.filter((r) => !r.isOwner && r.createdAt && now - Date.parse(r.createdAt) < 7 * day).length,
+    activeThisWeek: rows.filter((r) => !r.isOwner && r.lastSeenAt && now - Date.parse(r.lastSeenAt) < 7 * day).length,
+    revenueEur: Math.round((paying.monthly * PRICE_EUR.monthly + paying.annual * PRICE_EUR.annual + paying.pass * PRICE_EUR.pass) * 100) / 100,
+  };
+
   const known = new Set(rows.map((r) => r.email));
   const pending = Object.entries(gifts)
     .filter(([email]) => !known.has(email))
@@ -131,10 +176,76 @@ async function overview() {
       connectedAt: mailer?.fields?.connectedAt?.timestampValue ?? null,
       error: str(mailer?.fields?.error) ?? null,
     },
+    subscribers,
     users: rows,
     pending,
   };
 }
+
+// --- Website visits (counted by the siteHit function, see functions/src/siteStats.ts)
+
+async function visits() {
+  const days = [];
+  for (let i = 29; i >= 0; i--) days.push(new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10));
+  const [stats, recent] = await Promise.all([
+    list("siteStats"),
+    query({ from: [{ collectionId: "siteVisits" }], orderBy: [{ field: { fieldPath: "at" }, direction: "DESCENDING" }], limit: 40 }),
+  ]);
+  const byDay = Object.fromEntries(stats.map((d) => [id(d), d.fields ?? {}]));
+  const series = days.map((date) => {
+    const f = byDay[date] ?? {};
+    // fresh: new people (a browser's first visit; counted since 19 Oct 2026). seconds / newSeconds: time the pages
+    // were on screen, for all visits and for visits that started as a new person, and timedVisits /
+    // timedNewVisitors: the visits whose pages report that time (measured since 20 Oct 2026).
+    return {
+      date,
+      views: num(f.views) ?? 0,
+      visits: num(f.visits) ?? 0,
+      fresh: num(f.newVisitors) ?? 0,
+      seconds: num(f.seconds) ?? 0,
+      newSeconds: num(f.newSeconds) ?? 0,
+      timedVisits: num(f.timedVisits) ?? 0,
+      timedFresh: num(f.timedNewVisitors) ?? 0,
+    };
+  });
+  const sum = (from, key) => series.slice(from).reduce((s, d) => s + d[key], 0);
+  // Average seconds on screen per new person (all their pages) and per visit; null: nothing measured yet.
+  const per = (secs, n) => (n ? Math.round(secs / n) : null);
+  const time = (from) => ({
+    perNew: per(sum(from, "newSeconds"), sum(from, "timedFresh")),
+    perVisit: per(sum(from, "seconds"), sum(from, "timedVisits")),
+  });
+  const top = (field) => {
+    const total = {};
+    for (const date of days) for (const [k, v] of Object.entries(counts(byDay[date]?.[field]))) total[k] = (total[k] ?? 0) + v;
+    return Object.entries(total)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, n]) => ({ name, n }));
+  };
+  const rows = recent.map((d) => ({
+    at: d.fields?.at?.timestampValue ?? null,
+    path: str(d.fields?.path) ?? "/",
+    from: str(d.fields?.from) ?? null,
+    device: str(d.fields?.device) ?? "",
+    fresh: d.fields?.new?.booleanValue === true,
+  }));
+  const fiveMin = Date.now() - 5 * 60_000;
+  return {
+    today: { views: series[29].views, visits: series[29].visits, fresh: series[29].fresh, ...time(29) },
+    week: { views: sum(23, "views"), visits: sum(23, "visits"), fresh: sum(23, "fresh"), ...time(23) },
+    month: { views: sum(0, "views"), visits: sum(0, "visits"), fresh: sum(0, "fresh"), ...time(0) },
+    now: rows.filter((r) => r.at && Date.parse(r.at) > fiveMin).length,
+    series: series.slice(16), // the last 14 days, for the chart
+    pages: top("pages"),
+    sources: top("sources"),
+    devices: top("devices"),
+    recent: rows.slice(0, 20),
+  };
+}
+
+// --- Gifts and limits
 
 const cleanEmail = (e) => {
   const email = String(e ?? "").trim().toLowerCase();
@@ -154,7 +265,7 @@ async function gift({ email, months, notify }) {
   const n = Number(months);
   if (![0, 1, 3, 6, 12].includes(n)) throw new Error("Choose a duration.");
   const fields = { gift: { booleanValue: true }, invitedAt: { timestampValue: new Date().toISOString() } };
-  // The sendGiftInvitation function emails them from the owner's Gmail, then clears this flag.
+  // The sendGiftInvitation function emails them from BAPTOU's mailbox, then clears this flag.
   if (notify) fields.notify = { booleanValue: true };
   if (n > 0) {
     const end = new Date();
@@ -231,23 +342,14 @@ async function connectSender() {
   return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
 }
 
-/**
- * Why users turned suggestions down (users/{uid}/dismissedOffers), newest first, to improve the searches.
- * Read-only.
- */
+/** Why users turned suggestions down (users/{uid}/dismissedOffers), newest first. Read-only. */
 async function feedback() {
-  const res = await fetch(`${BASE}:runQuery`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "dismissedOffers", allDescendants: true }] } }),
-  });
-  if (!res.ok) throw new Error(`Firestore ${res.status}`);
+  const docs = await query({ from: [{ collectionId: "dismissedOffers", allDescendants: true }] });
   const users = Object.fromEntries((await list("users")).map((u) => [id(u), str(u.fields?.email) ?? ""]));
-  const rows = (await res.json())
-    .filter((r) => r.document)
-    .map((r) => {
-      const f = r.document.fields ?? {};
-      const uid = r.document.name.split("/users/")[1].split("/")[0];
+  const rows = docs
+    .map((doc) => {
+      const f = doc.fields ?? {};
+      const uid = doc.name.split("/users/")[1].split("/")[0];
       return {
         email: users[uid] ?? uid,
         at: f.dismissedAt?.timestampValue ?? null,
@@ -266,64 +368,4 @@ async function feedback() {
   return { rows };
 }
 
-const commands = { overview, gift, removeInvite, setLimit, connectSender, feedback };
-
-// --- Server
-
-let lastPing = Date.now();
-const page = () => readFileSync(join(here, "index.html"), "utf8").replace("__TOKEN__", TOKEN);
-
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
-  if (req.method === "GET" && url.pathname === "/") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-    return res.end(page());
-  }
-  if (req.method === "GET" && url.pathname === "/logo.svg") {
-    res.writeHead(200, { "Content-Type": "image/svg+xml" });
-    return res.end(readFileSync(join(here, "..", "public", "logo.svg")));
-  }
-  if (req.method === "POST" && url.pathname.startsWith("/api/")) {
-    if (req.headers["x-admin-token"] !== TOKEN) {
-      res.writeHead(403);
-      return res.end();
-    }
-    lastPing = Date.now();
-    const name = url.pathname.slice(5);
-    let body = "";
-    for await (const chunk of req) body += chunk;
-    try {
-      if (name === "ping") return res.end("{}");
-      if (!commands[name]) throw new Error("Unknown command.");
-      const result = await commands[name](body ? JSON.parse(body) : {});
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify(result ?? { ok: true }));
-    } catch (e) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ error: e.message }));
-    }
-  }
-  res.writeHead(404);
-  res.end();
-});
-
-server.on("error", (e) => {
-  // Already running: just open another window on it.
-  if (e.code === "EADDRINUSE") openWindow().then(() => process.exit(0));
-  else throw e;
-});
-
-function openWindow() {
-  const url = `http://127.0.0.1:${PORT}/`;
-  // Edge app mode gives a standalone window without tabs or address bar.
-  spawn("cmd", ["/c", "start", "", "msedge", `--app=${url}`, "--window-size=980,720"], { detached: true, stdio: "ignore" }).unref();
-  return Promise.resolve();
-}
-
-server.listen(PORT, "127.0.0.1", () => {
-  if (!process.env.BAPTOU_ADMIN_NO_WINDOW) openWindow();
-  // The window pings every 5 seconds; stop when it has been closed for a while.
-  setInterval(() => {
-    if (Date.now() - lastPing > 30_000) process.exit(0);
-  }, 5_000);
-});
+export default { overview, visits, gift, removeInvite, setLimit, connectSender, feedback };

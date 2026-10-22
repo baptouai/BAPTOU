@@ -4,7 +4,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { endBillingForDeletedAccount, stripeKey } from "./billing.js";
 import { GMAIL_SECRETS, revokeGmail } from "./gmail.js";
-import { bucket, db, REGION } from "./shared.js";
+import { bucket, db, rateLimit, REGION, requireUser } from "./shared.js";
 
 // The user's rights over their data (GDPR): a copy of everything BAPTOU stores about them, and deletion.
 
@@ -29,8 +29,8 @@ async function dump(ref: DocumentReference, snap?: DocumentSnapshot): Promise<Re
 }
 
 export const exportMyData = onCall({ region: REGION, timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
+  await rateLimit(uid, "export", 5, 3600);
   const [user, priv, files] = await Promise.all([
     dump(db.doc(`users/${uid}`)),
     db.doc(`private/${uid}`).get(),
@@ -51,8 +51,7 @@ export const exportMyData = onCall({ region: REGION, timeoutSeconds: 300, memory
 export const deleteMyAccount = onCall(
   { region: REGION, timeoutSeconds: 300, secrets: [stripeKey, ...GMAIL_SECRETS] },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request, { unverified: true }); // e.g. an account made with a mistyped address
     if (request.data?.confirm !== "DELETE") throw new HttpsError("invalid-argument", "Type DELETE to confirm.");
     if ((await db.doc("config/app").get()).get("ownerUid") === uid) {
       throw new HttpsError("failed-precondition", "The owner account sends BAPTOU's emails and can't be deleted from the app.");

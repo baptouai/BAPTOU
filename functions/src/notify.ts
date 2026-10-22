@@ -148,7 +148,9 @@ export async function userLang(uid: string): Promise<Lang> {
 export async function emailUser(uid: string, mail: Mail | ((lang: Lang) => Mail)) {
   let subject = "";
   try {
-    const to = (await getAuth().getUser(uid)).email;
+    // Only to a confirmed address: BAPTOU's mailbox must never write to an address someone merely typed.
+    const user = await getAuth().getUser(uid);
+    const to = user.emailVerified ? user.email : undefined;
     if (!to) return false;
     const content = typeof mail === "function" ? mail(await userLang(uid)) : mail;
     subject = content.subject;
@@ -158,6 +160,68 @@ export async function emailUser(uid: string, mail: Mail | ((lang: Lang) => Mail)
     logger.error("Email to user failed", { uid, subject, error: String(e) });
     return false;
   }
+}
+
+// --- Alerts to BAPTOU's owner (in French): a free search launched, a plan bought. They go to config/app.alertEmail
+// when set, otherwise to the owner's sign-in address (config/app.ownerUid).
+
+const PLAN_FR: Record<string, string> = { monthly: "Mensuel", annual: "Annuel", pass: "Pass un mois" };
+const KIND_FR: Record<string, string> = { internship: "stage", job: "emploi", alternance: "alternance", masters: "master" };
+const nowParis = () => new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" });
+
+/** Emails the owner. Never throws: the user's action must not fail because of an alert. */
+async function alertOwner(mail: Mail) {
+  try {
+    const config = await db.doc("config/app").get();
+    const ownerUid = config.get("ownerUid") as string | undefined;
+    const to = (config.get("alertEmail") as string | undefined) ?? (ownerUid ? (await getAuth().getUser(ownerUid)).email : undefined);
+    if (!to) return logger.warn("No address for owner alerts", { subject: mail.subject });
+    await sendMail(await senderGmail(), { to, fromName: "BAPTOU Alertes", ...mail });
+  } catch (e) {
+    logger.error("Owner alert failed", { subject: mail.subject, error: String(e) });
+  }
+}
+
+/** Someone launched their free search (sent once per person, when its first run is queued). */
+export async function alertFreeSearch(email: string, search: { name?: string; kind?: string }) {
+  const total = await db.collection("trialEmails").count().get().then((r) => r.data().count).catch(() => null);
+  await alertOwner({
+    subject: `🔎 Recherche gratuite lancée sur BAPTOU (${email})`,
+    body: `Quelqu'un vient de lancer sa recherche gratuite sur BAPTOU.
+
+Compte : ${email}
+Recherche : « ${search.name || "sans nom"} » (${KIND_FR[search.kind ?? ""] ?? "stage"})
+Date : ${nowParis()}
+${total != null ? `\nRecherches gratuites depuis le 19 octobre 2026 : ${total}\n` : ""}
+Suivi dans BAPTOU Admin (tuile « Free searches »).
+
+BAPTOU`,
+  });
+}
+
+/** Someone bought a plan (a new subscription or a one-month pass, not a renewal). */
+export async function alertPurchase(email: string, plan: string, amountCents: number | null) {
+  const amount = amountCents != null ? `${(amountCents / 100).toFixed(2).replace(".", ",")} €` : "montant inconnu";
+  // Plans live now (a one-month pass stays "active" after it ends, so its end date is checked too).
+  const paying = await db
+    .collection("private")
+    .where("plan.status", "in", ["active", "past_due"])
+    .get()
+    .then((s) => s.docs.filter((d) => ((d.get("plan.currentPeriodEnd") as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? Infinity) > Date.now()).length)
+    .catch(() => null);
+  await alertOwner({
+    subject: `💶 Nouvel abonnement BAPTOU : ${PLAN_FR[plan] ?? plan} (${amount})`,
+    body: `Bonne nouvelle : quelqu'un vient de payer BAPTOU !
+
+Compte : ${email}
+Formule : ${PLAN_FR[plan] ?? plan}
+Montant : ${amount}
+Date : ${nowParis()}
+${paying != null ? `\nAbonnés payants en cours : ${paying}\n` : ""}
+Paiements sur Stripe : https://dashboard.stripe.com/payments
+
+BAPTOU`,
+  });
 }
 
 /**

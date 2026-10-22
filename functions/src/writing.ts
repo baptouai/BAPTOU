@@ -6,7 +6,7 @@ import { loadProfile, runAgent, today } from "./agent.js";
 import { toContentBlock } from "./profile.js";
 import { letterLimit } from "./form.js";
 import { fitToLimits } from "./limits.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess, requireUser } from "./shared.js";
 import { fallbackRecipient, HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 const Input = z.object({
@@ -87,8 +87,7 @@ ${String(app.postingText).slice(0, 8_000)}
 export const draftLetter = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 540, memory: "1GiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     const { applicationId, instructions } = Input.parse(request.data);
     const { appRef, app, profile, pastLetters } = await loadContext(uid, applicationId);
@@ -148,8 +147,7 @@ ${instructions ? `Student's instructions: ${instructions}` : current ? "Improve 
 export const draftEmail = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 300, memory: "1GiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     const { applicationId, instructions } = Input.parse(request.data);
     const { appRef, app, profile, pastLetters } = await loadContext(uid, applicationId);

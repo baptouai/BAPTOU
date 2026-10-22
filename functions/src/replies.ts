@@ -8,7 +8,7 @@ import { z } from "zod";
 import { runAgent, today } from "./agent.js";
 import { GMAIL_SECRETS, type Gmail, gmailFor, requireGmailRead } from "./gmail.js";
 import { domainTokens, offerTokens } from "./mailIndex.js";
-import { anthropicKey, db, entitlementFor, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, entitlementFor, MODELS, rateLimit, REGION, requireAccess, requireUser } from "./shared.js";
 
 // Replies to applications: once a day (and on demand), new mail is matched to the student's applications
 // with the Gmail API only (free). Claude is called only when something matches, once for all matches.
@@ -219,10 +219,10 @@ export const dailyReplies = onSchedule({ region: REGION, schedule: "every day 07
 export const scanRepliesNow = onCall(
   { region: REGION, secrets: [anthropicKey, ...GMAIL_SECRETS], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     await requireGmailRead(uid);
+    await rateLimit(uid, "scanReplies", 10, 3600);
     return { found: await scanReplies(uid) };
   },
 );

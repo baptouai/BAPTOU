@@ -4,7 +4,7 @@ import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
 import { fitToLimits } from "./limits.js";
 import { applyCheck, checkPosting } from "./postings.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess, requireUser } from "./shared.js";
 import { fallbackRecipient, HUMAN_STYLE, LETTER_METHOD } from "./style.js";
 
 type Form = z.infer<typeof FormSchema>;
@@ -263,8 +263,7 @@ export async function prepareAndSave(
 export const prepareApplication = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     const { applicationId, formText } = z
       .object({ applicationId: z.string().min(1), formText: z.string().max(40_000).optional() })
@@ -300,8 +299,7 @@ export const prepareApplication = onCall(
 export const fitApplicationLimits = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     const applicationId = z.string().min(1).parse(request.data?.applicationId);
     const appRef = db.doc(`users/${uid}/applications/${applicationId}`);

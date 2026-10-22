@@ -59,6 +59,19 @@ AI features only work for invited users. To invite someone, create a document in
 (database `baptou`) at `access/<their email in lowercase>`, optionally with a number field
 `monthlyLimitUsd` (default 5).
 
+## BAPTOU Admin (desktop app)
+
+`admin/` is a small Electron app for the owner: subscribers, website visits, gifts, allowances, the sender
+mailbox and suggestion feedback. It reads and writes Firestore with the Firebase CLI login
+(`npx firebase login`). First time: `npm install` then `npm run shortcuts` in `admin/` (Desktop and Start
+menu shortcuts). It refreshes itself every 30 seconds, and reloads by itself when its files change
+(`index.html`, `commands.mjs`; a new `main.mjs` or `preload.cjs` relaunches it).
+
+Website visits come from `siteHit` (`functions/src/siteStats.ts`), reached at `baptou.com/api/hit` through a
+Hosting rewrite and called by `site/theme.js` on every page: no cookies, no IP addresses; daily totals in
+`siteStats/{date}`, each page view in `siteVisits` (30-day TTL on `expireAt`). `baptou.com/?notrack` stops
+counting the current browser.
+
 ## Emails to users
 
 Invitations, new-offer emails and cancellation confirmations are sent from BAPTOU's own Gmail,

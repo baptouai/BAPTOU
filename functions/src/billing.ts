@@ -6,8 +6,8 @@ import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { GMAIL_SECRETS } from "./gmail.js";
-import { APP_URL, emailUser, longDate } from "./notify.js";
-import { db, entitlementFor, type Plan, REGION } from "./shared.js";
+import { alertPurchase, APP_URL, emailUser, longDate } from "./notify.js";
+import { db, entitlementFor, type Plan, rateLimit, REGION, requireUser } from "./shared.js";
 
 // Payments with Stripe (plain REST, no SDK). The three contracts are Stripe prices found by lookup key;
 // Stripe's webhook keeps private/{uid}.plan up to date, which is what grants access (see entitlementFor).
@@ -17,6 +17,30 @@ const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 const LOOKUP_KEYS = { monthly: "baptou_monthly", annual: "baptou_annual", pass: "baptou_pass" } as const;
 type PlanId = keyof typeof LOOKUP_KEYS;
+// What each contract costs, in euro cents (no VAT: franchise en base, art. 293 B du CGI). Each covers the €10
+// AI allowance + Stripe's fees (~1.5% + €0.25 per card payment, +0.7% on subscriptions) + a margin of about
+// €2 (monthly, pass) or €1 (yearly, committed). Keep in sync with src/lib/plan.ts and the public site.
+// When an amount here changes, the next checkout creates the new Stripe price and moves the lookup key to it;
+// subscriptions already running keep the price they were sold at.
+const AMOUNTS: Record<PlanId, number> = { monthly: 1249, annual: 1149, pass: 1249 };
+
+/** The live Stripe price for a contract, created from AMOUNTS when the amount has changed. */
+async function priceFor(plan: PlanId) {
+  const current = (await stripe("GET", `prices?active=true&lookup_keys[]=${LOOKUP_KEYS[plan]}`)).data?.[0];
+  if (!current) throw new HttpsError("unavailable", "This plan isn't available right now.");
+  if (current.unit_amount === AMOUNTS[plan] && current.currency === "eur") return current;
+  const created = await stripe("POST", "prices", {
+    product: current.product,
+    currency: "eur",
+    unit_amount: AMOUNTS[plan],
+    ...(current.recurring ? { recurring: { interval: current.recurring.interval, interval_count: current.recurring.interval_count } } : {}),
+    lookup_key: LOOKUP_KEYS[plan],
+    transfer_lookup_key: true,
+    nickname: current.nickname ?? undefined,
+  });
+  logger.info("New Stripe price", { plan, from: current.unit_amount, to: AMOUNTS[plan], price: created.id });
+  return created;
+}
 const COMMITMENT_MONTHS = 12; // the yearly plan is paid monthly but committed for 12 months
 const RETURN_ORIGINS = ["https://app.baptou.com", "https://baptou-app.web.app", "http://localhost:3000"];
 
@@ -69,8 +93,8 @@ async function customerFor(uid: string) {
 
 /** Starts Stripe Checkout for one of the three contracts; returns the page to send the user to. */
 export const createCheckout = onCall({ region: REGION, secrets: [stripeKey] }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
+  await rateLimit(uid, "checkout", 10, 3600);
   const { plan, returnTo } = z
     .object({ plan: z.enum(["monthly", "annual", "pass"]), returnTo: z.string().default("") })
     .parse(request.data);
@@ -80,8 +104,7 @@ export const createCheckout = onCall({ region: REGION, secrets: [stripeKey] }, a
     throw new HttpsError("failed-precondition", "You already have an active plan. You can manage it on this page.");
   }
 
-  const price = (await stripe("GET", `prices?active=true&lookup_keys[]=${LOOKUP_KEYS[plan as PlanId]}`)).data?.[0];
-  if (!price) throw new HttpsError("unavailable", "This plan isn't available right now.");
+  const price = await priceFor(plan as PlanId);
   const origin = RETURN_ORIGINS.includes(returnTo) ? returnTo : RETURN_ORIGINS[0];
   const metadata = { uid, plan };
 
@@ -104,8 +127,8 @@ export const createCheckout = onCall({ region: REGION, secrets: [stripeKey] }, a
  * (end date by email, yearly commitment respected), so the portal is opened without the cancel option.
  */
 export const billingPortal = onCall({ region: REGION, secrets: [stripeKey] }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
+  await rateLimit(uid, "portal", 20, 3600);
   const returnTo = z.string().default("").parse(request.data?.returnTo);
   const priv = await db.doc(`private/${uid}`).get();
   const customer = priv.get(customerField()) as string | undefined;
@@ -146,8 +169,7 @@ async function portalConfiguration(canCancel: boolean) {
  * `undo` keeps the subscription. The user gets the end date by email.
  */
 export const cancelSubscription = onCall({ region: REGION, secrets: [stripeKey, ...GMAIL_SECRETS] }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   const undo = request.data?.undo === true;
   const plan = (await db.doc(`private/${uid}`).get()).get("plan") as Plan | undefined;
   if (!plan?.subscriptionId || (plan.status !== "active" && plan.status !== "past_due")) {
@@ -260,7 +282,7 @@ async function syncSubscription(sub: any) {
   });
 }
 
-export const stripeWebhook = onRequest({ region: REGION, secrets: [stripeKey, stripeWebhookSecret] }, async (req, res) => {
+export const stripeWebhook = onRequest({ region: REGION, secrets: [stripeKey, stripeWebhookSecret, ...GMAIL_SECRETS] }, async (req, res) => {
   if (req.method !== "POST" || !verifySignature(req.rawBody, req.get("stripe-signature") ?? "", stripeWebhookSecret.value())) {
     res.status(400).send("Invalid signature");
     return;
@@ -282,6 +304,14 @@ export const stripeWebhook = onRequest({ region: REGION, secrets: [stripeKey, st
           await setPlan(uid, { type: "pass", status: "active", currentPeriodEnd: Timestamp.fromMillis(addMonths(Date.now(), 1)) });
         } else if (obj.mode === "subscription" && obj.subscription) {
           await syncSubscription(await stripe("GET", `subscriptions/${obj.subscription}`));
+        }
+        // The owner gets an email for each purchase (renewals don't go through Checkout, so they don't alert).
+        if ((obj.mode === "payment" && obj.payment_status === "paid") || obj.mode === "subscription") {
+          await alertPurchase(
+            String(obj.customer_details?.email ?? obj.customer_email ?? uid ?? "inconnu"),
+            String(obj.metadata?.plan ?? (obj.mode === "payment" ? "pass" : "monthly")),
+            typeof obj.amount_total === "number" ? obj.amount_total : null,
+          );
         }
         break;
       }

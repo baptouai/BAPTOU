@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { loadProfile, runAgent, today } from "./agent.js";
-import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess } from "./shared.js";
+import { anthropicKey, db, kindLabel, MODELS, REGION, requireAccess, requireUser } from "./shared.js";
 
 const Input = z.object({
   applicationId: z.string().min(1),
@@ -33,8 +33,7 @@ When done, call submit_answer exactly once.`;
 export const askAboutOffer = onCall(
   { region: REGION, secrets: [anthropicKey], timeoutSeconds: 300, memory: "512MiB" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const uid = requireUser(request);
     await requireAccess(uid);
     const { applicationId, question } = Input.parse(request.data);
 

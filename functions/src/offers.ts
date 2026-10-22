@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { db, REGION, requireAccess } from "./shared.js";
+import { db, REGION, requireAccess, requireUser } from "./shared.js";
 
 const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 20);
 
@@ -83,8 +83,7 @@ export async function loadDismissed(uid: string) {
 
 /** "Not for me": deletes the offer and everything attached to it, and records it so it never comes back. */
 export const dismissOffer = onCall({ region: REGION }, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = requireUser(request);
   await requireAccess(uid);
   const { applicationId, reason } = z
     .object({ applicationId: z.string().min(1), reason: z.string().max(1000).default("") })
